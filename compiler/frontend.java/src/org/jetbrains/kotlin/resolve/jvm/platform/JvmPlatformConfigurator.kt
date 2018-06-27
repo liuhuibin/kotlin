@@ -24,11 +24,13 @@ import org.jetbrains.kotlin.load.java.sam.SamConversionResolverImpl
 import org.jetbrains.kotlin.platform.JavaToKotlinClassMap
 import org.jetbrains.kotlin.resolve.PlatformConfigurator
 import org.jetbrains.kotlin.resolve.calls.checkers.ReifiedTypeParameterSubstitutionChecker
+import org.jetbrains.kotlin.resolve.checkers.BigFunctionTypeAvailabilityChecker
 import org.jetbrains.kotlin.resolve.checkers.ExpectedActualDeclarationChecker
 import org.jetbrains.kotlin.resolve.jvm.*
 import org.jetbrains.kotlin.resolve.jvm.checkers.*
 import org.jetbrains.kotlin.synthetic.JavaSyntheticScopes
 import org.jetbrains.kotlin.types.DynamicTypesSettings
+import org.jetbrains.kotlin.types.expressions.FunctionWithBigAritySupport
 
 object JvmPlatformConfigurator : PlatformConfigurator(
     DynamicTypesSettings(),
@@ -55,7 +57,8 @@ object JvmPlatformConfigurator : PlatformConfigurator(
         ProtectedSyntheticExtensionCallChecker,
         ReifiedTypeParameterSubstitutionChecker(),
         RuntimeAssertionsOnExtensionReceiverCallChecker,
-        ApiVersionIsAtLeastArgumentsChecker
+        ApiVersionIsAtLeastArgumentsChecker,
+        BigFunctionTypeAvailabilityChecker
     ),
 
     additionalTypeCheckers = listOf(
@@ -67,6 +70,7 @@ object JvmPlatformConfigurator : PlatformConfigurator(
     ),
 
     additionalClassifierUsageCheckers = listOf(
+        BigFunctionTypeAvailabilityChecker.ClassifierUsage
     ),
 
     additionalAnnotationCheckers = listOf(
@@ -100,5 +104,6 @@ object JvmPlatformConfigurator : PlatformConfigurator(
         container.useInstance(JvmTypeSpecificityComparator)
         container.useImpl<JvmDefaultSuperCallChecker>()
         container.useImpl<JvmSamConversionTransformer>()
+        container.useInstance(FunctionWithBigAritySupport.LANGUAGE_VERSION_DEPENDENT)
     }
 }
