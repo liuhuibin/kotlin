@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2017 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.decompiler.stubBuilder
@@ -24,6 +13,7 @@ import com.intellij.util.indexing.FileContentImpl
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.config.JVMConfigurationKeys
+import org.jetbrains.kotlin.idea.caches.IDEKotlinBinaryClassCache
 import org.jetbrains.kotlin.idea.decompiler.KotlinDecompiledFileViewProvider
 import org.jetbrains.kotlin.idea.decompiler.classFile.KotlinClsStubBuilder
 import org.jetbrains.kotlin.idea.decompiler.classFile.KtClsFile
@@ -52,6 +42,11 @@ abstract class AbstractLoadJavaClsStubTest : TestCaseWithTmpdir() {
             configuration.put(JVMConfigurationKeys.USE_TYPE_TABLE, true)
         }
         val environment = KotlinCoreEnvironment.createForTests(testRootDisposable, configuration, EnvironmentConfigFiles.JVM_CONFIG_FILES)
+        environment.projectEnvironment.environment.application.registerService(
+            IDEKotlinBinaryClassCache::class.java,
+            IDEKotlinBinaryClassCache()
+        )
+
         LoadDescriptorUtil.compileKotlinToDirAndGetModule(listOf(ktFile), tmpdir, environment)
 
         val classFiles = tmpdir.walk().filter { it.extension == "class" }.toList()
@@ -77,14 +72,19 @@ abstract class AbstractLoadJavaClsStubTest : TestCaseWithTmpdir() {
 
             if (stubTreeFromCls != null) {
                 val stubsFromDeserializedDescriptors = run {
-                    val decompiledProvider = KotlinDecompiledFileViewProvider(PsiManager.getInstance(environment.project), file, true) { provider ->
-                        KtClsFile(provider)
-                    }
+                    val decompiledProvider =
+                        KotlinDecompiledFileViewProvider(PsiManager.getInstance(environment.project), file, true) { provider ->
+                            KtClsFile(provider)
+                        }
 
                     KtFileStubBuilder().buildStubTree(KtClsFile(decompiledProvider))
                 }
 
-                Assert.assertEquals("File: ${file.name}", stubsFromDeserializedDescriptors.serializeToString(), stubTreeFromCls.serializeToString())
+                Assert.assertEquals(
+                    "File: ${file.name}",
+                    stubsFromDeserializedDescriptors.serializeToString(),
+                    stubTreeFromCls.serializeToString()
+                )
             }
         }
     }

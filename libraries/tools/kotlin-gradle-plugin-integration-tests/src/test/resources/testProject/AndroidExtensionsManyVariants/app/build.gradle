@@ -32,6 +32,11 @@ android {
             versionNameSuffix "-full"
         }
     }
+
+    lintOptions {
+        checkReleaseBuilds false
+        abortOnError false
+    }
 }
 
 androidExtensions {
@@ -42,5 +47,4 @@ androidExtensions {
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-    compile project(":library")
 }

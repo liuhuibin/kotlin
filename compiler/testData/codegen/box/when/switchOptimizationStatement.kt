@@ -1,4 +1,5 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
+// KJS_WITH_FULL_RUNTIME
 // WITH_RUNTIME
 // CHECK_CASES_COUNT: function=exhaustive count=3
 // CHECK_IF_COUNT: function=exhaustive count=0

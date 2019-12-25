@@ -1,9 +1,11 @@
+// IGNORE_BACKEND_FIR: JVM_IR
 fun box(): String {
     main(array())
     return "OK"
 }
 
 fun main(args: Array<String>) {
+    args.size
     D.foo(array())
 }
 

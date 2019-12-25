@@ -1,4 +1,4 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
 package test
 
 enum class My(val s: String) {

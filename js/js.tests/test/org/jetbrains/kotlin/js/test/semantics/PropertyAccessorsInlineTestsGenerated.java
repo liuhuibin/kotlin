@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.js.test.semantics;
@@ -26,7 +26,7 @@ public class PropertyAccessorsInlineTestsGenerated extends AbstractPropertyAcces
     }
 
     public void testAllFilesPresentInProperty() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/codegen/boxInline/property"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.JS, true);
+        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/codegen/boxInline/property"), Pattern.compile("^(.+)\\.kt$"), null, TargetBackend.JS, true);
     }
 
     @TestMetadata("augAssignmentAndInc.kt")
@@ -57,6 +57,16 @@ public class PropertyAccessorsInlineTestsGenerated extends AbstractPropertyAcces
     @TestMetadata("augAssignmentAndIncViaConvention.kt")
     public void testAugAssignmentAndIncViaConvention() throws Exception {
         runTest("compiler/testData/codegen/boxInline/property/augAssignmentAndIncViaConvention.kt");
+    }
+
+    @TestMetadata("fromObject.kt")
+    public void testFromObject() throws Exception {
+        runTest("compiler/testData/codegen/boxInline/property/fromObject.kt");
+    }
+
+    @TestMetadata("kt22649.kt")
+    public void testKt22649() throws Exception {
+        runTest("compiler/testData/codegen/boxInline/property/kt22649.kt");
     }
 
     @TestMetadata("property.kt")

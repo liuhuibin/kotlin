@@ -1,5 +1,4 @@
-// LANGUAGE_VERSION: 1.3
-
+// IGNORE_BACKEND_FIR: JVM_IR
 class Test {
     private companion object {
         val res = "OK"

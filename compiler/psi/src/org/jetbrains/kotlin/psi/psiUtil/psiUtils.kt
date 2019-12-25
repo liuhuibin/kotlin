@@ -20,17 +20,18 @@ import com.intellij.injected.editor.VirtualFileWindow
 import com.intellij.lang.ASTNode
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.*
+import com.intellij.psi.impl.source.tree.LazyParseablePsiElement
 import com.intellij.psi.impl.source.tree.TreeUtil
 import com.intellij.psi.search.PsiSearchScopeUtil
 import com.intellij.psi.search.SearchScope
 import com.intellij.psi.util.PsiTreeUtil
+import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.diagnostics.PsiDiagnosticUtils
 import org.jetbrains.kotlin.lexer.KtTokens
-import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.psi.KtFileAnnotationList
-import org.jetbrains.kotlin.psi.KtModifierList
-import org.jetbrains.kotlin.psi.KtModifierListOwner
+import org.jetbrains.kotlin.psi.*
 import java.util.*
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.contract
 
 // NOTE: in this file we collect only LANGUAGE INDEPENDENT methods working with PSI and not modifying it
 
@@ -94,6 +95,10 @@ fun PsiElement.nextLeaf(filter: (PsiElement) -> Boolean): PsiElement? {
     return leaf
 }
 
+fun <T : PsiElement> PsiElement.getParentOfTypes(strict: Boolean = false, vararg parentClasses: Class<out T>): T? {
+    return getParentOfTypesAndPredicate(strict, *parentClasses) { true }
+}
+
 fun <T : PsiElement> PsiElement.getParentOfTypesAndPredicate(
     strict: Boolean = false, vararg parentClasses: Class<out T>, predicate: (T) -> Boolean
 ): T? {
@@ -119,6 +124,18 @@ fun <T : PsiElement> PsiElement.getNonStrictParentOfType(parentClass: Class<T>):
 
 inline fun <reified T : PsiElement> PsiElement.getParentOfType(strict: Boolean): T? {
     return PsiTreeUtil.getParentOfType(this, T::class.java, strict)
+}
+
+inline fun <reified T : PsiElement, reified V : PsiElement> PsiElement.getParentOfTypes2(): PsiElement? {
+    return PsiTreeUtil.getParentOfType(this, T::class.java, V::class.java)
+}
+
+inline fun <reified T : PsiElement, reified V : PsiElement, reified U : PsiElement> PsiElement.getParentOfTypes3(): PsiElement? {
+    return PsiTreeUtil.getParentOfType(this, T::class.java, V::class.java, U::class.java)
+}
+
+inline fun <reified T : PsiElement> PsiElement.getParentOfType(strict: Boolean, vararg stopAt: Class<out PsiElement>): T? {
+    return PsiTreeUtil.getParentOfType(this, T::class.java, strict, *stopAt)
 }
 
 inline fun <reified T : PsiElement> PsiElement.getStrictParentOfType(): T? {
@@ -282,6 +299,20 @@ val PsiElement.startOffset: Int
 val PsiElement.endOffset: Int
     get() = textRange.endOffset
 
+val KtPureElement.pureStartOffset: Int
+    get() = psiOrParent.textRangeWithoutComments.startOffset
+
+val KtPureElement.pureEndOffset: Int
+    get() = psiOrParent.textRangeWithoutComments.endOffset
+
+val PsiElement.startOffsetSkippingComments: Int
+    get() {
+        if (!startsWithComment()) return startOffset // fastpath
+        val firstNonCommentChild = generateSequence(firstChild) { it.nextSibling }
+            .firstOrNull { it !is PsiWhiteSpace && it !is PsiComment }
+        return firstNonCommentChild?.startOffset ?: startOffset
+    }
+
 fun PsiElement.getStartOffsetIn(ancestor: PsiElement): Int {
     var offset = 0
     var parent = this
@@ -337,10 +368,10 @@ private fun findFirstLeafWhollyInRange(file: PsiFile, range: TextRange): PsiElem
 }
 
 val PsiElement.textRangeWithoutComments: TextRange
-    get() {
-        val firstNonCommentChild = children.firstOrNull { it !is PsiWhiteSpace && it !is PsiComment } ?: return textRange
-        return TextRange(firstNonCommentChild.startOffset, endOffset)
-    }
+    get() = if (!startsWithComment()) textRange else TextRange(startOffsetSkippingComments, endOffset)
+
+fun PsiElement.startsWithComment(): Boolean = firstChild is PsiComment
+
 
 // ---------------------------------- Debug/logging ----------------------------------------------------------------------------------------
 
@@ -353,7 +384,7 @@ fun PsiElement.getElementTextWithContext(): String {
 
     // Find parent for element among file children
     val topLevelElement = PsiTreeUtil.findFirstParent(this, { it.parent is PsiFile })
-            ?: throw AssertionError("For non-file element we should always be able to find parent in file children")
+        ?: throw AssertionError("For non-file element we should always be able to find parent in file children")
 
     val startContextOffset = topLevelElement.startOffset
     val elementContextOffset = textRange.startOffset
@@ -404,11 +435,15 @@ fun PsiElement.before(element: PsiElement) = textRange.endOffset <= element.text
 
 inline fun <reified T : PsiElement> PsiElement.getLastParentOfTypeInRow() = parents.takeWhile { it is T }.lastOrNull() as? T
 
+inline fun <reified T : PsiElement> PsiElement.getLastParentOfTypeInRowWithSelf() = parentsWithSelf
+    .takeWhile { it is T }.lastOrNull() as? T
+
 fun KtModifierListOwner.hasExpectModifier() = hasModifier(KtTokens.HEADER_KEYWORD) || hasModifier(KtTokens.EXPECT_KEYWORD)
 fun KtModifierList.hasExpectModifier() = hasModifier(KtTokens.HEADER_KEYWORD) || hasModifier(KtTokens.EXPECT_KEYWORD)
 
 fun KtModifierListOwner.hasActualModifier() = hasModifier(KtTokens.IMPL_KEYWORD) || hasModifier(KtTokens.ACTUAL_KEYWORD)
 fun KtModifierList.hasActualModifier() = hasModifier(KtTokens.IMPL_KEYWORD) || hasModifier(KtTokens.ACTUAL_KEYWORD)
+fun KtModifierList.hasSuspendModifier() = hasModifier(KtTokens.SUSPEND_KEYWORD)
 
 fun ASTNode.children() = generateSequence(firstChildNode) { node -> node.treeNext }
 fun ASTNode.parents() = generateSequence(treeParent) { node -> node.treeParent }
@@ -435,4 +470,22 @@ fun ASTNode.closestPsiElement(): PsiElement? {
         node = node.treeParent
     }
     return node.psi
+}
+
+fun LazyParseablePsiElement.getContainingKtFile(): KtFile {
+
+    val file = this.containingFile
+
+    if (file is KtFile) return file
+
+    val fileString = if (file != null && file.isValid) file.text else ""
+    throw IllegalStateException("KtElement not inside KtFile: $file with text \"$fileString\" for element $this of type ${this::class.java} node = ${this.node}")
+}
+
+@UseExperimental(ExperimentalContracts::class)
+fun KtExpression.isNull(): Boolean {
+    contract {
+        returns(true) implies (this@isNull is KtConstantExpression)
+    }
+    return this is KtConstantExpression && this.node.elementType == KtNodeTypes.NULL
 }

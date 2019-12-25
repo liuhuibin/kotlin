@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.ir.expressions.impl
@@ -9,12 +9,14 @@ import org.jetbrains.kotlin.ir.declarations.IrVariable
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrSuspendableExpression
 import org.jetbrains.kotlin.ir.expressions.IrSuspensionPoint
+import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformer
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitor
-import org.jetbrains.kotlin.types.KotlinType
 
 class IrSuspensionPointImpl(
-    startOffset: Int, endOffset: Int, type: KotlinType,
+    startOffset: Int,
+    endOffset: Int,
+    type: IrType,
     override var suspensionPointIdParameter: IrVariable,
     override var result: IrExpression,
     override var resumeResult: IrExpression
@@ -37,8 +39,11 @@ class IrSuspensionPointImpl(
 }
 
 class IrSuspendableExpressionImpl(
-    startOffset: Int, endOffset: Int, type: KotlinType,
-    override var suspensionPointId: IrExpression, override var result: IrExpression
+    startOffset: Int,
+    endOffset: Int,
+    type: IrType,
+    override var suspensionPointId: IrExpression,
+    override var result: IrExpression
 ) : IrExpressionBase(startOffset, endOffset, type), IrSuspendableExpression {
 
     override fun <R, D> accept(visitor: IrElementVisitor<R, D>, data: D): R =

@@ -16,11 +16,11 @@
 
 package org.jetbrains.kotlin.serialization.builtins
 
+import org.jetbrains.kotlin.builtins.jvm.JvmBuiltInsSettings
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.descriptors.impl.ModuleDescriptorImpl
 import org.jetbrains.kotlin.descriptors.resolveClassByFqName
 import org.jetbrains.kotlin.incremental.components.NoLookupLocation
-import org.jetbrains.kotlin.load.kotlin.JvmBuiltInsSettings
 import org.jetbrains.kotlin.load.kotlin.computeJvmDescriptor
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.descriptorUtil.isEffectivelyPublicApi
@@ -57,8 +57,11 @@ class AdditionalBuiltInsMembersSignatureListsTest : KotlinTestWithEnvironment() 
 
             val scope = classDescriptor.unsubstitutedMemberScope
 
-            jvmDescriptors.forEach {
-                jvmDescriptor ->
+            val lateJdkSignatures = LATE_JDK_SIGNATURES[internalName] ?: emptySet()
+
+            for (jvmDescriptor in jvmDescriptors) {
+                if (jvmDescriptor in lateJdkSignatures) continue
+
                 val stringName = jvmDescriptor.split("(")[0]
                 val functions =
                         if (stringName == "<init>")
@@ -72,4 +75,8 @@ class AdditionalBuiltInsMembersSignatureListsTest : KotlinTestWithEnvironment() 
             }
         }
     }
+
+    private val LATE_JDK_SIGNATURES = mapOf(
+        "java/lang/String" to setOf("isBlank()Z", "lines()Ljava/util/stream/Stream;", "repeat(I)Ljava/lang/String;")
+    )
 }

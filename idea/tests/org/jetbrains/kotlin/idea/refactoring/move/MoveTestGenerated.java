@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.refactoring.move;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.idea.refactoring.move;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -22,11 +21,11 @@ import java.util.regex.Pattern;
 @RunWith(JUnit3RunnerWithInners.class)
 public class MoveTestGenerated extends AbstractMoveTest {
     private void runTest(String testDataFilePath) throws Exception {
-        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
 
     public void testAllFilesPresentInMove() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentInSingleGeneratedClass(this.getClass(), new File("idea/testData/refactoring/move"), Pattern.compile("^(.+)\\.test$"), TargetBackend.ANY);
+        KotlinTestUtils.assertAllTestsPresentInSingleGeneratedClassWithExcluded(this.getClass(), new File("idea/testData/refactoring/move"), Pattern.compile("^(.+)\\.test$"), null);
     }
 
     @TestMetadata("java/moveClass/callableReferences/nestedToAnotherClass/nestedToAnotherClass.test")
@@ -287,6 +286,11 @@ public class MoveTestGenerated extends AbstractMoveTest {
     @TestMetadata("kotlin/moveFile/moveMultipleFIles/moveMultipleFiles.test")
     public void testKotlin_moveFile_moveMultipleFIles_MoveMultipleFiles() throws Exception {
         runTest("idea/testData/refactoring/move/kotlin/moveFile/moveMultipleFIles/moveMultipleFiles.test");
+    }
+
+    @TestMetadata("kotlin/moveFile/moveMultipleFIlesWithImplicitPrefix/moveMultipleFilesWithImplicitPrefix.test")
+    public void testKotlin_moveFile_moveMultipleFIlesWithImplicitPrefix_MoveMultipleFilesWithImplicitPrefix() throws Exception {
+        runTest("idea/testData/refactoring/move/kotlin/moveFile/moveMultipleFIlesWithImplicitPrefix/moveMultipleFilesWithImplicitPrefix.test");
     }
 
     @TestMetadata("kotlin/moveFile/packageWithQuotation/moveFileToPackageWithQuotation.test")
@@ -574,9 +578,9 @@ public class MoveTestGenerated extends AbstractMoveTest {
         runTest("idea/testData/refactoring/move/kotlin/moveTopLevelDeclarations/misc/moveFunctionWithImportsRetained/moveFunctionWithImportsRetained.test");
     }
 
-    @TestMetadata("kotlin/moveTopLevelDeclarations/misc/mutualDependency/mutualDependency.test")
+    @TestMetadata("kotlin/moveTopLevelDeclarations/misc/mutualDependency/MutualDependency.test")
     public void testKotlin_moveTopLevelDeclarations_misc_mutualDependency_MutualDependency() throws Exception {
-        runTest("idea/testData/refactoring/move/kotlin/moveTopLevelDeclarations/misc/mutualDependency/mutualDependency.test");
+        runTest("idea/testData/refactoring/move/kotlin/moveTopLevelDeclarations/misc/mutualDependency/MutualDependency.test");
     }
 
     @TestMetadata("kotlin/moveTopLevelDeclarations/misc/nonCodeUsagesWithQuotedName/nonCodeUsageWithQuotedName.test")
@@ -732,6 +736,16 @@ public class MoveTestGenerated extends AbstractMoveTest {
     @TestMetadata("kotlin/moveTopLevelDeclarations/movePropertyToPackage/movePropertyToPackage.test")
     public void testKotlin_moveTopLevelDeclarations_movePropertyToPackage_MovePropertyToPackage() throws Exception {
         runTest("idea/testData/refactoring/move/kotlin/moveTopLevelDeclarations/movePropertyToPackage/movePropertyToPackage.test");
+    }
+
+    @TestMetadata("kotlin/moveTopLevelDeclarations/moveSealedClassWithImplsToAnotherPackage/moveSealedClassWithNestedImplsToAnotherPackage.test")
+    public void testKotlin_moveTopLevelDeclarations_moveSealedClassWithImplsToAnotherPackage_MoveSealedClassWithNestedImplsToAnotherPackage() throws Exception {
+        runTest("idea/testData/refactoring/move/kotlin/moveTopLevelDeclarations/moveSealedClassWithImplsToAnotherPackage/moveSealedClassWithNestedImplsToAnotherPackage.test");
+    }
+
+    @TestMetadata("kotlin/moveTopLevelDeclarations/moveSealedClassWithNestedImplsToAnotherPackage/moveSealedClassWithNestedImplsToAnotherPackage.test")
+    public void testKotlin_moveTopLevelDeclarations_moveSealedClassWithNestedImplsToAnotherPackage_MoveSealedClassWithNestedImplsToAnotherPackage() throws Exception {
+        runTest("idea/testData/refactoring/move/kotlin/moveTopLevelDeclarations/moveSealedClassWithNestedImplsToAnotherPackage/moveSealedClassWithNestedImplsToAnotherPackage.test");
     }
 
     @TestMetadata("kotlin/moveTopLevelDeclarations/objectAlreadyInaccessible/objectAlreadyInaccessible.test")

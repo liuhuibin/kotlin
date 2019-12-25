@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.refactoring.inline;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.idea.refactoring.inline;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -22,11 +21,11 @@ import java.util.regex.Pattern;
 @RunWith(JUnit3RunnerWithInners.class)
 public class InlineTestGenerated extends AbstractInlineTest {
     private void runTest(String testDataFilePath) throws Exception {
-        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
 
     public void testAllFilesPresentInInline() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/refactoring/inline"), Pattern.compile("^(\\w+)\\.kt$"), TargetBackend.ANY, true);
+        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/refactoring/inline"), Pattern.compile("^(\\w+)\\.kt$"), null, true);
     }
 
     @TestMetadata("idea/testData/refactoring/inline/function")
@@ -34,11 +33,11 @@ public class InlineTestGenerated extends AbstractInlineTest {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Function extends AbstractInlineTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInFunction() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/refactoring/inline/function"), Pattern.compile("^(\\w+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/refactoring/inline/function"), Pattern.compile("^(\\w+)\\.kt$"), null, true);
         }
 
         @TestMetadata("EmptyFunction.kt")
@@ -86,6 +85,11 @@ public class InlineTestGenerated extends AbstractInlineTest {
             runTest("idea/testData/refactoring/inline/function/ReturnNotInTheEnd.kt");
         }
 
+        @TestMetadata("Sequence.kt")
+        public void testSequence() throws Exception {
+            runTest("idea/testData/refactoring/inline/function/Sequence.kt");
+        }
+
         @TestMetadata("UnitReturnType.kt")
         public void testUnitReturnType() throws Exception {
             runTest("idea/testData/refactoring/inline/function/UnitReturnType.kt");
@@ -101,11 +105,11 @@ public class InlineTestGenerated extends AbstractInlineTest {
         @RunWith(JUnit3RunnerWithInners.class)
         public static class ExpressionBody extends AbstractInlineTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInExpressionBody() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/refactoring/inline/function/expressionBody"), Pattern.compile("^(\\w+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/refactoring/inline/function/expressionBody"), Pattern.compile("^(\\w+)\\.kt$"), null, true);
             }
 
             @TestMetadata("ComplexArgumentNotUsed.kt")
@@ -229,11 +233,11 @@ public class InlineTestGenerated extends AbstractInlineTest {
         @RunWith(JUnit3RunnerWithInners.class)
         public static class FromIntellij extends AbstractInlineTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInFromIntellij() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/refactoring/inline/function/fromIntellij"), Pattern.compile("^(\\w+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/refactoring/inline/function/fromIntellij"), Pattern.compile("^(\\w+)\\.kt$"), null, true);
             }
 
             @TestMetadata("ArrayAccess.kt")
@@ -337,7 +341,7 @@ public class InlineTestGenerated extends AbstractInlineTest {
         @RunWith(JUnit3RunnerWithInners.class)
         public static class ReturnAtEnd extends AbstractInlineTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             @TestMetadata("AddBlockToControlStatement.kt")
@@ -346,7 +350,7 @@ public class InlineTestGenerated extends AbstractInlineTest {
             }
 
             public void testAllFilesPresentInReturnAtEnd() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/refactoring/inline/function/returnAtEnd"), Pattern.compile("^(\\w+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/refactoring/inline/function/returnAtEnd"), Pattern.compile("^(\\w+)\\.kt$"), null, true);
             }
 
             @TestMetadata("Bug1.kt")
@@ -446,11 +450,11 @@ public class InlineTestGenerated extends AbstractInlineTest {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class InlineTypeAlias extends AbstractInlineTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInInlineTypeAlias() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/refactoring/inline/inlineTypeAlias"), Pattern.compile("^(\\w+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/refactoring/inline/inlineTypeAlias"), Pattern.compile("^(\\w+)\\.kt$"), null, true);
         }
 
         @TestMetadata("extensionFunctionTypeToFunctionType.kt")
@@ -489,11 +493,11 @@ public class InlineTestGenerated extends AbstractInlineTest {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class InlineVariableOrProperty extends AbstractInlineTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInInlineVariableOrProperty() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/refactoring/inline/inlineVariableOrProperty"), Pattern.compile("^(\\w+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/refactoring/inline/inlineVariableOrProperty"), Pattern.compile("^(\\w+)\\.kt$"), null, true);
         }
 
         @TestMetadata("AppendToCollection.kt")
@@ -514,6 +518,11 @@ public class InlineTestGenerated extends AbstractInlineTest {
         @TestMetadata("ifInQualifiedExpression.kt")
         public void testIfInQualifiedExpression() throws Exception {
             runTest("idea/testData/refactoring/inline/inlineVariableOrProperty/ifInQualifiedExpression.kt");
+        }
+
+        @TestMetadata("InAnnotation.kt")
+        public void testInAnnotation() throws Exception {
+            runTest("idea/testData/refactoring/inline/inlineVariableOrProperty/InAnnotation.kt");
         }
 
         @TestMetadata("InFunctionLiteral.kt")
@@ -601,11 +610,11 @@ public class InlineTestGenerated extends AbstractInlineTest {
         @RunWith(JUnit3RunnerWithInners.class)
         public static class AddParenthesis extends AbstractInlineTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInAddParenthesis() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/refactoring/inline/inlineVariableOrProperty/addParenthesis"), Pattern.compile("^(\\w+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/refactoring/inline/inlineVariableOrProperty/addParenthesis"), Pattern.compile("^(\\w+)\\.kt$"), null, true);
             }
 
             @TestMetadata("ArrayAccess.kt")
@@ -774,11 +783,11 @@ public class InlineTestGenerated extends AbstractInlineTest {
         @RunWith(JUnit3RunnerWithInners.class)
         public static class ExplicateParameterTypes extends AbstractInlineTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInExplicateParameterTypes() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/refactoring/inline/inlineVariableOrProperty/explicateParameterTypes"), Pattern.compile("^(\\w+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/refactoring/inline/inlineVariableOrProperty/explicateParameterTypes"), Pattern.compile("^(\\w+)\\.kt$"), null, true);
             }
 
             @TestMetadata("EnoughDontExplicate.kt")
@@ -822,11 +831,11 @@ public class InlineTestGenerated extends AbstractInlineTest {
         @RunWith(JUnit3RunnerWithInners.class)
         public static class ExplicateTypeArgument extends AbstractInlineTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInExplicateTypeArgument() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/refactoring/inline/inlineVariableOrProperty/explicateTypeArgument"), Pattern.compile("^(\\w+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/refactoring/inline/inlineVariableOrProperty/explicateTypeArgument"), Pattern.compile("^(\\w+)\\.kt$"), null, true);
             }
 
             @TestMetadata("DeeperNestedCall.kt")
@@ -885,11 +894,11 @@ public class InlineTestGenerated extends AbstractInlineTest {
         @RunWith(JUnit3RunnerWithInners.class)
         public static class Property extends AbstractInlineTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInProperty() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/refactoring/inline/inlineVariableOrProperty/property"), Pattern.compile("^(\\w+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/refactoring/inline/inlineVariableOrProperty/property"), Pattern.compile("^(\\w+)\\.kt$"), null, true);
             }
 
             @TestMetadata("Basic.kt")
@@ -952,11 +961,11 @@ public class InlineTestGenerated extends AbstractInlineTest {
             @RunWith(JUnit3RunnerWithInners.class)
             public static class Accessors extends AbstractInlineTest {
                 private void runTest(String testDataFilePath) throws Exception {
-                    KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
 
                 public void testAllFilesPresentInAccessors() throws Exception {
-                    KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/refactoring/inline/inlineVariableOrProperty/property/accessors"), Pattern.compile("^(\\w+)\\.kt$"), TargetBackend.ANY, true);
+                    KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/refactoring/inline/inlineVariableOrProperty/property/accessors"), Pattern.compile("^(\\w+)\\.kt$"), null, true);
                 }
 
                 @TestMetadata("BlockBody.kt")
@@ -996,7 +1005,7 @@ public class InlineTestGenerated extends AbstractInlineTest {
         @RunWith(JUnit3RunnerWithInners.class)
         public static class StringTemplates extends AbstractInlineTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             @TestMetadata("addBraces.kt")
@@ -1005,7 +1014,7 @@ public class InlineTestGenerated extends AbstractInlineTest {
             }
 
             public void testAllFilesPresentInStringTemplates() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/refactoring/inline/inlineVariableOrProperty/stringTemplates"), Pattern.compile("^(\\w+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/refactoring/inline/inlineVariableOrProperty/stringTemplates"), Pattern.compile("^(\\w+)\\.kt$"), null, true);
             }
 
             @TestMetadata("blockEntry.kt")

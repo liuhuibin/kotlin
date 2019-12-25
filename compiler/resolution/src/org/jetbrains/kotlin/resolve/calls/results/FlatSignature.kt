@@ -16,32 +16,36 @@
 
 package org.jetbrains.kotlin.resolve.calls.results
 
+import org.jetbrains.kotlin.builtins.getValueParameterTypesFromCallableReflectionType
+import org.jetbrains.kotlin.container.DefaultImplementation
+import org.jetbrains.kotlin.container.PlatformSpecificExtension
 import org.jetbrains.kotlin.descriptors.CallableDescriptor
 import org.jetbrains.kotlin.descriptors.MemberDescriptor
-import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
 import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
 import org.jetbrains.kotlin.descriptors.synthetic.SyntheticMemberDescriptor
 import org.jetbrains.kotlin.resolve.calls.components.hasDefaultValue
-import org.jetbrains.kotlin.types.*
-import org.jetbrains.kotlin.types.checker.KotlinTypeChecker
-import org.jetbrains.kotlin.types.checker.captureFromExpression
+import org.jetbrains.kotlin.types.AbstractTypeChecker
+import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.types.UnwrappedType
+import org.jetbrains.kotlin.types.model.*
 
 interface SpecificityComparisonCallbacks {
-    fun isNonSubtypeNotLessSpecific(specific: KotlinType, general: KotlinType): Boolean
+    fun isNonSubtypeNotLessSpecific(specific: KotlinTypeMarker, general: KotlinTypeMarker): Boolean
 }
 
-interface TypeSpecificityComparator {
-    fun isDefinitelyLessSpecific(specific: KotlinType, general: KotlinType): Boolean
+@DefaultImplementation(impl = TypeSpecificityComparator.NONE::class)
+interface TypeSpecificityComparator : PlatformSpecificExtension<TypeSpecificityComparator> {
+    fun isDefinitelyLessSpecific(specific: KotlinTypeMarker, general: KotlinTypeMarker): Boolean
 
     object NONE : TypeSpecificityComparator {
-        override fun isDefinitelyLessSpecific(specific: KotlinType, general: KotlinType) = false
+        override fun isDefinitelyLessSpecific(specific: KotlinTypeMarker, general: KotlinTypeMarker) = false
     }
 }
 
-class FlatSignature<out T> private constructor(
+class FlatSignature<out T> constructor(
     val origin: T,
-    val typeParameters: Collection<TypeParameterDescriptor>,
-    val valueParameterTypes: List<KotlinType?>,
+    val typeParameters: Collection<TypeParameterMarker>,
+    val valueParameterTypes: List<KotlinTypeMarker?>,
     val hasExtensionReceiver: Boolean,
     val hasVarargs: Boolean,
     val numDefaults: Int,
@@ -57,11 +61,18 @@ class FlatSignature<out T> private constructor(
             numDefaults: Int,
             reflectionType: UnwrappedType
         ): FlatSignature<T> {
+            // Note that receiver is taking over descriptor, not reflection type
+            // This is correct as extension receiver can't have any defaults/varargs/coercions, so there is no need to use reflection type
+            // Plus, currently, receiver for reflection type is taking from *candidate*, see buildReflectionType, this candidate can
+            // have transient receiver which is not the same in its signature
+            val receiver = descriptor.extensionReceiverParameter?.type
+            val parameters = reflectionType.getValueParameterTypesFromCallableReflectionType(receiver == null).map { it.type }
+
             return FlatSignature(
                 origin,
                 descriptor.typeParameters,
-                reflectionType.arguments.map { it.type }, // should we drop return type?
-                hasExtensionReceiver = false,
+                listOfNotNull(receiver) + parameters,
+                hasExtensionReceiver = receiver != null,
                 hasVarargs = descriptor.valueParameters.any { it.varargElementType != null },
                 numDefaults = numDefaults,
                 isExpect = descriptor is MemberDescriptor && descriptor.isExpect,
@@ -113,12 +124,14 @@ class FlatSignature<out T> private constructor(
 
 
 interface SimpleConstraintSystem {
-    fun registerTypeVariables(typeParameters: Collection<TypeParameterDescriptor>): TypeSubstitutor
-    fun addSubtypeConstraint(subType: UnwrappedType, superType: UnwrappedType)
+    fun registerTypeVariables(typeParameters: Collection<TypeParameterMarker>): TypeSubstitutorMarker
+    fun addSubtypeConstraint(subType: KotlinTypeMarker, superType: KotlinTypeMarker)
     fun hasContradiction(): Boolean
 
     // todo hack for migration
     val captureFromArgument get() = false
+
+    val context: TypeSystemInferenceExtensionContext
 }
 
 fun <T> SimpleConstraintSystem.isSignatureNotLessSpecific(
@@ -140,14 +153,14 @@ fun <T> SimpleConstraintSystem.isSignatureNotLessSpecific(
             return false
         }
 
-        if (typeParameters.isEmpty() || !TypeUtils.dependsOnTypeParameters(generalType, typeParameters)) {
-            if (!KotlinTypeChecker.DEFAULT.isSubtypeOf(specificType, generalType)) {
+        if (typeParameters.isEmpty() || !generalType.dependsOnTypeParameters(context, typeParameters)) {
+            if (!AbstractTypeChecker.isSubtypeOf(context, specificType, generalType)) {
                 if (!callbacks.isNonSubtypeNotLessSpecific(specificType, generalType)) {
                     return false
                 }
             }
         } else {
-            val substitutedGeneralType = typeSubstitutor.safeSubstitute(generalType, Variance.INVARIANT)
+            val substitutedGeneralType = typeSubstitutor.safeSubstitute(context, generalType)
 
             /**
              * Example:
@@ -156,8 +169,9 @@ fun <T> SimpleConstraintSystem.isSignatureNotLessSpecific(
              * Here, when we try solve this CS(Y is variables) then Array<out X> <: Array<out Y> and this system impossible to solve,
              * so we capture types from receiver and value parameters.
              */
-            val specificCapturedType = specificType.unwrap().let { if (captureFromArgument) captureFromExpression(it) ?: it else it }
-            addSubtypeConstraint(specificCapturedType, substitutedGeneralType.unwrap())
+            val specificCapturedType =
+                context.prepareType(specificType).let { if (captureFromArgument) context.captureFromExpression(it) ?: it else it }
+            addSubtypeConstraint(specificCapturedType, substitutedGeneralType)
         }
     }
 

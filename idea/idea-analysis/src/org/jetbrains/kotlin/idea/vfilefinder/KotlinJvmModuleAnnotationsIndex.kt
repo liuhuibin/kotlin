@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.vfilefinder
@@ -45,11 +45,13 @@ object KotlinJvmModuleAnnotationsIndex : FileBasedIndexExtension<String, List<Cl
     override fun getIndexer(): DataIndexer<String, List<ClassId>, FileContent> = DataIndexer { inputData ->
         val file = inputData.file
         try {
-            val moduleMapping = ModuleMapping.loadModuleMapping(inputData.content, file.toString(), DeserializationConfiguration.Default)
-            return@DataIndexer mapOf(file.nameWithoutExtension to moduleMapping.moduleData.annotations.map(ClassId::fromString))
+            val moduleMapping = ModuleMapping.loadModuleMapping(inputData.content, file.toString(), DeserializationConfiguration.Default) {}
+            if (moduleMapping !== ModuleMapping.EMPTY) {
+                return@DataIndexer mapOf(file.nameWithoutExtension to moduleMapping.moduleData.annotations.map(ClassId::fromString))
+            }
         } catch (e: Exception) {
             // Exceptions are already reported in KotlinModuleMappingIndex
-            emptyMap()
         }
+        emptyMap()
     }
 }

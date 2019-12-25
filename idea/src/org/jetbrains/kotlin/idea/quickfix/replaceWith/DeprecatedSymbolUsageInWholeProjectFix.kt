@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2016 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.quickfix.replaceWith
@@ -19,7 +8,6 @@ package org.jetbrains.kotlin.idea.quickfix.replaceWith
 import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
-import com.intellij.psi.PsiFile
 import org.jetbrains.kotlin.diagnostics.Diagnostic
 import org.jetbrains.kotlin.idea.codeInliner.UsageReplacementStrategy
 import org.jetbrains.kotlin.idea.codeInliner.replaceUsagesInWholeProject
@@ -31,9 +19,9 @@ import org.jetbrains.kotlin.renderer.DescriptorRenderer
 import org.jetbrains.kotlin.renderer.ParameterNameRenderingPolicy
 
 class DeprecatedSymbolUsageInWholeProjectFix(
-        element: KtSimpleNameExpression,
-        replaceWith: ReplaceWith,
-        private val text: String
+    element: KtSimpleNameExpression,
+    replaceWith: ReplaceWith,
+    private val text: String
 ) : DeprecatedSymbolUsageFixBase(element, replaceWith) {
 
     override fun getFamilyName() = "Replace deprecated symbol usage in whole project"
@@ -52,15 +40,13 @@ class DeprecatedSymbolUsageInWholeProjectFix(
         replacementStrategy.replaceUsagesInWholeProject(psiElement, progressTitle = "Applying '$text'", commandName = text)
     }
 
-    private fun targetPsiElement(): KtDeclaration? {
-        val referenceTarget = element?.mainReference?.resolve()
-        return when (referenceTarget) {
-            is KtNamedFunction -> referenceTarget
-            is KtProperty -> referenceTarget
-            is KtTypeAlias -> referenceTarget
-            is KtConstructor<*> -> referenceTarget.getContainingClassOrObject() //TODO: constructor can be deprecated itself
-            else -> null
-        }
+    private fun targetPsiElement(): KtDeclaration? = when (val referenceTarget = element?.mainReference?.resolve()) {
+        is KtNamedFunction -> referenceTarget
+        is KtProperty -> referenceTarget
+        is KtTypeAlias -> referenceTarget
+        is KtConstructor<*> -> referenceTarget.getContainingClassOrObject() //TODO: constructor can be deprecated itself
+        is KtClass -> referenceTarget.takeIf { it.isAnnotation() }
+        else -> null
     }
 
     companion object : KotlinSingleIntentionActionFactory() {
@@ -77,9 +63,13 @@ class DeprecatedSymbolUsageInWholeProjectFix(
         }
 
         override fun createAction(diagnostic: Diagnostic): IntentionAction? {
-            val (nameExpression, replacement, descriptor) = DeprecatedSymbolUsageFixBase.extractDataFromDiagnostic(diagnostic) ?: return null
+            val (nameExpression, replacement, descriptor) = extractDataFromDiagnostic(diagnostic, true) ?: return null
             val descriptorName = RENDERER.render(descriptor)
-            return DeprecatedSymbolUsageInWholeProjectFix(nameExpression, replacement, "Replace usages of '$descriptorName' in whole project")
+            return DeprecatedSymbolUsageInWholeProjectFix(
+                nameExpression,
+                replacement,
+                "Replace usages of '$descriptorName' in whole project"
+            )
         }
     }
 }

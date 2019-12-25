@@ -23,9 +23,11 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiModifiableCodeBlock;
 import com.intellij.psi.tree.IElementType;
 import com.intellij.psi.util.PsiTreeUtil;
+import com.intellij.util.AstLoadingFilter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.lexer.KtTokens;
+import org.jetbrains.kotlin.psi.psiUtil.KtPsiUtilKt;
 import org.jetbrains.kotlin.psi.stubs.KotlinFunctionStub;
 import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes;
 import org.jetbrains.kotlin.psi.typeRefHelpers.TypeRefHelpersKt;
@@ -121,7 +123,30 @@ public class KtNamedFunction extends KtTypeParameterListOwnerStub<KotlinFunction
     @Override
     @Nullable
     public KtExpression getBodyExpression() {
-        return findChildByClass(KtExpression.class);
+        KotlinFunctionStub stub = getStub();
+        if (stub != null && !stub.hasBody()) {
+            return null;
+        }
+
+        return AstLoadingFilter.forceAllowTreeLoading(this.getContainingFile(), () ->
+                findChildByClass(KtExpression.class)
+        );
+    }
+
+    @Nullable
+    @Override
+    public KtBlockExpression getBodyBlockExpression() {
+        KotlinFunctionStub stub = getStub();
+        if (stub != null && !(stub.hasBlockBody() && stub.hasBody())) {
+            return null;
+        }
+
+        KtExpression bodyExpression = findChildByClass(KtExpression.class);
+        if (bodyExpression instanceof KtBlockExpression) {
+            return (KtBlockExpression) bodyExpression;
+        }
+
+        return null;
     }
 
     @Override
@@ -218,5 +243,14 @@ public class KtNamedFunction extends KtTypeParameterListOwnerStub<KotlinFunction
     public boolean shouldChangeModificationCount(PsiElement place) {
         // Suppress Java check for out-of-block
         return false;
+    }
+
+    public boolean mayHaveContract() {
+        KotlinFunctionStub stub = getStub();
+        if (stub != null) {
+            return stub.mayHaveContract();
+        }
+
+        return KtPsiUtilKt.isContractPresentPsiCheck(this);
     }
 }

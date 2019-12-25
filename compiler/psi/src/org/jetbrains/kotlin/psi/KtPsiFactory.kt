@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.psi
@@ -9,6 +9,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.psi.PsiComment
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiFileFactory
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.LocalTimeCounter
@@ -18,6 +19,8 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.ImportPath
+import org.jetbrains.kotlin.utils.KotlinExceptionWithAttachments
+import org.jetbrains.kotlin.utils.checkWithAttachment
 
 @JvmOverloads
 fun KtPsiFactory(project: Project?, markGenerated: Boolean = true): KtPsiFactory = KtPsiFactory(project!!, markGenerated)
@@ -255,7 +258,10 @@ class KtPsiFactory @JvmOverloads constructor(private val project: Project, val m
     }
 
     fun createPropertyGetter(expression: KtExpression): KtPropertyAccessor {
-        val property = createProperty("val x get() = 1")
+        val property = if (expression is KtBlockExpression)
+            createProperty("val x get() {\nreturn 1\n}")
+        else
+            createProperty("val x get() = 1")
         val getter = property.getter!!
         val bodyExpression = getter.bodyExpression!!
 
@@ -274,9 +280,17 @@ class KtPsiFactory @JvmOverloads constructor(private val project: Project, val m
         bodyExpression.replace(expression)
         return setter
     }
+    
+    fun createPropertyDelegate(expression: KtExpression): KtPropertyDelegate {
+        val property = createProperty("val x by lazy { 1 }")
+        val delegate = property.delegate!!
+        val delegateExpression = delegate.expression!!
+        delegateExpression.replace(expression)
+        return delegate
+    }
 
     fun createDestructuringDeclaration(text: String): KtDestructuringDeclaration {
-        return (createFunction("fun foo() {$text}").bodyExpression as KtBlockExpression).statements.first() as KtDestructuringDeclaration
+        return createFunction("fun foo() {$text}").bodyBlockExpression!!.statements.first() as KtDestructuringDeclaration
     }
 
     fun createDestructuringParameter(text: String): KtParameter {
@@ -287,7 +301,13 @@ class KtPsiFactory @JvmOverloads constructor(private val project: Project, val m
     fun <TDeclaration : KtDeclaration> createDeclaration(text: String): TDeclaration {
         val file = createFile(text)
         val declarations = file.declarations
-        assert(declarations.size == 1) { "${declarations.size} declarations in $text" }
+        checkWithAttachment(declarations.size == 1, { "unexpected ${declarations.size} declarations" }) {
+            it.withAttachment("text.kt", text)
+            for (d in declarations.withIndex()) {
+                it.withAttachment("declaration${d.index}.kt", d.value.text)
+            }
+        }
+        @Suppress("UNCHECKED_CAST")
         return declarations.first() as TDeclaration
     }
 
@@ -337,7 +357,7 @@ class KtPsiFactory @JvmOverloads constructor(private val project: Project, val m
     }
 
     fun createEmptyBody(): KtBlockExpression {
-        return createFunction("fun foo() {}").bodyExpression as KtBlockExpression
+        return createFunction("fun foo() {}").bodyBlockExpression!!
     }
 
     fun createAnonymousInitializer(): KtAnonymousInitializer {
@@ -350,6 +370,10 @@ class KtPsiFactory @JvmOverloads constructor(private val project: Project, val m
 
     fun createParameter(text: String): KtParameter {
         return createClass("class A($text)").primaryConstructorParameters.first()
+    }
+
+    fun createLoopParameter(text: String): KtParameter {
+        return (createExpression("for ($text in list) {}") as KtForExpression).loopParameter!!
     }
 
     fun createParameterList(text: String): KtParameterList {
@@ -404,6 +428,11 @@ class KtPsiFactory @JvmOverloads constructor(private val project: Project, val m
         return stringTemplateExpression.entries[0] as KtSimpleNameStringTemplateEntry
     }
 
+    fun createLiteralStringTemplateEntry(literal: String): KtLiteralStringTemplateEntry {
+        val stringTemplateExpression = createExpression("\"$literal\"") as KtStringTemplateExpression
+        return stringTemplateExpression.entries[0] as KtLiteralStringTemplateEntry
+    }
+
     fun createStringTemplate(content: String) = createExpression("\"$content\"") as KtStringTemplateExpression
 
     fun createPackageDirective(fqName: FqName): KtPackageDirective {
@@ -437,6 +466,7 @@ class KtPsiFactory @JvmOverloads constructor(private val project: Project, val m
         }
     }
 
+    @Deprecated("function is not used in the kotlin plugin/compiler and will be removed soon")
     fun createImportDirectives(paths: Collection<ImportPath>): List<KtImportDirective> {
         val fileContent = buildString {
             for (path in paths) {
@@ -448,6 +478,8 @@ class KtPsiFactory @JvmOverloads constructor(private val project: Project, val m
         val file = createFile(fileContent)
         return file.importDirectives
     }
+
+    fun createClassKeyword(): PsiElement = createClass("class A").getClassKeyword()!!
 
     fun createPrimaryConstructor(text: String = ""): KtPrimaryConstructor {
         return createClass(if (text.isNotEmpty()) "class A $text" else "class A()").primaryConstructor!!
@@ -481,13 +513,19 @@ class KtPsiFactory @JvmOverloads constructor(private val project: Project, val m
             createExpressionByPattern("if ($0) $1", condition, thenExpr)) as KtIfExpression
     }
 
-    fun createArgument(expression: KtExpression?, name: Name? = null, isSpread: Boolean = false): KtValueArgument {
-        val argumentList = buildByPattern({ pattern, args -> createByPattern(pattern, *args) { createCallArguments(it) } }) {
+    fun createArgument(
+        expression: KtExpression?,
+        name: Name? = null,
+        isSpread: Boolean = false,
+        reformat: Boolean = true
+    ): KtValueArgument {
+        val argumentList = buildByPattern(
+            { pattern, args -> createByPattern(pattern, *args, reformat = reformat) { createCallArguments(it) } }) {
             appendFixedText("(")
 
             if (name != null) {
                 appendName(name)
-                appendFixedText("=")
+                appendFixedText(" = ")
             }
 
             if (isSpread) {
@@ -809,13 +847,13 @@ class KtPsiFactory @JvmOverloads constructor(private val project: Project, val m
     }
 
     fun createBlock(bodyText: String): KtBlockExpression {
-        return createFunction("fun foo() {\n$bodyText\n}").bodyExpression as KtBlockExpression
+        return createFunction("fun foo() {\n$bodyText\n}").bodyBlockExpression!!
     }
 
     fun createSingleStatementBlock(statement: KtExpression, prevComment: String? = null, nextComment: String? = null): KtBlockExpression {
         val prev = if (prevComment == null) "" else " $prevComment "
         val next = if (nextComment == null) "" else " $nextComment "
-        return createDeclarationByPattern<KtNamedFunction>("fun foo() {\n$prev$0$next\n}", statement).bodyExpression as KtBlockExpression
+        return createDeclarationByPattern<KtNamedFunction>("fun foo() {\n$prev$0$next\n}", statement).bodyBlockExpression!!
     }
 
     fun createComment(text: String): PsiComment {
@@ -838,7 +876,8 @@ class KtPsiFactory @JvmOverloads constructor(private val project: Project, val m
     }
 
     private class BlockWrapper(fakeBlockExpression: KtBlockExpression, private val expression: KtExpression) :
-        KtBlockExpression(fakeBlockExpression.node), KtPsiUtil.KtExpressionWrapper {
+        KtBlockExpression(fakeBlockExpression.text), KtPsiUtil.KtExpressionWrapper {
+
         override fun getStatements(): List<KtExpression> {
             return listOf(expression)
         }
@@ -846,5 +885,13 @@ class KtPsiFactory @JvmOverloads constructor(private val project: Project, val m
         override fun getBaseExpression(): KtExpression {
             return expression
         }
+
+        override fun getParent(): PsiElement = expression.parent
+
+        override fun getPsiOrParent(): KtElement = expression.psiOrParent
+
+        override fun getContainingKtFile() = expression.containingKtFile
+
+        override fun getContainingFile(): PsiFile = expression.containingFile
     }
 }

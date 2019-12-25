@@ -23,6 +23,8 @@ import com.intellij.psi.*
 import com.intellij.psi.stubs.StubElement
 import com.intellij.psi.tree.TokenSet
 import org.jetbrains.kotlin.KtNodeTypes
+import org.jetbrains.kotlin.descriptors.Visibilities
+import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.lexer.KotlinLexer
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken
 import org.jetbrains.kotlin.lexer.KtTokens
@@ -33,6 +35,7 @@ import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.stubs.KotlinClassOrObjectStub
 import org.jetbrains.kotlin.types.expressions.OperatorConventions
+import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 import java.util.*
 
 // NOTE: in this file we collect only Kotlin-specific methods working with PSI and not modifying it
@@ -151,6 +154,9 @@ fun KtExpression.getQualifiedExpressionForReceiverOrThis(): KtExpression {
 fun KtExpression.isDotReceiver(): Boolean =
     (parent as? KtDotQualifiedExpression)?.receiverExpression == this
 
+fun KtExpression.isDotSelector(): Boolean =
+    (parent as? KtDotQualifiedExpression)?.selectorExpression == this
+
 fun KtExpression.getPossiblyQualifiedCallExpression(): KtCallExpression? =
     ((this as? KtQualifiedExpression)?.selectorExpression ?: this) as? KtCallExpression
 
@@ -162,15 +168,15 @@ fun KtElement.blockExpressionsOrSingle(): Sequence<KtElement> =
 fun KtExpression.lastBlockStatementOrThis(): KtExpression = (this as? KtBlockExpression)?.statements?.lastOrNull() ?: this
 
 fun KtBlockExpression.contentRange(): PsiChildRange {
-    val first = (lBrace?.nextSibling ?: firstChild)
-        ?.siblings(withItself = false)
-        ?.firstOrNull { it !is PsiWhiteSpace }
-    val rBrace = rBrace
+    val lBrace = this.lBrace ?: return PsiChildRange.EMPTY
+    val rBrace = this.rBrace ?: return PsiChildRange.EMPTY
+
+    val first = lBrace.siblings(withItself = false).firstOrNull { it !is PsiWhiteSpace }
     if (first == rBrace) return PsiChildRange.EMPTY
-    val last = rBrace!!
-        .siblings(forward = false, withItself = false)
-        .first { it !is PsiWhiteSpace }
+
+    val last = rBrace.siblings(forward = false, withItself = false).first { it !is PsiWhiteSpace }
     if (last == lBrace) return PsiChildRange.EMPTY
+
     return PsiChildRange(first, last)
 }
 
@@ -185,7 +191,7 @@ fun KtClass.isAbstract(): Boolean = isInterface() || hasModifier(KtTokens.ABSTRA
  * @return the list of possible superclass names
  */
 fun StubBasedPsiElementBase<out KotlinClassOrObjectStub<out KtClassOrObject>>.getSuperNames(): List<String> {
-    fun addSuperName(result: MutableList<String>, referencedName: String): Unit {
+    fun addSuperName(result: MutableList<String>, referencedName: String) {
         result.add(referencedName)
 
         val file = containingFile
@@ -210,8 +216,8 @@ fun StubBasedPsiElementBase<out KotlinClassOrObjectStub<out KtClassOrObject>>.ge
         return stub.getSuperNames()
     }
 
-    val specifiers = (this as KtClassOrObject).superTypeListEntries
-    if (specifiers.isEmpty()) return Collections.emptyList<String>()
+    val specifiers = this.superTypeListEntries
+    if (specifiers.isEmpty()) return Collections.emptyList()
 
     val result = ArrayList<String>()
     for (specifier in specifiers) {
@@ -235,13 +241,13 @@ fun KtExpression.getAnnotationEntries(): List<KtAnnotationEntry> {
     return when (parent) {
         is KtAnnotatedExpression -> parent.annotationEntries
         is KtLabeledExpression -> parent.getAnnotationEntries()
-        else -> emptyList<KtAnnotationEntry>()
+        else -> emptyList()
     }
 }
 
 fun KtAnnotationsContainer.collectAnnotationEntriesFromStubOrPsi(): List<KtAnnotationEntry> {
     return when (this) {
-        is StubBasedPsiElementBase<*> -> getStub()?.collectAnnotationEntriesFromStubElement() ?: collectAnnotationEntriesFromPsi()
+        is StubBasedPsiElementBase<*> -> stub?.collectAnnotationEntriesFromStubElement() ?: collectAnnotationEntriesFromPsi()
         else -> collectAnnotationEntriesFromPsi()
     }
 }
@@ -251,7 +257,7 @@ private fun StubElement<*>.collectAnnotationEntriesFromStubElement(): List<KtAnn
         when (child.stubType) {
             KtNodeTypes.ANNOTATION_ENTRY -> listOf(child.psi as KtAnnotationEntry)
             KtNodeTypes.ANNOTATION -> (child.psi as KtAnnotation).entries
-            else -> emptyList<KtAnnotationEntry>()
+            else -> emptyList()
         }
     }
 }
@@ -261,7 +267,7 @@ private fun KtAnnotationsContainer.collectAnnotationEntriesFromPsi(): List<KtAnn
         when (child) {
             is KtAnnotationEntry -> listOf(child)
             is KtAnnotation -> child.entries
-            else -> emptyList<KtAnnotationEntry>()
+            else -> emptyList()
         }
     }
 }
@@ -287,6 +293,39 @@ inline fun <reified T : KtElement, R> flatMapDescendantsOfTypeVisitor(
 ): KtVisitorVoid {
     return forEachDescendantOfTypeVisitor<T> { accumulator.addAll(map(it)) }
 }
+
+// ----------- Contracts -------------------------------------------------------------------------------------------------------------------
+
+fun KtNamedFunction.isContractPresentPsiCheck(): Boolean {
+    val contractAllowedHere =
+        isTopLevel &&
+                hasBlockBody() &&
+                !hasModifier(KtTokens.OPERATOR_KEYWORD)
+    if (!contractAllowedHere) return false
+
+    val firstExpression = (this as? KtFunction)?.bodyBlockExpression?.statements?.firstOrNull() ?: return false
+
+    return firstExpression.isContractDescriptionCallPsiCheck()
+}
+
+fun KtExpression.isContractDescriptionCallPsiCheck(): Boolean =
+    (this is KtCallExpression && calleeExpression?.text == "contract") || (this is KtQualifiedExpression && isContractDescriptionCallPsiCheck())
+
+fun KtQualifiedExpression.isContractDescriptionCallPsiCheck(): Boolean {
+    val expression = selectorExpression ?: return false
+    return receiverExpression.text == "kotlin.contracts" && expression.isContractDescriptionCallPsiCheck()
+}
+
+fun KtElement.isFirstStatement(): Boolean {
+    var parent = parent
+    var element = this
+    if (parent is KtDotQualifiedExpression) {
+        element = parent
+        parent = parent.parent
+    }
+    return parent is KtBlockExpression && parent.firstStatement == element
+}
+
 
 // ----------- Other -----------------------------------------------------------------------------------------------------------------------
 
@@ -389,6 +428,8 @@ val KtStringTemplateExpression.plainContent: String
 
 fun KtStringTemplateExpression.isSingleQuoted(): Boolean = node.firstChildNode.textLength == 1
 
+val KtNamedDeclaration.isPrivateNestedClassOrObject: Boolean get() = this is KtClassOrObject && isPrivate() && !isTopLevel()
+
 fun KtNamedDeclaration.getValueParameters(): List<KtParameter> {
     return getValueParameterList()?.parameters ?: Collections.emptyList()
 }
@@ -430,7 +471,12 @@ val KtModifierListOwner.isPublic: Boolean
 fun KtModifierListOwner.visibilityModifierType(): KtModifierKeywordToken? =
     visibilityModifier()?.node?.elementType as KtModifierKeywordToken?
 
+fun KtModifierListOwner.visibilityModifierTypeOrDefault(): KtModifierKeywordToken =
+    visibilityModifierType() ?: KtTokens.DEFAULT_VISIBILITY_KEYWORD
+
 fun KtDeclaration.modalityModifier() = modifierFromTokenSet(MODALITY_MODIFIERS)
+
+fun KtDeclaration.modalityModifierType(): KtModifierKeywordToken? = modalityModifier()?.node?.elementType as KtModifierKeywordToken?
 
 fun KtStringTemplateExpression.isPlain() = entries.all { it is KtLiteralStringTemplateEntry }
 fun KtStringTemplateExpression.isPlainWithEscapes() =
@@ -477,7 +523,7 @@ fun KtElement.containingClass(): KtClass? = getStrictParentOfType()
 
 fun KtClassOrObject.findPropertyByName(name: String): KtNamedDeclaration? {
     return declarations.firstOrNull { it is KtProperty && it.name == name } as KtNamedDeclaration?
-            ?: primaryConstructorParameters.firstOrNull { it.hasValOrVar() && it.name == name }
+        ?: primaryConstructorParameters.firstOrNull { it.hasValOrVar() && it.name == name }
 }
 
 fun KtClassOrObject.findFunctionByName(name: String): KtNamedDeclaration? {
@@ -591,4 +637,49 @@ fun isTopLevelInFileOrScript(element: PsiElement): Boolean {
         is KtBlockExpression -> parent.parent is KtScript
         else -> false
     }
+}
+
+fun KtModifierKeywordToken.toVisibility(): Visibility {
+    return when (this) {
+        KtTokens.PUBLIC_KEYWORD -> Visibilities.PUBLIC
+        KtTokens.PRIVATE_KEYWORD -> Visibilities.PRIVATE
+        KtTokens.PROTECTED_KEYWORD -> Visibilities.PROTECTED
+        KtTokens.INTERNAL_KEYWORD -> Visibilities.INTERNAL
+        else -> throw IllegalArgumentException("Unknown visibility modifier:$this")
+    }
+}
+
+fun KtFile.getFileOrScriptDeclarations() = if (isScript()) script!!.declarations else declarations
+
+fun KtExpression.getBinaryWithTypeParent(): KtBinaryExpressionWithTypeRHS? {
+    val callExpression = parent.safeAs<KtCallExpression>() ?: return null
+    val possibleQualifiedExpression = callExpression.parent
+
+    val targetExpression = if (possibleQualifiedExpression is KtQualifiedExpression) {
+        if (possibleQualifiedExpression.selectorExpression != callExpression) return null
+        possibleQualifiedExpression
+    } else {
+        callExpression
+    }
+
+    return targetExpression.topParenthesizedParentOrMe().parent as? KtBinaryExpressionWithTypeRHS
+}
+
+fun KtExpression.topParenthesizedParentOrMe(): KtExpression {
+    var result: KtExpression = this
+    while (KtPsiUtil.deparenthesizeOnce(result.parent.safeAs()) == result) {
+        result = result.parent.safeAs() ?: break
+    }
+    return result
+}
+
+fun getTrailingCommaByClosingElement(closingElement: PsiElement?): PsiElement? {
+    val elementBeforeClosingElement =
+        closingElement?.getPrevSiblingIgnoringWhitespaceAndComments() ?: return null
+
+    return elementBeforeClosingElement.run { if (node.elementType == KtTokens.COMMA) this else null }
+}
+
+fun getTrailingCommaByElementsList(elementList: PsiElement?): PsiElement? {
+    return elementList?.lastChild?.run { if (node.elementType == KtTokens.COMMA) this else null }
 }

@@ -1,5 +1,6 @@
 // !LANGUAGE: +MultiPlatformProjects
 // !USE_EXPERIMENTAL: kotlin.ExperimentalMultiplatform
+// IGNORE_BACKEND_FIR: JVM_IR
 // TARGET_BACKEND: JVM
 // WITH_RUNTIME
 // FILE: common.kt
@@ -8,6 +9,8 @@
 expect annotation class Anno(val s: String)
 
 // FILE: jvm.kt
+
+@file:Suppress("OPTIONAL_DECLARATION_USAGE_IN_NON_COMMON_SOURCE") // TODO: support common sources in the test infrastructure
 
 import java.lang.reflect.AnnotatedElement
 

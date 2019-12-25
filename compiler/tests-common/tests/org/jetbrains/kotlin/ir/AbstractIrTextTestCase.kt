@@ -18,50 +18,92 @@ package org.jetbrains.kotlin.ir
 
 import com.intellij.openapi.util.text.StringUtil
 import junit.framework.TestCase
+import org.jetbrains.kotlin.cli.js.loadPluginsForTests
+import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.config.languageVersionSettings
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
+import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
+import org.jetbrains.kotlin.descriptors.findClassAcrossModuleDependencies
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
 import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
-import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.scripting.compiler.plugin.loadScriptConfiguration
 import org.jetbrains.kotlin.test.KotlinTestUtils
+import org.jetbrains.kotlin.test.testFramework.KtUsefulTestCase
 import org.jetbrains.kotlin.utils.rethrow
 import java.io.File
 import java.util.regex.Pattern
 
 abstract class AbstractIrTextTestCase : AbstractIrGeneratorTestCase() {
     override fun doTest(wholeFile: File, testFiles: List<TestFile>) {
+        val irModule = buildFragmentAndTestIt(wholeFile, testFiles)
+        doTestIrModuleDependencies(wholeFile, irModule)
+    }
+
+    protected fun buildFragmentAndTestIt(wholeFile: File, testFiles: List<TestFile>): IrModuleFragment {
         val dir = wholeFile.parentFile
         val ignoreErrors = shouldIgnoreErrors(wholeFile)
         val irModule = generateIrModule(ignoreErrors)
 
-        val ktFiles = testFiles.filter { it.name.endsWith(".kt") }
+        val ktFiles = testFiles.filter { it.name.endsWith(".kt") || it.name.endsWith(".kts") }
         for ((testFile, irFile) in ktFiles.zip(irModule.files)) {
             doTestIrFileAgainstExpectations(dir, testFile, irFile)
         }
 
-        if (shouldDumpDependencies(wholeFile)) {
-            doTestIrModuleDependencies(wholeFile, irModule)
-        }
+        return irModule
     }
 
     private fun doTestIrModuleDependencies(wholeFile: File, irModule: IrModuleFragment) {
-        irModule.dependencyModules.forEach { irDependencyModule ->
-            val actual = irDependencyModule.dump()
-            val sanitizedModuleName = StringUtil.sanitizeJavaIdentifier(irDependencyModule.descriptor.name.asString())
-            val expectedFileName = wholeFile.absolutePath.replace(".kt", "__$sanitizedModuleName.txt")
-            KotlinTestUtils.assertEqualsToFile(File(expectedFileName), actual)
+        val wholeText = wholeFile.readText()
+
+        val stubGenerator = DeclarationStubGenerator(
+            irModule.descriptor,
+            SymbolTable(), // TODO
+            myEnvironment.configuration.languageVersionSettings
+        )
+
+        val path = wholeFile.path
+        val replacedPath = path.replace(".kt", "__")
+        val filesInDir = wholeFile.parentFile.listFiles() ?: return
+        val externalFilePaths = filesInDir.mapNotNullTo(mutableListOf()) {
+            if (it.path.startsWith(replacedPath)) it.path else null
+        }
+        for (externalClassFqn in parseDumpExternalClasses(wholeText)) {
+            val classDump = stubGenerator.generateExternalClass(irModule.descriptor, externalClassFqn).dump()
+            val expectedFilePath = path.replace(".kt", "__$externalClassFqn.txt")
+            val expectedFile = File(expectedFilePath)
+            externalFilePaths -= expectedFilePath
+            KotlinTestUtils.assertEqualsToFile(expectedFile, classDump)
+        }
+        KtUsefulTestCase.assertEmpty("The following external dump files were not built: $externalFilePaths", externalFilePaths)
+    }
+
+    private fun DeclarationStubGenerator.generateExternalClass(descriptor: ModuleDescriptor, externalClassFqn: String): IrClass {
+        val classDescriptor =
+            descriptor.findClassAcrossModuleDependencies(ClassId.topLevel(FqName(externalClassFqn)))
+                ?: throw AssertionError("Can't find a class in external dependencies: $externalClassFqn")
+
+        return generateMemberStub(classDescriptor) as IrClass
+    }
+
+    override fun configureTestSpecific(configuration: CompilerConfiguration, testFiles: List<TestFile>) {
+        if (testFiles.any { it.name.endsWith(".kts") }) {
+            loadScriptConfiguration(configuration)
+            loadPluginsForTests(configuration)
         }
     }
 
-    protected fun doTestIrFileAgainstExpectations(dir: File, testFile: TestFile, irFile: IrFile) {
+    private fun doTestIrFileAgainstExpectations(dir: File, testFile: TestFile, irFile: IrFile) {
         if (testFile.isExternalFile()) return
 
         val expectations = parseExpectations(dir, testFile)
-        val irFileDump = irFile.dump()
+        val irFileDump = irFile.dump(normalizeNames = true)
 
         val expected = StringBuilder()
         val actual = StringBuilder()
@@ -72,19 +114,15 @@ abstract class AbstractIrTextTestCase : AbstractIrGeneratorTestCase() {
         }
 
         for (irTreeFileLabel in expectations.irTreeFileLabels) {
-            val actualTrees = irFile.dumpTreesFromLineNumber(irTreeFileLabel.lineNumber)
+            val actualTrees = irFile.dumpTreesFromLineNumber(irTreeFileLabel.lineNumber, normalizeNames = true)
             KotlinTestUtils.assertEqualsToFile(irTreeFileLabel.expectedTextFile, actualTrees)
             verify(irFile)
 
             // Check that deep copy produces an equivalent result
             val irFileCopy = irFile.deepCopyWithSymbols()
-            val copiedTrees = irFileCopy.dumpTreesFromLineNumber(irTreeFileLabel.lineNumber)
+            val copiedTrees = irFileCopy.dumpTreesFromLineNumber(irTreeFileLabel.lineNumber, normalizeNames = true)
             TestCase.assertEquals("IR dump mismatch after deep copy with symbols", actualTrees, copiedTrees)
             verify(irFileCopy)
-
-            val irFileCopyOld = irFile.deepCopyOld()
-            val copiedTreesOld = irFileCopyOld.dumpTreesFromLineNumber(irTreeFileLabel.lineNumber)
-            TestCase.assertEquals("IR dump mismatch after old deep copy", actualTrees, copiedTreesOld)
         }
 
         try {
@@ -118,8 +156,18 @@ abstract class AbstractIrTextTestCase : AbstractIrGeneratorTestCase() {
             }
         }
 
+        private val elementsAreUniqueChecker = object : IrElementVisitorVoid {
+            private val elements = HashSet<IrElement>()
+
+            override fun visitElement(element: IrElement) {
+                require(elements.add(element)) { "Non-unique element: ${element.render()}" }
+                element.acceptChildrenVoid(this)
+            }
+        }
+
         fun verifyWithAssert(irFile: IrFile) {
             irFile.acceptChildrenVoid(this)
+            irFile.acceptChildrenVoid(elementsAreUniqueChecker)
             TestCase.assertFalse(errorsAsMessage + "\n\n\n" + irFile.dump(), hasErrors)
         }
 
@@ -146,6 +194,22 @@ abstract class AbstractIrTextTestCase : AbstractIrGeneratorTestCase() {
                                 "and containing declaration descriptor ($containingDeclarationDescriptor)"
                     }
                 }
+            }
+        }
+
+        override fun visitProperty(declaration: IrProperty) {
+            visitDeclaration(declaration)
+
+            require((declaration.origin == IrDeclarationOrigin.FAKE_OVERRIDE) == declaration.isFakeOverride) {
+                "${declaration.descriptor}: origin: ${declaration.origin}; isFakeOverride: ${declaration.isFakeOverride}"
+            }
+        }
+
+        override fun visitField(declaration: IrField) {
+            visitDeclaration(declaration)
+
+            require((declaration.origin == IrDeclarationOrigin.FAKE_OVERRIDE) == declaration.isFakeOverride) {
+                "${declaration.descriptor}: origin: ${declaration.origin}; isFakeOverride: ${declaration.isFakeOverride}"
             }
         }
 
@@ -185,6 +249,14 @@ abstract class AbstractIrTextTestCase : AbstractIrGeneratorTestCase() {
             }
         }
 
+        override fun visitSimpleFunction(declaration: IrSimpleFunction) {
+            visitFunction(declaration)
+
+            require((declaration.origin == IrDeclarationOrigin.FAKE_OVERRIDE) == declaration.isFakeOverride) {
+                "${declaration.descriptor}: origin: ${declaration.origin}; isFakeOverride: ${declaration.isFakeOverride}"
+            }
+        }
+
         override fun visitDeclarationReference(expression: IrDeclarationReference) {
             expression.symbol.checkBinding("ref", expression)
         }
@@ -208,6 +280,15 @@ abstract class AbstractIrTextTestCase : AbstractIrGeneratorTestCase() {
         private fun IrSymbol.checkBinding(kind: String, irElement: IrElement) {
             if (!isBound) {
                 error("${javaClass.simpleName} $descriptor is unbound @$kind ${irElement.render()}")
+            } else {
+                val irDeclaration = owner as? IrDeclaration
+                if (irDeclaration != null) {
+                    try {
+                        irDeclaration.parent
+                    } catch (e: Throwable) {
+                        error("Referenced declaration has no parent: ${irDeclaration.render()}")
+                    }
+                }
             }
 
             val otherSymbol = symbolForDeclaration.getOrPut(owner) { this }
@@ -253,44 +334,47 @@ abstract class AbstractIrTextTestCase : AbstractIrGeneratorTestCase() {
 
     internal class IrTreeFileLabel(val expectedTextFile: File, val lineNumber: Int)
 
+    protected open fun getExpectedTextFileName(testFile: TestFile, name: String = testFile.name): String {
+        return name.replace(".kts", ".txt").replace(".kt", ".txt")
+    }
+
+    private fun parseExpectations(dir: File, testFile: TestFile): Expectations {
+        val regexps =
+            testFile.content.matchLinesWith(EXPECTED_OCCURRENCES_PATTERN) {
+                RegexpInText(it.groupValues[1], it.groupValues[2].trim())
+            }
+
+        var treeFiles =
+            testFile.content.matchLinesWith(IR_FILE_TXT_PATTERN) {
+                val fileName = it.groupValues[1].trim()
+                val file = File(dir, getExpectedTextFileName(testFile, fileName))
+                IrTreeFileLabel(file, 0)
+            }
+
+        if (treeFiles.isEmpty()) {
+            val file = File(dir, getExpectedTextFileName(testFile))
+            treeFiles = listOf(IrTreeFileLabel(file, 0))
+        }
+
+        return Expectations(regexps, treeFiles)
+    }
+
     companion object {
         private val EXPECTED_OCCURRENCES_PATTERN = Regex("""^\s*//\s*(\d+)\s*(.*)$""")
         private val IR_FILE_TXT_PATTERN = Regex("""// IR_FILE: (.*)$""")
 
-        private val DUMP_DEPENDENCIES_PATTERN = Regex("""// !DUMP_DEPENDENCIES""")
+        private val DUMP_EXTERNAL_CLASS = Regex("""// DUMP_EXTERNAL_CLASS (.*)""")
 
         private val EXTERNAL_FILE_PATTERN = Regex("""// EXTERNAL_FILE""")
 
-        internal fun shouldDumpDependencies(wholeFile: File): Boolean =
-            DUMP_DEPENDENCIES_PATTERN.containsMatchIn(wholeFile.readText())
+        private inline fun <T> String.matchLinesWith(regex: Regex, ifMatched: (MatchResult) -> T): List<T> =
+            lines().mapNotNull { regex.matchEntire(it)?.let(ifMatched) }
+
+        internal fun parseDumpExternalClasses(text: String) =
+            text.matchLinesWith(DUMP_EXTERNAL_CLASS) { it.groupValues[1] }
 
         internal fun TestFile.isExternalFile() =
             EXTERNAL_FILE_PATTERN.containsMatchIn(content)
-
-        internal fun KtFile.isExternalFile() =
-            EXTERNAL_FILE_PATTERN.containsMatchIn(text)
-
-        internal fun parseExpectations(dir: File, testFile: TestFile): Expectations {
-            val regexps = ArrayList<RegexpInText>()
-            val treeFiles = ArrayList<IrTreeFileLabel>()
-
-            for (line in testFile.content.split("\n")) {
-                EXPECTED_OCCURRENCES_PATTERN.matchEntire(line)?.let { matchResult ->
-                    regexps.add(RegexpInText(matchResult.groupValues[1], matchResult.groupValues[2].trim()))
-                } ?: IR_FILE_TXT_PATTERN.find(line)?.let { matchResult ->
-                    val fileName = matchResult.groupValues[1].trim()
-                    val file = createExpectedTextFile(testFile, dir, fileName)
-                    treeFiles.add(IrTreeFileLabel(file, 0))
-                }
-            }
-
-            if (treeFiles.isEmpty()) {
-                val file = createExpectedTextFile(testFile, dir, testFile.name.replace(".kt", ".txt"))
-                treeFiles.add(IrTreeFileLabel(file, 0))
-            }
-
-            return Expectations(regexps, treeFiles)
-        }
     }
 
 }

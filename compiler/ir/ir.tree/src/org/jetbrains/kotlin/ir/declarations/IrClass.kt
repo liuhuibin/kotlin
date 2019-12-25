@@ -21,22 +21,26 @@ import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
-import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.ir.types.IrType
 
-interface IrClass : IrSymbolDeclaration<IrClassSymbol>, IrDeclarationContainer, IrTypeParametersContainer {
+interface IrClass :
+    IrSymbolDeclaration<IrClassSymbol>, IrDeclarationWithName, IrDeclarationWithVisibility,
+    IrDeclarationContainer, IrTypeParametersContainer, IrAttributeContainer {
+
     override val descriptor: ClassDescriptor
 
-    val name: Name
+    override var visibility: Visibility
+
     val kind: ClassKind
-    val visibility: Visibility
-    val modality: Modality
+    var modality: Modality
     val isCompanion: Boolean
     val isInner: Boolean
     val isData: Boolean
     val isExternal: Boolean
+    val isInline: Boolean
+    val isExpect: Boolean
 
-    // NB type parameters can't be top-level classifiers in supetypes of a class
-    val superClasses: MutableList<IrClassSymbol>
+    val superTypes: MutableList<IrType>
 
     var thisReceiver: IrValueParameter?
 }
@@ -61,4 +65,3 @@ fun IrClass.getInstanceInitializerMembers() =
             else -> false
         }
     }
-

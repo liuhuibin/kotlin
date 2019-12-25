@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.quickfix
@@ -92,7 +92,11 @@ private fun KtAnnotationEntry.getRequiredAnnotationTargets(annotationClass: KtCl
         }
     }.flatten().toSet()
     val annotationTargetValueNames = AnnotationTarget.values().map { it.name }
-    return (requiredTargets + otherReferenceRequiredTargets).distinct().filter { it.name in annotationTargetValueNames }
+    return (requiredTargets + otherReferenceRequiredTargets).asSequence()
+        .distinct()
+        .filter { it.name in annotationTargetValueNames }
+        .sorted()
+        .toList()
 }
 
 private fun getActualTargetList(annotated: PsiTarget): AnnotationChecker.Companion.TargetList {
@@ -104,7 +108,7 @@ private fun getActualTargetList(annotated: PsiTarget): AnnotationChecker.Compani
                 else -> T_MEMBER_FUNCTION
             }
         is PsiExpression -> T_EXPRESSION
-        is PsiField -> T_MEMBER_PROPERTY(true, false)
+        is PsiField -> T_MEMBER_PROPERTY(backingField = true, delegate = false)
         is PsiLocalVariable -> T_LOCAL_VARIABLE
         is PsiParameter -> T_VALUE_PARAMETER_WITHOUT_VAL
         else -> EMPTY
@@ -118,9 +122,9 @@ private fun PsiAnnotation.getActualTargetList(): List<KotlinTarget> {
 
 private fun KtAnnotationEntry.getActualTargetList(): List<KotlinTarget> {
     val annotatedElement = getStrictParentOfType<KtModifierList>()?.owner as? KtElement
-            ?: getStrictParentOfType<KtAnnotatedExpression>()?.baseExpression
-            ?: getStrictParentOfType<KtFile>()
-            ?: return emptyList()
+        ?: getStrictParentOfType<KtAnnotatedExpression>()?.baseExpression
+        ?: getStrictParentOfType<KtFile>()
+        ?: return emptyList()
 
     val targetList = AnnotationChecker.getActualTargetList(annotatedElement, null, BindingTraceContext().bindingContext)
 
@@ -146,8 +150,20 @@ private fun KtAnnotationEntry.getActualTargetList(): List<KotlinTarget> {
 }
 
 private fun KtClass.addAnnotationTargets(annotationTargets: List<KotlinTarget>, psiFactory: KtPsiFactory) {
-    val targetAnnotationName = KotlinBuiltIns.FQ_NAMES.target.shortName().asString()
+    val retentionAnnotationName = KotlinBuiltIns.FQ_NAMES.retention.shortName().asString()
+    if (annotationTargets.any { it == KotlinTarget.EXPRESSION }) {
+        val retentionEntry = annotationEntries.firstOrNull { it.typeReference?.text == retentionAnnotationName }
+        val newRetentionEntry = psiFactory.createAnnotationEntry(
+            "@$retentionAnnotationName(${KotlinBuiltIns.FQ_NAMES.annotationRetention.shortName()}.${AnnotationRetention.SOURCE.name})"
+        )
+        if (retentionEntry == null) {
+            addAnnotationEntry(newRetentionEntry)
+        } else {
+            retentionEntry.replace(newRetentionEntry)
+        }
+    }
 
+    val targetAnnotationName = KotlinBuiltIns.FQ_NAMES.target.shortName().asString()
     val targetAnnotationEntry = annotationEntries.find { it.typeReference?.text == targetAnnotationName } ?: run {
         val text = "@$targetAnnotationName${annotationTargets.toArgumentListString()}"
         addAnnotationEntry(psiFactory.createAnnotationEntry(text))

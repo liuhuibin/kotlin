@@ -16,10 +16,13 @@
 
 package org.jetbrains.kotlin.idea.test;
 
+import com.intellij.openapi.module.Module;
 import com.intellij.openapi.projectRoots.Sdk;
+import com.intellij.openapi.roots.LanguageLevelModuleExtension;
+import com.intellij.openapi.roots.ModifiableRootModel;
+import com.intellij.pom.java.LanguageLevel;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime;
-import org.jetbrains.kotlin.test.KotlinTestUtils;
 import org.jetbrains.kotlin.utils.PathUtil;
 
 import java.io.File;
@@ -38,10 +41,28 @@ public class KotlinWithJdkAndRuntimeLightProjectDescriptor extends KotlinJdkAndL
     @NotNull
     public static final KotlinWithJdkAndRuntimeLightProjectDescriptor INSTANCE = new KotlinWithJdkAndRuntimeLightProjectDescriptor();
 
+    public static KotlinWithJdkAndRuntimeLightProjectDescriptor getInstance(LanguageLevel level) {
+        return new KotlinWithJdkAndRuntimeLightProjectDescriptor() {
+            @Override
+            public void configureModule(
+                    @NotNull Module module, @NotNull ModifiableRootModel model
+            ) {
+                super.configureModule(module, model);
+                model.getModuleExtension(LanguageLevelModuleExtension.class).setLanguageLevel(level);
+            }
+        };
+    }
+
     @NotNull
     public static final KotlinWithJdkAndRuntimeLightProjectDescriptor INSTANCE_WITH_KOTLIN_TEST = new KotlinWithJdkAndRuntimeLightProjectDescriptor(
             Arrays.asList(ForTestCompileRuntime.runtimeJarForTests(),
                           PathUtil.getKotlinPathsForDistDirectory().getKotlinTestPath())
+    );
+
+    @NotNull
+    public static final KotlinWithJdkAndRuntimeLightProjectDescriptor INSTANCE_WITH_SCRIPT_RUNTIME = new KotlinWithJdkAndRuntimeLightProjectDescriptor(
+            Arrays.asList(ForTestCompileRuntime.runtimeJarForTests(),
+                          PathUtil.getKotlinPathsForDistDirectory().getScriptRuntimePath())
     );
 
     @NotNull

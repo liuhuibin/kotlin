@@ -112,12 +112,26 @@ class OverridesCompletion(
                         else -> "dummy() {}"
                     }
                     val dummyMemberText = dummyMemberHead + dummyMemberTail
-                    context.document.replaceString(context.startOffset, context.tailOffset, dummyMemberText)
+                    val override = KtTokens.OVERRIDE_KEYWORD.value
+
+                    tailrec fun calcStartOffset(startOffset: Int, diff: Int = 0): Int {
+                        return when {
+                            context.document.text[startOffset - 1].isWhitespace() -> calcStartOffset(startOffset - 1, diff + 1)
+                            context.document.text.substring(startOffset - override.length, startOffset) == override -> {
+                                startOffset - override.length
+                            }
+                            else -> diff + startOffset
+                        }
+                    }
+
+                    val startOffset = calcStartOffset(context.startOffset)
+                    val tailOffset = context.tailOffset
+                    context.document.replaceString(startOffset, tailOffset, dummyMemberText)
 
                     val psiDocumentManager = PsiDocumentManager.getInstance(context.project)
                     psiDocumentManager.commitAllDocuments()
 
-                    val dummyMember = context.file.findElementAt(context.startOffset)!!.getStrictParentOfType<KtNamedDeclaration>()!!
+                    val dummyMember = context.file.findElementAt(startOffset)!!.getStrictParentOfType<KtNamedDeclaration>()!!
 
                     // keep original modifiers
                     val modifierList = KtPsiFactory(context.project).createModifierList(dummyMember.modifierList!!.text)

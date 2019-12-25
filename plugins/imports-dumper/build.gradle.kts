@@ -6,6 +6,10 @@ plugins {
     id("jps-compatible")
 }
 
+repositories {
+    maven("https://dl.bintray.com/kotlin/kotlinx")
+}
+
 val kotlinxSerializationVersion = "0.4.2"
 
 dependencies {
@@ -13,13 +17,11 @@ dependencies {
     compile(project(":compiler:plugin-api"))
     compileOnly("org.jetbrains.kotlinx", "kotlinx-serialization-runtime", kotlinxSerializationVersion) { isTransitive = false }
 
-    compile(intellijCoreDep()) { includeJars("intellij-core") }
+    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
 
-    testCompile(project(":compiler:tests-common"))
     testCompile(projectTests(":compiler:tests-common"))
 
-
-    embeddedComponents("org.jetbrains.kotlinx", "kotlinx-serialization-runtime", kotlinxSerializationVersion) { isTransitive = false }
+    embedded("org.jetbrains.kotlinx", "kotlinx-serialization-runtime", kotlinxSerializationVersion) { isTransitive = false }
 }
 
 sourceSets {
@@ -32,8 +34,4 @@ projectTest {
     dependsOn(":dist")
 }
 
-runtimeJar {
-    fromEmbeddedComponents()
-}
-
-dist()
+runtimeJar()

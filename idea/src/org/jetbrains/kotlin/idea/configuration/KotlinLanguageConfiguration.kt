@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.configuration
@@ -12,36 +12,44 @@ import com.intellij.openapi.updateSettings.impl.UpdateSettings
 import org.jetbrains.kotlin.idea.KotlinPluginUpdater
 import org.jetbrains.kotlin.idea.KotlinPluginUtil
 import org.jetbrains.kotlin.idea.PluginUpdateStatus
-import org.jetbrains.kotlin.idea.configuration.ui.ConfigurePluginUpdatesForm
+import org.jetbrains.kotlin.idea.configuration.ui.KotlinLanguageConfigurationForm
+import org.jetbrains.kotlin.j2k.J2kConverterExtension
 import javax.swing.JComponent
 
-class KotlinUpdatesSettingsConfigurable : SearchableConfigurable, Configurable.NoScroll {
+class KotlinLanguageConfiguration : SearchableConfigurable, Configurable.NoScroll {
     companion object {
         const val ID = "preferences.language.Kotlin"
 
-        private fun saveSelectedChannel(channel: Int) {
+        private fun saveSelectedChannel(channelOrdinal: Int) {
             val hosts = UpdateSettings.getInstance().storedPluginHosts
             hosts.removeIf {
                 it.startsWith("https://plugins.jetbrains.com/plugins/") &&
                         (it.endsWith("/6954") || it.endsWith(KotlinPluginUtil.KOTLIN_PLUGIN_ID.idString))
             }
-            when (channel) {
-                EAPChannels.EAP_1_3.uiIndex -> hosts.add(EAPChannels.EAP_1_3.url)
-                EAPChannels.EAP_1_2.uiIndex -> hosts.add(EAPChannels.EAP_1_2.url)
+
+            UpdateChannel.values().find { it.ordinal == channelOrdinal }?.let { eapChannel ->
+                if (eapChannel != UpdateChannel.STABLE) {
+                    hosts.add(eapChannel.url ?: error("Shouldn't add null urls to custom repositories"))
+                }
             }
         }
 
-        enum class EAPChannels(val url: String, val uiIndex: Int) {
-            EAP_1_2("https://plugins.jetbrains.com/plugins/eap-1.2/${KotlinPluginUtil.KOTLIN_PLUGIN_ID.idString}", 1),
-            EAP_1_3("https://plugins.jetbrains.com/plugins/eap-next/${KotlinPluginUtil.KOTLIN_PLUGIN_ID.idString}", 2);
+        enum class UpdateChannel(val url: String?, val title: String) {
+            STABLE(null, "Stable"),
+            EAP("https://plugins.jetbrains.com/plugins/eap/${KotlinPluginUtil.KOTLIN_PLUGIN_ID.idString}", "Early Access Preview 1.3.x"),
+            EAP_NEXT(
+                "https://plugins.jetbrains.com/plugins/eap-next/${KotlinPluginUtil.KOTLIN_PLUGIN_ID.idString}",
+                "Early Access Preview 1.4.x"
+            );
 
-            private val hasChannel: Boolean get() = url in UpdateSettings.getInstance().pluginHosts
-
-            fun indexIfAvailable() = if (hasChannel) uiIndex else null
+            fun isInHosts(): Boolean {
+                if (this == STABLE) return false
+                return url in UpdateSettings.getInstance().pluginHosts
+            }
         }
     }
 
-    private val form = ConfigurePluginUpdatesForm()
+    private val form = KotlinLanguageConfigurationForm()
     private var update: PluginUpdateStatus.Update? = null
 
     private var savedChannel = -1
@@ -53,12 +61,15 @@ class KotlinUpdatesSettingsConfigurable : SearchableConfigurable, Configurable.N
 
     override fun getId(): String = ID
 
-    override fun getDisplayName(): String = "Kotlin Updates"
+    override fun getDisplayName(): String = "Kotlin"
 
-    override fun isModified() = false
+    override fun isModified() =
+        form.useNewJ2kCheckBox.isSelected != J2kConverterExtension.isNewJ2k
 
     override fun apply() {
         // Selected channel is now saved automatically
+
+        J2kConverterExtension.isNewJ2k = form.useNewJ2kCheckBox.isSelected
     }
 
     private fun setInstalledVersion(installedVersion: String?, installingStatus: String?) {
@@ -67,6 +78,7 @@ class KotlinUpdatesSettingsConfigurable : SearchableConfigurable, Configurable.N
     }
 
     override fun createComponent(): JComponent? {
+        form.useNewJ2kCheckBox.isSelected = J2kConverterExtension.isNewJ2k
         form.updateCheckProgressIcon.suspend()
         form.updateCheckProgressIcon.setPaintPassiveIcon(false)
 
@@ -110,7 +122,9 @@ class KotlinUpdatesSettingsConfigurable : SearchableConfigurable, Configurable.N
             }
         }
 
-        savedChannel = EAPChannels.EAP_1_3.indexIfAvailable() ?: EAPChannels.EAP_1_2.indexIfAvailable() ?: 0
+        form.initChannels(UpdateChannel.values().map { it.title })
+
+        savedChannel = UpdateChannel.values().find { it.isInHosts() }?.ordinal ?: 0
         form.channelCombo.selectedIndex = savedChannel
 
         form.channelCombo.addActionListener {
@@ -130,7 +144,7 @@ class KotlinUpdatesSettingsConfigurable : SearchableConfigurable, Configurable.N
         saveChannelSettings()
         form.updateCheckProgressIcon.resume()
         form.resetUpdateStatus()
-        KotlinPluginUpdater.getInstance().runUpdateCheck{ pluginUpdateStatus ->
+        KotlinPluginUpdater.getInstance().runUpdateCheck { pluginUpdateStatus ->
             // Need this to show something is happening when check is very fast
             Thread.sleep(30)
             form.updateCheckProgressIcon.suspend()
@@ -138,7 +152,7 @@ class KotlinUpdatesSettingsConfigurable : SearchableConfigurable, Configurable.N
             when (pluginUpdateStatus) {
                 PluginUpdateStatus.LatestVersionInstalled -> {
                     form.setUpdateStatus(
-                        "You have the latest version of the plugin (${KotlinPluginUtil.getPluginVersion()}) installed.",
+                        "You have the latest version of the plugin installed.",
                         false
                     )
                 }

@@ -1,6 +1,7 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
+// SKIP_JDK6
+// TARGET_BACKEND: JVM
 // WITH_REFLECT
-// IGNORE_BACKEND: JS, NATIVE
 
 abstract class Outer {
     inner class Inner

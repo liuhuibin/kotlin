@@ -1,6 +1,6 @@
-// IGNORE_BACKEND: JS_IR
-// TODO: muted automatically, investigate should it be ran for JS or not
-// IGNORE_BACKEND: JS, NATIVE
+// IGNORE_BACKEND_FIR: JVM_IR
+// IGNORE_BACKEND: JVM_IR
+// TARGET_BACKEND: JVM
 
 // KT-11447 Multifile declaration causes IAE: Method can not access a member of class
 // WITH_REFLECT

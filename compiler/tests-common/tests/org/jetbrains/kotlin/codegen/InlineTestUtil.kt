@@ -17,6 +17,8 @@
 package org.jetbrains.kotlin.codegen
 
 import org.jetbrains.kotlin.backend.common.output.OutputFile
+import org.jetbrains.kotlin.codegen.coroutines.DO_RESUME_METHOD_NAME
+import org.jetbrains.kotlin.codegen.coroutines.INVOKE_SUSPEND_METHOD_NAME
 import org.jetbrains.kotlin.inline.inlineFunctionsJvmNames
 import org.jetbrains.kotlin.load.java.JvmAbi
 import org.jetbrains.kotlin.load.java.JvmAnnotationNames
@@ -33,7 +35,7 @@ object InlineTestUtil {
     fun checkNoCallsToInline(outputFiles: Iterable<OutputFile>, sourceFiles: List<KtFile>) {
         val inlineInfo = obtainInlineInfo(outputFiles)
         val inlineMethods = inlineInfo.inlineMethods
-        assert(!inlineMethods.isEmpty()) { "There are no inline methods" }
+        assert(inlineMethods.isNotEmpty()) { "There are no inline methods" }
 
         val notInlinedCalls = checkInlineMethodNotInvoked(outputFiles, inlineMethods)
         assert(notInlinedCalls.isEmpty()) { "All inline methods should be inlined but:\n" + notInlinedCalls.joinToString("\n") }
@@ -46,7 +48,7 @@ object InlineTestUtil {
             val notInlinedParameters = checkParametersInlined(outputFiles, inlineInfo, sourceFiles)
             assert(notInlinedParameters.isEmpty()) {
                 "All inline parameters should be inlined but:\n${notInlinedParameters.joinToString("\n")}\n" +
-                "but if you have not inlined lambdas or anonymous objects enable NO_CHECK_LAMBDA_INLINING directive"
+                        "but if you have not inlined lambdas or anonymous objects enable NO_CHECK_LAMBDA_INLINING directive"
             }
         }
     }
@@ -59,7 +61,9 @@ object InlineTestUtil {
             val inlineFunctions = inlineFunctionsJvmNames(binaryClass.classHeader)
 
             val classVisitor = object : ClassVisitorWithName() {
-                override fun visitMethod(access: Int, name: String, desc: String, signature: String?, exceptions: Array<String>?): MethodVisitor? {
+                override fun visitMethod(
+                    access: Int, name: String, desc: String, signature: String?, exceptions: Array<String>?
+                ): MethodVisitor? {
                     if (name + desc in inlineFunctions) {
                         inlineMethods.add(MethodInfo(className, name, desc))
                     }
@@ -68,7 +72,7 @@ object InlineTestUtil {
             }
 
             ClassReader(file.asByteArray()).accept(classVisitor, 0)
-            binaryClasses.put(classVisitor.className, binaryClass)
+            binaryClasses[classVisitor.className] = binaryClass
         }
 
         return InlineInfo(inlineMethods, binaryClasses)
@@ -82,9 +86,11 @@ object InlineTestUtil {
 
             //if inline function creates anonymous object then do not try to check that all lambdas are inlined
             val classVisitor = object : ClassVisitorWithName() {
-                override fun visitMethod(access: Int, name: String, desc: String, signature: String?, exceptions: Array<String>?): MethodVisitor? {
+                override fun visitMethod(
+                    access: Int, name: String, desc: String, signature: String?, exceptions: Array<String>?
+                ): MethodVisitor? {
                     if (name + desc in inlineFunctions) {
-                        return object: MethodNodeWithAnonymousObjectCheck(inlineInfo, access, name, desc, signature, exceptions) {
+                        return object : MethodNodeWithAnonymousObjectCheck(inlineInfo, access, name, desc, signature, exceptions) {
                             override fun onAnonymousConstructorCallOrSingletonAccess(owner: String) {
                                 doLambdaInliningCheck = false
                             }
@@ -112,7 +118,7 @@ object InlineTestUtil {
 
                 override fun visitAnnotation(desc: String, visible: Boolean): AnnotationVisitor? {
                     if (desc == JvmAnnotationNames.METADATA_DESC) {
-                        return object : AnnotationVisitor(Opcodes.ASM5) {
+                        return object : AnnotationVisitor(Opcodes.API_VERSION) {
                             override fun visit(name: String?, value: Any) {
                                 if (name == JvmAnnotationNames.KIND_FIELD_NAME && value == KotlinClassHeader.Kind.MULTIFILE_CLASS.id) {
                                     skipMethodsOfThisClass = true
@@ -124,15 +130,22 @@ object InlineTestUtil {
                     return null
                 }
 
-                override fun visitMethod(access: Int, name: String, desc: String, signature: String?, exceptions: Array<String>?): MethodVisitor? {
+                override fun visitMethod(
+                    access: Int, name: String, desc: String, signature: String?, exceptions: Array<String>?
+                ): MethodVisitor? {
                     if (skipMethodsOfThisClass) {
                         return null
                     }
-                    if (name == "doResume" && desc == "(Ljava/lang/Object;Ljava/lang/Throwable;)Ljava/lang/Object;") {
+
+                    if (name == DO_RESUME_METHOD_NAME && desc == "(Ljava/lang/Object;Ljava/lang/Throwable;)Ljava/lang/Object;") {
                         return null
                     }
 
-                    return object : MethodNode(Opcodes.ASM5, access, name, desc, signature, exceptions) {
+                    if (name == INVOKE_SUSPEND_METHOD_NAME && desc == "(Ljava/lang/Object;)Ljava/lang/Object;") {
+                        return null
+                    }
+
+                    return object : MethodNode(Opcodes.API_VERSION, access, name, desc, signature, exceptions) {
                         override fun visitMethodInsn(opcode: Int, owner: String, name: String, desc: String, itf: Boolean) {
                             val methodCall = MethodInfo(owner, name, desc)
                             if (inlinedMethods.contains(methodCall)) {
@@ -153,11 +166,13 @@ object InlineTestUtil {
         return notInlined
     }
 
-    private fun checkParametersInlined(outputFiles: Iterable<OutputFile>, inlineInfo: InlineInfo, sourceFiles: List<KtFile>): ArrayList<NotInlinedParameter> {
+    private fun checkParametersInlined(
+        outputFiles: Iterable<OutputFile>, inlineInfo: InlineInfo, sourceFiles: List<KtFile>
+    ): ArrayList<NotInlinedParameter> {
         val skipMethods =
-                sourceFiles.flatMap {
-                    InTextDirectivesUtils.findLinesWithPrefixesRemoved(it.text, "// SKIP_INLINE_CHECK_IN: ")
-                }.toSet()
+            sourceFiles.flatMap {
+                InTextDirectivesUtils.findLinesWithPrefixesRemoved(it.text, "// SKIP_INLINE_CHECK_IN: ")
+            }.toSet()
 
         val inlinedMethods = inlineInfo.inlineMethods
         val notInlinedParameters = ArrayList<NotInlinedParameter>()
@@ -165,7 +180,9 @@ object InlineTestUtil {
             if (!isClassOrPackagePartKind(loadBinaryClass(file))) continue
 
             ClassReader(file.asByteArray()).accept(object : ClassVisitorWithName() {
-                override fun visitMethod(access: Int, name: String, desc: String, signature: String?, exceptions: Array<String>?): MethodVisitor? {
+                override fun visitMethod(
+                    access: Int, name: String, desc: String, signature: String?, exceptions: Array<String>?
+                ): MethodVisitor? {
                     val declaration = MethodInfo(className, name, desc)
 
                     //do not check anonymous object creation in inline functions and in package facades
@@ -177,7 +194,7 @@ object InlineTestUtil {
                         return null
                     }
 
-                    return object: MethodNodeWithAnonymousObjectCheck(inlineInfo, access, name, desc, signature, exceptions) {
+                    return object : MethodNodeWithAnonymousObjectCheck(inlineInfo, access, name, desc, signature, exceptions) {
                         override fun onAnonymousConstructorCallOrSingletonAccess(owner: String) {
                             val fromCall = MethodInfo(className, this.name, this.desc)
                             notInlinedParameters.add(NotInlinedParameter(owner, fromCall))
@@ -194,29 +211,27 @@ object InlineTestUtil {
         if (classInternalName.startsWith("kotlin/jvm/internal/"))
             return true
 
-        return isClassOrPackagePartKind(inlineInfo.binaryClasses[classInternalName]!!)
+        return isClassOrPackagePartKind(inlineInfo.binaryClasses.getValue(classInternalName))
     }
 
     private fun isClassOrPackagePartKind(klass: KotlinJvmBinaryClass): Boolean {
         return klass.classHeader.kind == KotlinClassHeader.Kind.CLASS && !klass.classId.isLocal
-               || klass.classHeader.kind == KotlinClassHeader.Kind.FILE_FACADE /*single file facade equals to package part*/
-               || klass.classHeader.kind == KotlinClassHeader.Kind.MULTIFILE_CLASS_PART
+                || klass.classHeader.kind == KotlinClassHeader.Kind.FILE_FACADE /*single file facade equals to package part*/
+                || klass.classHeader.kind == KotlinClassHeader.Kind.MULTIFILE_CLASS_PART
     }
 
-    private fun loadBinaryClass(file: OutputFile): KotlinJvmBinaryClass {
-        val klass = FileBasedKotlinClass.create(file.asByteArray()) {
-            className, classVersion, classHeader, innerClasses ->
+    private fun loadBinaryClass(file: OutputFile): KotlinJvmBinaryClass =
+        FileBasedKotlinClass.create<FileBasedKotlinClass>(file.asByteArray()) { className, classVersion, classHeader, innerClasses ->
             object : FileBasedKotlinClass(className, classVersion, classHeader, innerClasses) {
                 override val location: String
                     get() = throw UnsupportedOperationException()
+
                 override fun getFileContents(): ByteArray = throw UnsupportedOperationException()
                 override fun hashCode(): Int = throw UnsupportedOperationException()
                 override fun equals(other: Any?): Boolean = throw UnsupportedOperationException()
                 override fun toString(): String = throw UnsupportedOperationException()
             }
         }!!
-        return klass
-    }
 
     private class InlineInfo(val inlineMethods: Set<MethodInfo>, val binaryClasses: Map<String, KotlinJvmBinaryClass>)
 
@@ -226,7 +241,7 @@ object InlineTestUtil {
 
     private data class MethodInfo(val owner: String, val name: String, val desc: String)
 
-    private open class ClassVisitorWithName : ClassVisitor(Opcodes.ASM5) {
+    private open class ClassVisitorWithName : ClassVisitor(Opcodes.API_VERSION) {
         lateinit var className: String
 
         override fun visit(version: Int, access: Int, name: String, signature: String?, superName: String?, interfaces: Array<String>?) {
@@ -235,9 +250,11 @@ object InlineTestUtil {
         }
     }
 
-    private abstract class MethodNodeWithAnonymousObjectCheck(val inlineInfo: InlineInfo, access: Int, name: String, desc: String, signature: String?, exceptions: Array<String>?) : MethodNode(Opcodes.ASM5, access, name, desc, signature, exceptions) {
+    private abstract class MethodNodeWithAnonymousObjectCheck(
+        val inlineInfo: InlineInfo, access: Int, name: String, desc: String, signature: String?, exceptions: Array<String>?
+    ) : MethodNode(Opcodes.API_VERSION, access, name, desc, signature, exceptions) {
         private fun isInlineParameterLikeOwner(owner: String) =
-                "$" in owner && !isTopLevelOrInnerOrPackageClass(owner, inlineInfo)
+            "$" in owner && !isTopLevelOrInnerOrPackageClass(owner, inlineInfo)
 
         override fun visitMethodInsn(opcode: Int, owner: String, name: String, desc: String, itf: Boolean) {
             if ("<init>" == name && isInlineParameterLikeOwner(owner)) {

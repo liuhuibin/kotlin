@@ -16,17 +16,29 @@
 
 package org.jetbrains.kotlin.incremental.js
 
+import org.jetbrains.kotlin.name.FqName
 import java.io.File
 
 // byte arrays are used to simplify passing to different classloaders
 interface IncrementalDataProvider {
     /** gets header metadata (serialized [JsProtoBuf.Header]) from previous compilation */
     val headerMetadata: ByteArray
+
     /** gets non-dirty package parts data from previous compilation */
     val compiledPackageParts: Map<File, TranslationResultValue>
+
+    val metadataVersion: IntArray
+
+    /** gets non-dirty package metadata from previous compilation */
+    val packageMetadata: Map<String, ByteArray>
+
+    val serializedIrFiles: Map<File, IrTranslationResultValue>
 }
 
 class IncrementalDataProviderImpl(
     override val headerMetadata: ByteArray,
-    override val compiledPackageParts: Map<File, TranslationResultValue>
+    override val compiledPackageParts: Map<File, TranslationResultValue>,
+    override val metadataVersion: IntArray,
+    override val packageMetadata: Map<String, ByteArray>,
+    override val serializedIrFiles: Map<File, IrTranslationResultValue>
 ) : IncrementalDataProvider

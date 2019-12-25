@@ -1,14 +1,11 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package kotlinx.metadata.jvm
 
-import kotlinx.metadata.InconsistentKotlinMetadataException
-import kotlinx.metadata.KmClassVisitor
-import kotlinx.metadata.KmLambdaVisitor
-import kotlinx.metadata.KmPackageVisitor
+import kotlinx.metadata.*
 import kotlinx.metadata.impl.ClassWriter
 import kotlinx.metadata.impl.LambdaWriter
 import kotlinx.metadata.impl.PackageWriter
@@ -35,6 +32,12 @@ sealed class KotlinClassMetadata(val header: KotlinClassHeader) {
                     ?: throw InconsistentKotlinMetadataException("data1 must not be empty"))
             JvmProtoBufUtil.readClassDataFrom(data1, header.data2)
         }
+
+        /**
+         * Visits metadata of this class with a new [KmClass] instance and returns that instance.
+         */
+        fun toKmClass(): KmClass =
+            KmClass().apply(this::accept)
 
         /**
          * Makes the given visitor visit metadata of this class.
@@ -86,6 +89,12 @@ sealed class KotlinClassMetadata(val header: KotlinClassHeader) {
         }
 
         /**
+         * Visits metadata of this file facade with a new [KmPackage] instance and returns that instance.
+         */
+        fun toKmPackage(): KmPackage =
+            KmPackage().apply(this::accept)
+
+        /**
          * Makes the given visitor visit metadata of this file facade.
          *
          * @param v the visitor that must visit this file facade
@@ -134,6 +143,14 @@ sealed class KotlinClassMetadata(val header: KotlinClassHeader) {
                 JvmProtoBufUtil.readFunctionDataFrom(data1, header.data2)
             }
         }
+
+        /**
+         * Visits metadata of this synthetic class with a new [KmLambda] instance and returns that instance.
+         *
+         * Returns `null` if this synthetic class does not represent a lambda.
+         */
+        fun toKmLambda(): KmLambda? =
+            if (isLambda) KmLambda().apply(this::accept) else null
 
         /**
          * Returns `true` if this synthetic class is a class file compiled for a Kotlin lambda.
@@ -254,6 +271,12 @@ sealed class KotlinClassMetadata(val header: KotlinClassHeader) {
             get() = header.extraString
 
         /**
+         * Visits metadata of this multi-file class part with a new [KmPackage] instance and returns that instance.
+         */
+        fun toKmPackage(): KmPackage =
+            KmPackage().apply(this::accept)
+
+        /**
          * Makes the given visitor visit metadata of this multi-file class part.
          *
          * @param v the visitor that must visit this multi-file class part
@@ -313,7 +336,11 @@ sealed class KotlinClassMetadata(val header: KotlinClassHeader) {
         @JvmStatic
         fun read(header: KotlinClassHeader): KotlinClassMetadata? {
             // We only support metadata of version 1.1.* (this is Kotlin from 1.0 until today)
-            if (!JvmMetadataVersion(*header.metadataVersion).isCompatible()) return null
+            if (!JvmMetadataVersion(
+                    header.metadataVersion,
+                    (header.extraInt and (1 shl 3)/* see JvmAnnotationNames.METADATA_STRICT_VERSION_SEMANTICS_FLAG */) != 0
+                ).isCompatible()
+            ) return null
 
             return try {
                 when (header.kind) {

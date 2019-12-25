@@ -21,18 +21,18 @@ import com.intellij.codeInsight.daemon.impl.ShowAutoImportPass
 import com.intellij.codeInsight.daemon.impl.actions.AddImportAction
 import com.intellij.codeInsight.hint.HintManager
 import com.intellij.codeInsight.hint.QuestionAction
+import com.intellij.ide.util.DefaultPsiElementCellRenderer
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.module.ModuleUtilCore
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.ui.popup.PopupStep
 import com.intellij.openapi.ui.popup.util.BaseListPopupStep
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.statistics.StatisticsManager
-import com.intellij.psi.util.ProximityLocation
 import com.intellij.psi.util.proximity.PsiProximityComparator
+import com.intellij.ui.popup.list.ListPopupImpl
+import com.intellij.ui.popup.list.PopupListElementRenderer
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
@@ -41,23 +41,29 @@ import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.KotlinDescriptorIconProvider
 import org.jetbrains.kotlin.idea.caches.resolve.resolveImportReference
 import org.jetbrains.kotlin.idea.codeInsight.DescriptorToSourceUtilsIde
+import org.jetbrains.kotlin.idea.completion.KotlinStatisticsInfo
 import org.jetbrains.kotlin.idea.core.ImportableFqNameClassifier
 import org.jetbrains.kotlin.idea.imports.importableFqName
 import org.jetbrains.kotlin.idea.references.KtSimpleNameReference
 import org.jetbrains.kotlin.idea.references.mainReference
+import org.jetbrains.kotlin.idea.references.resolveMainReferenceToDescriptors
 import org.jetbrains.kotlin.idea.util.ImportInsertHelper
 import org.jetbrains.kotlin.idea.util.application.executeWriteCommand
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.isOneSegmentFQN
 import org.jetbrains.kotlin.name.parentOrNull
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtSimpleNameExpression
+import java.awt.BorderLayout
+import javax.swing.JPanel
+import javax.swing.ListCellRenderer
 
 internal fun createSingleImportAction(
-        project: Project,
-        editor: Editor,
-        element: KtElement,
-        fqNames: Collection<FqName>
+    project: Project,
+    editor: Editor,
+    element: KtElement,
+    fqNames: Collection<FqName>
 ): KotlinAddImportAction {
     val file = element.containingKtFile
     val prioritizer = Prioritizer(element.containingKtFile)
@@ -71,53 +77,52 @@ internal fun createSingleImportAction(
 }
 
 internal fun createSingleImportActionForConstructor(
-        project: Project,
-        editor: Editor,
-        element: KtElement,
-        fqNames: Collection<FqName>
+    project: Project,
+    editor: Editor,
+    element: KtElement,
+    fqNames: Collection<FqName>
 ): KotlinAddImportAction {
     val file = element.containingKtFile
     val prioritizer = Prioritizer(element.containingKtFile)
     val variants = fqNames.mapNotNull { fqName ->
         val sameFqNameDescriptors = file.resolveImportReference(fqName.parent())
-                .filterIsInstance<ClassDescriptor>()
-                .flatMap { it.constructors }
+            .filterIsInstance<ClassDescriptor>()
+            .flatMap { it.constructors }
 
-        val priority = sameFqNameDescriptors.map { prioritizer.priority(it) }.min() ?: return@mapNotNull null
+        val priority = sameFqNameDescriptors.asSequence().map { prioritizer.priority(it) }.min() ?: return@mapNotNull null
         Prioritizer.VariantWithPriority(SingleImportVariant(fqName, sameFqNameDescriptors), priority)
     }.sortedBy { it.priority }.map { it.variant }
     return KotlinAddImportAction(project, editor, element, variants)
 }
 
 internal fun createGroupedImportsAction(
-        project: Project,
-        editor: Editor,
-        element: KtElement,
-        autoImportDescription: String,
-        fqNames: Collection<FqName>
+    project: Project,
+    editor: Editor,
+    element: KtElement,
+    autoImportDescription: String,
+    fqNames: Collection<FqName>
 ): KotlinAddImportAction {
     val prioritizer = DescriptorGroupPrioritizer(element.containingKtFile)
 
     val file = element.containingKtFile
     val variants = fqNames
-            .groupBy { it.parentOrNull() ?: FqName.ROOT }
-            .map {
-                val samePackageFqNames = it.value
-                val descriptors = samePackageFqNames.flatMap { file.resolveImportReference(it) }
-                val variant = if (samePackageFqNames.size > 1) {
-                    GroupedImportVariant(autoImportDescription, descriptors)
-                }
-                else {
-                    SingleImportVariant(samePackageFqNames.first(), descriptors)
-                }
+        .groupBy { it.parentOrNull() ?: FqName.ROOT }
+        .map {
+            val samePackageFqNames = it.value
+            val descriptors = samePackageFqNames.flatMap { fqName -> file.resolveImportReference(fqName) }
+            val variant = if (samePackageFqNames.size > 1) {
+                GroupedImportVariant(autoImportDescription, descriptors)
+            } else {
+                SingleImportVariant(samePackageFqNames.first(), descriptors)
+            }
 
-                val priority = prioritizer.priority(descriptors)
-                DescriptorGroupPrioritizer.VariantWithPriority(variant, priority)
-            }
-            .sortedBy {
-                it.priority
-            }
-            .map { it.variant }
+            val priority = prioritizer.priority(descriptors)
+            DescriptorGroupPrioritizer.VariantWithPriority(variant, priority)
+        }
+        .sortedBy {
+            it.priority
+        }
+        .map { it.variant }
 
     return KotlinAddImportAction(project, editor, element, variants)
 }
@@ -127,10 +132,11 @@ internal fun createGroupedImportsAction(
  * Based on {@link AddImportAction}
  */
 class KotlinAddImportAction internal constructor(
-        private val project: Project,
-        private val editor: Editor,
-        private val element: KtElement,
-        private val variants: List<AutoImportVariant>) : QuestionAction {
+    private val project: Project,
+    private val editor: Editor,
+    private val element: KtElement,
+    private val variants: List<AutoImportVariant>
+) : QuestionAction {
     fun showHint(): Boolean {
         if (variants.isEmpty()) return false
 
@@ -141,7 +147,7 @@ class KotlinAddImportAction internal constructor(
     }
 
     fun isUnambiguous(): Boolean {
-        return variants.size == 1
+        return variants.size == 1 && variants[0].descriptorsToImport.all { it is ClassDescriptor }
     }
 
     override fun execute(): Boolean {
@@ -154,7 +160,28 @@ class KotlinAddImportAction internal constructor(
             return true
         }
 
-        JBPopupFactory.getInstance().createListPopup(getVariantSelectionPopup()).showInBestPositionFor(editor)
+        object : ListPopupImpl(getVariantSelectionPopup()) {
+            override fun getListElementRenderer(): ListCellRenderer<AutoImportVariant> {
+                val baseRenderer = super.getListElementRenderer() as PopupListElementRenderer
+                val psiRenderer = DefaultPsiElementCellRenderer()
+                return ListCellRenderer { list, value, index, isSelected, cellHasFocus ->
+                    JPanel(BorderLayout()).apply {
+                        baseRenderer.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus)
+                        add(baseRenderer.nextStepLabel, BorderLayout.EAST)
+                        add(
+                            psiRenderer.getListCellRendererComponent(
+                                list,
+                                value.declarationToImport(project),
+                                index,
+                                isSelected,
+                                cellHasFocus
+                            )
+                        )
+                    }
+                }
+            }
+        }.showInBestPositionFor(editor)
+
         return true
     }
 
@@ -179,7 +206,7 @@ class KotlinAddImportAction internal constructor(
                         return "Exclude '$value' from auto-import"
                     }
 
-                    override fun onChosen(selectedValue: String?, finalChoice: Boolean): PopupStep<Any>? {
+                    override fun onChosen(selectedValue: String, finalChoice: Boolean): PopupStep<Any>? {
                         if (finalChoice && !project.isDisposed) {
                             AddImportAction.excludeFromImport(project, selectedValue)
                         }
@@ -195,24 +222,43 @@ class KotlinAddImportAction internal constructor(
     }
 
     private fun addImport(variant: AutoImportVariant) {
-        PsiDocumentManager.getInstance(project).commitAllDocuments()
+        val psiDocumentManager = PsiDocumentManager.getInstance(project)
+        psiDocumentManager.commitAllDocuments()
 
         project.executeWriteCommand(QuickFixBundle.message("add.import")) {
             if (!element.isValid) return@executeWriteCommand
 
             val file = element.containingKtFile
 
-            variant.declarationToImport(project)?.let {
-                val location = ProximityLocation(element, ModuleUtilCore.findModuleForPsiElement(element))
-                StatisticsManager.getInstance().incUseCount(PsiProximityComparator.STATISTICS_KEY, it, location)
-            }
+            val statisticsManager = StatisticsManager.getInstance()
 
-            for (descriptor in variant.descriptorsToImport) {
+            variant.descriptorsToImport.forEach { descriptor ->
+                val statisticsInfo = KotlinStatisticsInfo.forDescriptor(descriptor)
+                statisticsManager.incUseCount(statisticsInfo)
+
                 // for class or package we use ShortenReferences because we not necessary insert an import but may want to
                 // insert partly qualified name
-                if (descriptor is ClassDescriptor || descriptor is PackageViewDescriptor) {
+
+                val importableFqName = descriptor.importableFqName
+                val importAlias = importableFqName?.let { file.findAliasByFqName(it) }
+                if (importableFqName?.isOneSegmentFQN() != true &&
+                    (importAlias != null || descriptor is ClassDescriptor || descriptor is PackageViewDescriptor)
+                ) {
                     if (element is KtSimpleNameExpression) {
-                        element.mainReference.bindToFqName(descriptor.importableFqName!!, KtSimpleNameReference.ShorteningMode.FORCED_SHORTENING)
+                        if (importAlias != null) {
+                            importAlias.nameIdentifier?.copy()?.let { element.getIdentifier()?.replace(it) }
+                            val resultDescriptor = element.resolveMainReferenceToDescriptors().firstOrNull()
+                            if (importableFqName == resultDescriptor?.importableFqName) {
+                                return@forEach
+                            }
+                        }
+
+                        importableFqName?.let {
+                            element.mainReference.bindToFqName(
+                                it,
+                                KtSimpleNameReference.ShorteningMode.FORCED_SHORTENING
+                            )
+                        }
                     }
                 } else {
                     ImportInsertHelper.getInstance(project).importDescriptor(file, descriptor)
@@ -260,7 +306,7 @@ private class DescriptorGroupPrioritizer(file: KtFile) {
     private val prioritizer = Prioritizer(file, false)
 
     inner class Priority(val descriptors: List<DeclarationDescriptor>) : Comparable<Priority> {
-        val ownDescriptorsPriority = descriptors.map { prioritizer.priority(it) }.max()!!
+        val ownDescriptorsPriority = descriptors.asSequence().map { prioritizer.priority(it) }.max()!!
 
         override fun compareTo(other: Priority): Int {
             val c1 = ownDescriptorsPriority.compareTo(other.ownDescriptorsPriority)
@@ -283,21 +329,28 @@ internal interface AutoImportVariant {
     fun icon(project: Project) = KotlinDescriptorIconProvider.getIcon(descriptorsToImport.first(), declarationToImport(project), 0)
 
     fun declarationToImport(project: Project): PsiElement? =
-            DescriptorToSourceUtilsIde.getAnyDeclaration(project, descriptorsToImport.first())
+        DescriptorToSourceUtilsIde.getAnyDeclaration(project, descriptorsToImport.first())
 }
 
-private class GroupedImportVariant(val autoImportDescription: String, val descriptors: Collection<DeclarationDescriptor>) : AutoImportVariant {
+private class GroupedImportVariant(
+    val autoImportDescription: String,
+    val descriptors: Collection<DeclarationDescriptor>
+) : AutoImportVariant {
     override val excludeFqNameCheck: FqName = descriptors.first().importableFqName!!.parent()
     override val descriptorsToImport: Collection<DeclarationDescriptor> get() = descriptors
     override val hint: String get() = "$autoImportDescription from $excludeFqNameCheck"
 }
 
 private class SingleImportVariant(
-        override val excludeFqNameCheck: FqName,
-        val descriptors: Collection<DeclarationDescriptor>
+    override val excludeFqNameCheck: FqName,
+    val descriptors: Collection<DeclarationDescriptor>
 ) : AutoImportVariant {
-    override val descriptorsToImport: Collection<DeclarationDescriptor> get() =
-            listOf(descriptors.singleOrNull() ?: descriptors.sortedBy { if (it is ClassDescriptor) 0 else 1 }.first())
+    override val descriptorsToImport: Collection<DeclarationDescriptor>
+        get() = listOf(
+            descriptors.singleOrNull()
+                ?: descriptors.minBy { if (it is ClassDescriptor) 0 else 1 }
+                ?: error("we create the class with not-empty descriptors always")
+        )
 
     override val hint: String get() = excludeFqNameCheck.asString()
 }

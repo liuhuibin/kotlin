@@ -1,4 +1,6 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
+// KJS_WITH_FULL_RUNTIME
+// IGNORE_BACKEND: JVM_IR
 // IGNORE_BACKEND: NATIVE
 
 open class Base<Target : DatabaseEntity>() : HashSet<Target>() {

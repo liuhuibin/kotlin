@@ -1,6 +1,5 @@
-// IGNORE_BACKEND: JS_IR
-// TODO: muted automatically, investigate should it be ran for JS or not
-// IGNORE_BACKEND: JS, NATIVE
+// !LANGUAGE: -ProhibitProtectedCallFromInline
+// TARGET_BACKEND: JVM
 
 // FILE: First.java
 

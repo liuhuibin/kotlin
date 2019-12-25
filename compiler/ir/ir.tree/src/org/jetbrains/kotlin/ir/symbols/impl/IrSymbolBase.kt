@@ -18,13 +18,16 @@ package org.jetbrains.kotlin.ir.symbols.impl
 
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.descriptors.*
 import org.jetbrains.kotlin.ir.expressions.IrReturnableBlock
 import org.jetbrains.kotlin.ir.symbols.*
+import org.jetbrains.kotlin.ir.util.UniqId
 
-abstract class IrSymbolBase<out D : DeclarationDescriptor>(override val descriptor: D) : IrSymbol
+abstract class IrSymbolBase<out D : DeclarationDescriptor>(override val descriptor: D, override var uniqId: UniqId = UniqId.NONE) : IrSymbol
 
-abstract class IrBindableSymbolBase<out D : DeclarationDescriptor, B : IrSymbolOwner>(descriptor: D) :
-    IrBindableSymbol<D, B>, IrSymbolBase<D>(descriptor) {
+abstract class IrBindableSymbolBase<out D : DeclarationDescriptor, B : IrSymbolOwner>(descriptor: D, uniqId: UniqId = UniqId.NONE) :
+    IrBindableSymbol<D, B>, IrSymbolBase<D>(descriptor, uniqId) {
+
     init {
         assert(isOriginalDescriptor(descriptor)) {
             "Substituted descriptor $descriptor for ${descriptor.original}"
@@ -32,20 +35,20 @@ abstract class IrBindableSymbolBase<out D : DeclarationDescriptor, B : IrSymbolO
     }
 
     private fun isOriginalDescriptor(descriptor: DeclarationDescriptor): Boolean =
-        if (descriptor is ValueParameterDescriptor)
-            isOriginalDescriptor(descriptor.containingDeclaration)
-        else
-            descriptor == descriptor.original
+        descriptor is WrappedDeclarationDescriptor<*> ||
+                descriptor is ValueParameterDescriptor && isOriginalDescriptor(descriptor.containingDeclaration) ||
+                descriptor == descriptor.original
 
     private var _owner: B? = null
     override val owner: B
         get() = _owner ?: throw IllegalStateException("Symbol for $descriptor is unbound")
 
     override fun bind(owner: B) {
-        if (_owner == null)
+        if (_owner == null) {
             _owner = owner
-        else
+        } else {
             throw IllegalStateException("${javaClass.simpleName} for $descriptor is already bound")
+        }
     }
 
     override val isBound: Boolean
@@ -62,57 +65,74 @@ class IrExternalPackageFragmentSymbolImpl(descriptor: PackageFragmentDescriptor)
 
 class IrAnonymousInitializerSymbolImpl(descriptor: ClassDescriptor) :
     IrBindableSymbolBase<ClassDescriptor, IrAnonymousInitializer>(descriptor),
-    IrAnonymousInitializerSymbol
+    IrAnonymousInitializerSymbol {
+    constructor(irClassSymbol: IrClassSymbol) : this(irClassSymbol.descriptor) {}
+}
 
-class IrClassSymbolImpl(descriptor: ClassDescriptor) :
-    IrBindableSymbolBase<ClassDescriptor, IrClass>(descriptor),
-    IrClassSymbol
+class IrClassSymbolImpl(descriptor: ClassDescriptor, uniqId: UniqId = UniqId.NONE) :
+    IrBindableSymbolBase<ClassDescriptor, IrClass>(descriptor, uniqId),
+    IrClassSymbol {
+    constructor(uniqId: UniqId) : this(WrappedClassDescriptor(), uniqId)
+}
 
-fun createClassSymbolOrNull(descriptor: ClassDescriptor?) =
-    descriptor?.let { IrClassSymbolImpl(it) }
+class IrEnumEntrySymbolImpl(descriptor: ClassDescriptor, uniqId: UniqId = UniqId.NONE) :
+    IrBindableSymbolBase<ClassDescriptor, IrEnumEntry>(descriptor, uniqId),
+    IrEnumEntrySymbol {
+    constructor(uniqId: UniqId) : this(WrappedEnumEntryDescriptor(), uniqId)
+}
 
-class IrEnumEntrySymbolImpl(descriptor: ClassDescriptor) :
-    IrBindableSymbolBase<ClassDescriptor, IrEnumEntry>(descriptor),
-    IrEnumEntrySymbol
+class IrFieldSymbolImpl(descriptor: PropertyDescriptor, uniqId: UniqId = UniqId.NONE) :
+    IrBindableSymbolBase<PropertyDescriptor, IrField>(descriptor, uniqId),
+    IrFieldSymbol {
+    constructor(uniqId: UniqId) : this(WrappedFieldDescriptor(), uniqId)
+}
 
-class IrFieldSymbolImpl(descriptor: PropertyDescriptor) :
-    IrBindableSymbolBase<PropertyDescriptor, IrField>(descriptor),
-    IrFieldSymbol
+class IrTypeParameterSymbolImpl(descriptor: TypeParameterDescriptor, uniqId: UniqId = UniqId.NONE) :
+    IrBindableSymbolBase<TypeParameterDescriptor, IrTypeParameter>(descriptor, uniqId),
+    IrTypeParameterSymbol {
+    constructor(uniqId: UniqId) : this(WrappedTypeParameterDescriptor(), uniqId)
+}
 
-class IrTypeParameterSymbolImpl(descriptor: TypeParameterDescriptor) :
-    IrBindableSymbolBase<TypeParameterDescriptor, IrTypeParameter>(descriptor),
-    IrTypeParameterSymbol
+class IrValueParameterSymbolImpl(descriptor: ParameterDescriptor, uniqId: UniqId = UniqId.NONE) :
+    IrBindableSymbolBase<ParameterDescriptor, IrValueParameter>(descriptor, uniqId),
+    IrValueParameterSymbol {
+    constructor(uniqId: UniqId) : this(WrappedValueParameterDescriptor(), uniqId)
+}
 
-class IrValueParameterSymbolImpl(descriptor: ParameterDescriptor) :
-    IrBindableSymbolBase<ParameterDescriptor, IrValueParameter>(descriptor),
-    IrValueParameterSymbol
+class IrVariableSymbolImpl(descriptor: VariableDescriptor, uniqId: UniqId = UniqId.NONE) :
+    IrBindableSymbolBase<VariableDescriptor, IrVariable>(descriptor, uniqId),
+    IrVariableSymbol {
+    constructor(uniqId: UniqId) : this(WrappedVariableDescriptor(), uniqId)
+}
 
-class IrVariableSymbolImpl(descriptor: VariableDescriptor) :
-    IrBindableSymbolBase<VariableDescriptor, IrVariable>(descriptor),
-    IrVariableSymbol
+class IrSimpleFunctionSymbolImpl(descriptor: FunctionDescriptor, uniqId: UniqId = UniqId.NONE) :
+    IrBindableSymbolBase<FunctionDescriptor, IrSimpleFunction>(descriptor, uniqId),
+    IrSimpleFunctionSymbol {
+    constructor(uniqId: UniqId) : this(WrappedSimpleFunctionDescriptor(), uniqId)
+}
 
-fun createValueSymbol(descriptor: ValueDescriptor): IrValueSymbol =
-    when (descriptor) {
-        is ParameterDescriptor -> IrValueParameterSymbolImpl(descriptor)
-        is VariableDescriptor -> IrVariableSymbolImpl(descriptor)
-        else -> throw IllegalArgumentException("Unexpected descriptor kind: $descriptor")
-    }
-
-class IrSimpleFunctionSymbolImpl(descriptor: FunctionDescriptor) :
-    IrBindableSymbolBase<FunctionDescriptor, IrSimpleFunction>(descriptor),
-    IrSimpleFunctionSymbol
-
-class IrConstructorSymbolImpl(descriptor: ClassConstructorDescriptor) :
-    IrBindableSymbolBase<ClassConstructorDescriptor, IrConstructor>(descriptor),
-    IrConstructorSymbol
-
-fun createFunctionSymbol(descriptor: CallableMemberDescriptor): IrFunctionSymbol =
-    when (descriptor) {
-        is ClassConstructorDescriptor -> IrConstructorSymbolImpl(descriptor.original)
-        is FunctionDescriptor -> IrSimpleFunctionSymbolImpl(descriptor.original)
-        else -> throw IllegalArgumentException("Unexpected descriptor kind: $descriptor")
-    }
+class IrConstructorSymbolImpl(descriptor: ClassConstructorDescriptor, uniqId: UniqId = UniqId.NONE) :
+    IrBindableSymbolBase<ClassConstructorDescriptor, IrConstructor>(descriptor, uniqId),
+    IrConstructorSymbol {
+    constructor(uniqId: UniqId) : this(WrappedClassConstructorDescriptor(), uniqId)
+}
 
 class IrReturnableBlockSymbolImpl(descriptor: FunctionDescriptor) :
     IrBindableSymbolBase<FunctionDescriptor, IrReturnableBlock>(descriptor),
     IrReturnableBlockSymbol
+
+class IrPropertySymbolImpl(descriptor: PropertyDescriptor, uniqId: UniqId = UniqId.NONE) :
+    IrBindableSymbolBase<PropertyDescriptor, IrProperty>(descriptor, uniqId),
+    IrPropertySymbol {
+    constructor(uniqId: UniqId) : this(WrappedPropertyDescriptor(), uniqId)
+}
+
+class IrLocalDelegatedPropertySymbolImpl(descriptor: VariableDescriptorWithAccessors) :
+    IrBindableSymbolBase<VariableDescriptorWithAccessors, IrLocalDelegatedProperty>(descriptor),
+    IrLocalDelegatedPropertySymbol
+
+class IrTypeAliasSymbolImpl(descriptor: TypeAliasDescriptor, uniqId: UniqId = UniqId.NONE) :
+    IrBindableSymbolBase<TypeAliasDescriptor, IrTypeAlias>(descriptor, uniqId),
+    IrTypeAliasSymbol {
+    constructor(uniqId: UniqId) : this(WrappedTypeAliasDescriptor(), uniqId)
+}

@@ -17,17 +17,12 @@
 package org.jetbrains.kotlin.generators.tests
 
 import org.jetbrains.kotlin.checkers.AbstractForeignJava8AnnotationsNoAnnotationInClasspathTest
-import org.jetbrains.kotlin.checkers.AbstractForeignJava8AnnotationsNoAnnotationInClasspathWithFastClassReadingTest
+import org.jetbrains.kotlin.checkers.AbstractForeignJava8AnnotationsNoAnnotationInClasspathWithPsiClassReadingTest
 import org.jetbrains.kotlin.checkers.AbstractForeignJava8AnnotationsTest
 import org.jetbrains.kotlin.checkers.javac.AbstractJavacForeignJava8AnnotationsTest
-import org.jetbrains.kotlin.codegen.AbstractBlackBoxCodegenTest
-import org.jetbrains.kotlin.codegen.AbstractBytecodeTextTest
-import org.jetbrains.kotlin.codegen.AbstractCompileKotlinAgainstKotlinTest
-import org.jetbrains.kotlin.codegen.flags.AbstractWriteFlagsTest
 import org.jetbrains.kotlin.generators.tests.generator.testGroup
-import org.jetbrains.kotlin.jvm.compiler.AbstractJava8WriteSignatureTest
 import org.jetbrains.kotlin.jvm.compiler.AbstractLoadJava8Test
-import org.jetbrains.kotlin.jvm.compiler.AbstractLoadJava8WithFastClassReadingTest
+import org.jetbrains.kotlin.jvm.compiler.AbstractLoadJava8WithPsiClassReadingTest
 import org.jetbrains.kotlin.jvm.compiler.javac.AbstractLoadJava8UsingJavacTest
 import org.jetbrains.kotlin.resolve.calls.AbstractEnhancedSignaturesResolvedCallsTest
 
@@ -35,10 +30,6 @@ fun main(args: Array<String>) {
     System.setProperty("java.awt.headless", "true")
 
     testGroup("compiler/tests-java8/tests", "compiler/testData") {
-        testClass<AbstractBlackBoxCodegenTest>("BlackBoxWithJava8CodegenTestGenerated") {
-            model("codegen/java8/box")
-        }
-
         testClass<AbstractForeignJava8AnnotationsTest> {
             model("foreignAnnotationsJava8/tests")
         }
@@ -51,7 +42,7 @@ fun main(args: Array<String>) {
             model("foreignAnnotationsJava8/tests")
         }
 
-        testClass<AbstractForeignJava8AnnotationsNoAnnotationInClasspathWithFastClassReadingTest> {
+        testClass<AbstractForeignJava8AnnotationsNoAnnotationInClasspathWithPsiClassReadingTest> {
             model("foreignAnnotationsJava8/tests")
         }
 
@@ -65,28 +56,12 @@ fun main(args: Array<String>) {
             model("loadJava8/sourceJava", extension = "java", testMethod = "doTestSourceJava")
         }
 
-        testClass<AbstractLoadJava8WithFastClassReadingTest> {
+        testClass<AbstractLoadJava8WithPsiClassReadingTest> {
             model("loadJava8/compiledJava", extension = "java", testMethod = "doTestCompiledJava")
         }
 
         testClass<AbstractEnhancedSignaturesResolvedCallsTest> {
             model("resolvedCalls/enhancedSignatures")
-        }
-
-        testClass<AbstractCompileKotlinAgainstKotlinTest> {
-            model("codegen/java8/compileKotlinAgainstKotlin")
-        }
-
-        testClass<AbstractJava8WriteSignatureTest> {
-            model("codegen/java8/writeSignature")
-        }
-
-        testClass<AbstractWriteFlagsTest> {
-            model("codegen/java8/writeFlags")
-        }
-
-        testClass<AbstractBytecodeTextTest>("BytecodeTextJava8TestGenerated") {
-            model("codegen/java8/bytecodeText")
         }
     }
 }

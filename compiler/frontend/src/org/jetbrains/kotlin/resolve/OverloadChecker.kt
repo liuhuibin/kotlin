@@ -27,9 +27,10 @@ import org.jetbrains.kotlin.resolve.descriptorUtil.isExtensionProperty
 import org.jetbrains.kotlin.resolve.descriptorUtil.varargParameterPosition
 import org.jetbrains.kotlin.types.ErrorUtils
 import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.types.model.KotlinTypeMarker
 
 object OverloadabilitySpecificityCallbacks : SpecificityComparisonCallbacks {
-    override fun isNonSubtypeNotLessSpecific(specific: KotlinType, general: KotlinType): Boolean =
+    override fun isNonSubtypeNotLessSpecific(specific: KotlinTypeMarker, general: KotlinTypeMarker): Boolean =
         false
 }
 
@@ -55,7 +56,9 @@ class OverloadChecker(val specificityComparator: TypeSpecificityComparator) {
         // They can be disambiguated by providing explicit type parameters.
         if (a.typeParameters.isEmpty() != b.typeParameters.isEmpty()) return true
 
-        if (ErrorUtils.containsErrorType(a) || ErrorUtils.containsErrorType(b)) return true
+        if (a is FunctionDescriptor && ErrorUtils.containsErrorTypeInParameters(a) ||
+            b is FunctionDescriptor && ErrorUtils.containsErrorTypeInParameters(b)
+        ) return true
         if (a.varargParameterPosition() != b.varargParameterPosition()) return true
 
         val aSignature = FlatSignature.createFromCallableDescriptor(a)

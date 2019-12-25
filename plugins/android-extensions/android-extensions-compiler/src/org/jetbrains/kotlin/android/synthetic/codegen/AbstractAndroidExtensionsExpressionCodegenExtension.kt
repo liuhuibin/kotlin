@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.android.synthetic.codegen
@@ -92,7 +92,7 @@ abstract class AbstractAndroidExtensionsExpressionCodegenExtension : ExpressionC
         return StackValue.functionCall(Type.VOID_TYPE, null) {
             val bytecodeClassName = c.typeMapper.mapType(container).internalName
 
-            actualReceiver.put(c.typeMapper.mapType(container), it)
+            actualReceiver.put(c.typeMapper.mapType(container), container.defaultType, it)
             it.invokevirtual(bytecodeClassName, CLEAR_CACHE_METHOD_NAME, "()V", false)
         }
     }

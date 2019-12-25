@@ -22,10 +22,11 @@ import org.jetbrains.kotlin.resolve.calls.context.CheckArgumentTypesMode
 import org.jetbrains.kotlin.resolve.calls.inference.ConstraintSystemBuilder
 import org.jetbrains.kotlin.resolve.calls.inference.ConstraintSystemOperation
 import org.jetbrains.kotlin.resolve.calls.inference.components.ConstraintInjector
-import org.jetbrains.kotlin.resolve.calls.inference.components.SimpleConstraintSystemImpl
+import org.jetbrains.kotlin.resolve.calls.inference.components.NewTypeSubstitutor
 import org.jetbrains.kotlin.resolve.calls.model.*
 import org.jetbrains.kotlin.resolve.calls.results.FlatSignature
 import org.jetbrains.kotlin.resolve.calls.results.OverloadingConflictResolver
+import org.jetbrains.kotlin.resolve.calls.results.PlatformOverloadsSpecificityComparator
 import org.jetbrains.kotlin.resolve.calls.results.TypeSpecificityComparator
 import org.jetbrains.kotlin.resolve.calls.tower.ImplicitScopeTower
 import org.jetbrains.kotlin.resolve.calls.tower.TowerResolver
@@ -36,17 +37,20 @@ class CallableReferenceOverloadConflictResolver(
     builtIns: KotlinBuiltIns,
     module: ModuleDescriptor,
     specificityComparator: TypeSpecificityComparator,
+    platformOverloadsSpecificityComparator: PlatformOverloadsSpecificityComparator,
     statelessCallbacks: KotlinResolutionStatelessCallbacks,
     constraintInjector: ConstraintInjector
 ) : OverloadingConflictResolver<CallableReferenceCandidate>(
     builtIns,
     module,
     specificityComparator,
+    platformOverloadsSpecificityComparator,
     { it.candidate },
-    { SimpleConstraintSystemImpl(constraintInjector, builtIns) },
+    { statelessCallbacks.createConstraintSystemForOverloadResolution(constraintInjector, builtIns) },
     Companion::createFlatSignature,
     { null },
-    { statelessCallbacks.isDescriptorFromSource(it) }
+    { statelessCallbacks.isDescriptorFromSource(it) },
+    null
 ) {
     companion object {
         private fun createFlatSignature(candidate: CallableReferenceCandidate) =
@@ -67,12 +71,21 @@ class CallableReferenceResolver(
         diagnosticsHolder: KotlinDiagnosticsHolder
     ) {
         val argument = resolvedAtom.atom
-        val expectedType = resolvedAtom.expectedType?.let { csBuilder.buildCurrentSubstitutor().safeSubstitute(it) }
+        val expectedType = resolvedAtom.expectedType?.let { (csBuilder.buildCurrentSubstitutor() as NewTypeSubstitutor).safeSubstitute(it) }
 
         val scopeTower = callComponents.statelessCallbacks.getScopeTowerForCallableReferenceArgument(argument)
         val candidates = runRHSResolution(scopeTower, argument, expectedType) { checkCallableReference ->
             csBuilder.runTransaction { checkCallableReference(this); false }
         }
+
+        if (candidates.size > 1 && resolvedAtom is EagerCallableReferenceAtom) {
+            resolvedAtom.setAnalyzedResults(
+                candidate = null,
+                subResolvedAtoms = listOf(resolvedAtom.transformToPostponed())
+            )
+            return
+        }
+
         val chosenCandidate = candidates.singleOrNull()
         if (chosenCandidate != null) {
             val (toFreshSubstitutor, diagnostic) = with(chosenCandidate) {
@@ -82,6 +95,7 @@ class CallableReferenceResolver(
                 )
             }
             diagnosticsHolder.addDiagnosticIfNotNull(diagnostic)
+            chosenCandidate.diagnostics.forEach { diagnosticsHolder.addDiagnostic(it) }
             chosenCandidate.freshSubstitutor = toFreshSubstitutor
         } else {
             if (candidates.isEmpty()) {
@@ -119,8 +133,7 @@ class CallableReferenceResolver(
         return callableReferenceOverloadConflictResolver.chooseMaximallySpecificCandidates(
             candidates,
             CheckArgumentTypesMode.CHECK_VALUE_ARGUMENTS,
-            discriminateGenerics = false, // we can't specify generics explicitly for callable references
-            isDebuggerContext = scopeTower.isDebuggerContext
+            discriminateGenerics = false // we can't specify generics explicitly for callable references
         )
     }
 }

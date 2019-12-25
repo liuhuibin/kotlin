@@ -63,7 +63,7 @@ class IfToWhenIntention : SelfTargetingRangeIntention<KtIfExpression>(KtIfExpres
                     builder.append(nextSibling.text)
                     nextSibling = nextSibling.nextSibling ?: break
                 }
-                KtPsiFactory(ifExpression).createBlock(builder.toString())
+                KtPsiFactory(ifExpression).createBlock(builder.toString()).takeIf { it.statements.isNotEmpty() }
             }
         }
     }
@@ -115,25 +115,37 @@ class IfToWhenIntention : SelfTargetingRangeIntention<KtIfExpression>(KtIfExpres
         }
     }
 
-    private fun BuilderByPattern<*>.appendElseBlock(block: KtExpression?) {
+    private fun BuilderByPattern<*>.appendElseBlock(block: KtExpression?, unwrapBlockOrParenthesis: Boolean = false) {
         appendFixedText("else->")
-        appendExpression(block?.unwrapBlockOrParenthesis())
+        appendExpression(if (unwrapBlockOrParenthesis) block?.unwrapBlockOrParenthesis() else block)
         appendFixedText("\n")
     }
 
+    private fun KtIfExpression.topmostIfExpression(): KtIfExpression {
+        var target = this
+        while (true) {
+            val container = target.parent as? KtContainerNodeForControlStructureBody ?: break
+            val parent = container.parent as? KtIfExpression ?: break
+            if (parent.`else` != target) break
+            target = parent
+        }
+        return target
+    }
+
     override fun applyTo(element: KtIfExpression, editor: Editor?) {
-        val siblings = element.siblings()
-        val elementCommentSaver = CommentSaver(element)
-        val fullCommentSaver = CommentSaver(PsiChildRange(element, siblings.last()), saveLineBreaks = true)
+        val ifExpression = element.topmostIfExpression()
+        val siblings = ifExpression.siblings()
+        val elementCommentSaver = CommentSaver(ifExpression)
+        val fullCommentSaver = CommentSaver(PsiChildRange(ifExpression, siblings.last()), saveLineBreaks = true)
 
         val toDelete = ArrayList<PsiElement>()
         var applyFullCommentSaver = true
-        val loop = element.getStrictParentOfType<KtLoopExpression>()
+        val loop = ifExpression.getStrictParentOfType<KtLoopExpression>()
         val loopJumpVisitor = LabelLoopJumpVisitor(loop)
-        var whenExpression = KtPsiFactory(element).buildExpression {
+        var whenExpression = KtPsiFactory(ifExpression).buildExpression {
             appendFixedText("when {\n")
 
-            var currentIfExpression = element
+            var currentIfExpression = ifExpression
             var baseIfExpressionForSyntheticBranch = currentIfExpression
             var canPassThrough = false
             while (true) {
@@ -148,7 +160,7 @@ class IfToWhenIntention : SelfTargetingRangeIntention<KtIfExpression>(KtIfExpres
                 appendFixedText("->")
 
                 val currentThenBranch = currentIfExpression.then
-                appendExpression(currentThenBranch?.unwrapBlockOrParenthesis())
+                appendExpression(currentThenBranch)
                 appendFixedText("\n")
 
                 canPassThrough = canPassThrough || canPassThrough(currentThenBranch)
@@ -163,7 +175,7 @@ class IfToWhenIntention : SelfTargetingRangeIntention<KtIfExpression>(KtIfExpres
                         currentIfExpression = syntheticElseBranch
                         toDelete.add(syntheticElseBranch)
                     } else {
-                        appendElseBlock(syntheticElseBranch)
+                        appendElseBlock(syntheticElseBranch, unwrapBlockOrParenthesis = true)
                         break
                     }
                 } else if (currentElseBranch is KtIfExpression) {
@@ -179,11 +191,12 @@ class IfToWhenIntention : SelfTargetingRangeIntention<KtIfExpression>(KtIfExpres
         } as KtWhenExpression
 
 
-        if (whenExpression.getSubjectToIntroduce() != null) {
-            whenExpression = whenExpression.introduceSubject()
+        if (whenExpression.getSubjectToIntroduce(checkConstants = false) != null) {
+            whenExpression = whenExpression.introduceSubject(checkConstants = false) ?: return
         }
 
-        val result = element.replaced(whenExpression)
+        val result = ifExpression.replaced(whenExpression)
+        editor?.caretModel?.moveToOffset(result.startOffset)
 
         (if (applyFullCommentSaver) fullCommentSaver else elementCommentSaver).restore(result)
         toDelete.forEach(PsiElement::delete)

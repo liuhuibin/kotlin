@@ -6,8 +6,6 @@ plugins {
     id("jps-compatible")
 }
 
-jvmTarget = "1.6"
-
 dependencies {
     compile(project(":core:descriptors"))
     compile(project(":compiler:util"))
@@ -30,6 +28,6 @@ sourceSets {
 
 configure<IdeaModel> {
     module {
-        excludeDirs = excludeDirs + files("testData/out-min")
+        excludeDirs = excludeDirs + files("testData/out", "testData/out-min")
     }
 }

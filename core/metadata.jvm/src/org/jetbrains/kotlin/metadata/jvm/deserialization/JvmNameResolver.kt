@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.metadata.jvm.deserialization
@@ -76,36 +76,36 @@ class JvmNameResolver(
 
     companion object {
         val PREDEFINED_STRINGS = listOf(
-                "kotlin/Any",
-                "kotlin/Nothing",
-                "kotlin/Unit",
-                "kotlin/Throwable",
-                "kotlin/Number",
+            "kotlin/Any",
+            "kotlin/Nothing",
+            "kotlin/Unit",
+            "kotlin/Throwable",
+            "kotlin/Number",
 
-                "kotlin/Byte", "kotlin/Double", "kotlin/Float", "kotlin/Int",
-                "kotlin/Long", "kotlin/Short", "kotlin/Boolean", "kotlin/Char",
+            "kotlin/Byte", "kotlin/Double", "kotlin/Float", "kotlin/Int",
+            "kotlin/Long", "kotlin/Short", "kotlin/Boolean", "kotlin/Char",
 
-                "kotlin/CharSequence",
-                "kotlin/String",
-                "kotlin/Comparable",
-                "kotlin/Enum",
+            "kotlin/CharSequence",
+            "kotlin/String",
+            "kotlin/Comparable",
+            "kotlin/Enum",
 
-                "kotlin/Array",
-                "kotlin/ByteArray", "kotlin/DoubleArray", "kotlin/FloatArray", "kotlin/IntArray",
-                "kotlin/LongArray", "kotlin/ShortArray", "kotlin/BooleanArray", "kotlin/CharArray",
+            "kotlin/Array",
+            "kotlin/ByteArray", "kotlin/DoubleArray", "kotlin/FloatArray", "kotlin/IntArray",
+            "kotlin/LongArray", "kotlin/ShortArray", "kotlin/BooleanArray", "kotlin/CharArray",
 
-                "kotlin/Cloneable",
-                "kotlin/Annotation",
+            "kotlin/Cloneable",
+            "kotlin/Annotation",
 
-                "kotlin/collections/Iterable", "kotlin/collections/MutableIterable",
-                "kotlin/collections/Collection", "kotlin/collections/MutableCollection",
-                "kotlin/collections/List", "kotlin/collections/MutableList",
-                "kotlin/collections/Set", "kotlin/collections/MutableSet",
-                "kotlin/collections/Map", "kotlin/collections/MutableMap",
-                "kotlin/collections/Map.Entry", "kotlin/collections/MutableMap.MutableEntry",
+            "kotlin/collections/Iterable", "kotlin/collections/MutableIterable",
+            "kotlin/collections/Collection", "kotlin/collections/MutableCollection",
+            "kotlin/collections/List", "kotlin/collections/MutableList",
+            "kotlin/collections/Set", "kotlin/collections/MutableSet",
+            "kotlin/collections/Map", "kotlin/collections/MutableMap",
+            "kotlin/collections/Map.Entry", "kotlin/collections/MutableMap.MutableEntry",
 
-                "kotlin/collections/Iterator", "kotlin/collections/MutableIterator",
-                "kotlin/collections/ListIterator", "kotlin/collections/MutableListIterator"
+            "kotlin/collections/Iterator", "kotlin/collections/MutableIterator",
+            "kotlin/collections/ListIterator", "kotlin/collections/MutableListIterator"
         )
 
         private val PREDEFINED_STRINGS_MAP = PREDEFINED_STRINGS.withIndex().associateBy({ it.value }, { it.index })

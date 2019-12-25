@@ -19,6 +19,7 @@ package org.jetbrains.kotlin.incremental.testingUtils
 import com.intellij.openapi.util.io.FileUtil
 import java.io.File
 import java.util.*
+import kotlin.math.max
 
 private val COMMANDS = listOf("new", "touch", "delete")
 private val COMMANDS_AS_REGEX_PART = COMMANDS.joinToString("|")
@@ -67,12 +68,18 @@ fun getModificationsToPerform(
             val underscore = fileName.indexOf("_")
 
             if (underscore != -1) {
-                val module = fileName.substring(0, underscore)
+                var moduleName = fileName.substring(0, underscore)
+                var moduleFileName = fileName.substring(underscore + 1)
+                if (moduleName.all { it.isDigit() }) {
+                    val (moduleName1, moduleFileName1) = moduleFileName.split("_")
+                    moduleName = moduleName1
+                    moduleFileName = moduleFileName1
+                }
 
                 assert(moduleNames != null) { "File name has module prefix, but multi-module environment is absent" }
-                assert(module in moduleNames!!) { "Module not found for file with prefix: $fileName" }
+                assert(moduleName in moduleNames!!) { "Module not found for file with prefix: $fileName" }
 
-                return Pair(module, fileName.substring(underscore + 1))
+                return Pair(moduleName, moduleFileName)
             }
 
             assert(moduleNames == null) { "Test is multi-module, but file has no module prefix: $fileName" }
@@ -160,7 +167,7 @@ class TouchFile(path: String, private val touchPolicy: TouchPolicy) : Modificati
             TouchPolicy.TIMESTAMP -> {
                 val oldLastModified = file.lastModified()
                 //Mac OS and some versions of Linux truncate timestamp to nearest second
-                file.setLastModified(Math.max(System.currentTimeMillis(), oldLastModified + 1000))
+                file.setLastModified(max(System.currentTimeMillis(), oldLastModified + 1000))
             }
             TouchPolicy.CHECKSUM -> {
                 file.appendText(" ")

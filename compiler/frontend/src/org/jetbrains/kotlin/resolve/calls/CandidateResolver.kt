@@ -1,23 +1,13 @@
 /*
- * Copyright 2010-2017 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.resolve.calls
 
 import com.google.common.collect.Lists
 import org.jetbrains.kotlin.builtins.ReflectionTypes
+import org.jetbrains.kotlin.builtins.isSuspendFunctionType
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationDescriptor
 import org.jetbrains.kotlin.descriptors.impl.TypeAliasConstructorDescriptor
@@ -55,6 +45,7 @@ import org.jetbrains.kotlin.types.expressions.DoubleColonExpressionResolver
 import org.jetbrains.kotlin.types.typeUtil.containsTypeProjectionsInTopLevelArguments
 import org.jetbrains.kotlin.types.typeUtil.makeNotNullable
 import java.util.*
+import kotlin.math.min
 
 class CandidateResolver(
     private val argumentTypeResolver: ArgumentTypeResolver,
@@ -362,7 +353,7 @@ class CandidateResolver(
                 val expectedType = getEffectiveExpectedType(parameterDescriptor, argument, context)
 
                 val newContext = context.replaceDataFlowInfo(infoForArguments.getInfo(argument)).replaceExpectedType(expectedType)
-                val typeInfoForCall = argumentTypeResolver.getArgumentTypeInfo(expression, newContext, resolveFunctionArgumentBodies)
+                val typeInfoForCall = argumentTypeResolver.getArgumentTypeInfo(expression, newContext, resolveFunctionArgumentBodies, expectedType.isSuspendFunctionType)
                 val type = typeInfoForCall.type
                 infoForArguments.updateInfo(argument, typeInfoForCall.dataFlowInfo)
 
@@ -371,7 +362,7 @@ class CandidateResolver(
                 if (type == null || (type.isError && !type.isFunctionPlaceholder)) {
                     matchStatus = ArgumentMatchStatus.ARGUMENT_HAS_NO_TYPE
                 } else if (!noExpectedType(expectedType)) {
-                    if (!ArgumentTypeResolver.isSubtypeOfForArgumentType(type, expectedType)) {
+                    if (!argumentTypeResolver.isSubtypeOfForArgumentType(type, expectedType)) {
                         val smartCast = smartCastValueArgumentTypeIfPossible(expression, newContext.expectedType, type, newContext)
                         if (smartCast == null) {
                             resultStatus = tryNotNullableArgument(type, expectedType) ?: OTHER_ERROR
@@ -386,7 +377,7 @@ class CandidateResolver(
                     val spreadElement = argument.getSpreadElement()
                     if (spreadElement != null && !type.isFlexible() && type.isMarkedNullable) {
                         val dataFlowValue = dataFlowValueFactory.createDataFlowValue(expression, type, context)
-                        val smartCastResult = SmartCastManager.checkAndRecordPossibleCast(
+                        val smartCastResult = smartCastManager.checkAndRecordPossibleCast(
                             dataFlowValue, expectedType, expression, context,
                             call = null, recordExpressionType = false
                         )
@@ -419,7 +410,7 @@ class CandidateResolver(
         if (!argumentType.isMarkedNullable || parameterType.isMarkedNullable) return null
 
         val notNullableArgumentType = argumentType.makeNotNullable()
-        val isApplicable = ArgumentTypeResolver.isSubtypeOfForArgumentType(notNullableArgumentType, parameterType)
+        val isApplicable = argumentTypeResolver.isSubtypeOfForArgumentType(notNullableArgumentType, parameterType)
         return if (isApplicable) NULLABLE_ARGUMENT_TYPE_MISMATCH else null
     }
 
@@ -553,11 +544,10 @@ class CandidateResolver(
         } else if (!nullableImplicitInvokeReceiver && smartCastNeeded) {
             // Look if smart cast has some useful nullability info
 
-            val smartCastResult = SmartCastManager.checkAndRecordPossibleCast(
+            val smartCastResult = smartCastManager.checkAndRecordPossibleCast(
                 dataFlowValue, expectedReceiverParameterType,
-                { possibleSmartCast -> isCandidateVisibleOrExtensionReceiver(receiverArgument, possibleSmartCast, isDispatchReceiver) },
                 expression, this, candidateCall.call, recordExpressionType = true
-            )
+            ) { possibleSmartCast -> isCandidateVisibleOrExtensionReceiver(receiverArgument, possibleSmartCast, isDispatchReceiver) }
 
             if (smartCastResult == null) {
                 if (notNullReceiverExpected) {
@@ -601,7 +591,7 @@ class CandidateResolver(
         }
 
         val typeParameters = functionDescriptor.typeParameters
-        for (i in 0..Math.min(typeParameters.size, ktTypeArguments.size) - 1) {
+        for (i in 0..min(typeParameters.size, ktTypeArguments.size) - 1) {
             val typeParameterDescriptor = typeParameters[i]
             val typeArgument = typeArguments[i]
             val typeReference = ktTypeArguments[i].typeReference
@@ -696,14 +686,14 @@ class CandidateResolver(
         // TODO do not perform substitution for type arguments multiple times
         val substitutedTypeArguments = typeAliasParametersSubstitutor.safeSubstitute(unsubstitutedType, Variance.INVARIANT).arguments
 
-        for (i in 0..Math.min(typeParameters.size, substitutedTypeArguments.size) - 1) {
+        for (i in 0..min(typeParameters.size, substitutedTypeArguments.size) - 1) {
             val substitutedTypeProjection = substitutedTypeArguments[i]
             if (substitutedTypeProjection.isStarProjection) continue
 
             val typeParameter = typeParameters[i]
             val substitutedTypeArgument = substitutedTypeProjection.type
             val unsubstitutedTypeArgument = unsubstitutedType.arguments[i].type
-            DescriptorResolver.checkBoundsInTypeAlias(
+            TypeAliasExpander.checkBoundsInTypeAlias(
                 reportStrategy,
                 unsubstitutedTypeArgument,
                 substitutedTypeArgument,

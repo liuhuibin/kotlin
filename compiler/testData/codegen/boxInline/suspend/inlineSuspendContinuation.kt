@@ -1,7 +1,11 @@
+// IGNORE_BACKEND: JVM_IR
+// IGNORE_BACKEND_MULTI_MODULE: JVM_IR
 // FILE: test.kt
 // COMMON_COROUTINES_TEST
 // WITH_RUNTIME
+// WITH_COROUTINES
 // NO_CHECK_LAMBDA_INLINING
+// TARGET_BACKEND: JVM
 
 suspend inline fun test1(c: () -> Unit) {
     c()
@@ -38,19 +42,9 @@ suspend inline fun test5(crossinline c: suspend() -> Unit) {
 
 import COROUTINES_PACKAGE.*
 import COROUTINES_PACKAGE.intrinsics.*
+import helpers.*
 import COROUTINES_PACKAGE.jvm.internal.*
 
-object EmptyContinuation: Continuation<Unit> {
-    override val context: CoroutineContext
-        get() = EmptyCoroutineContext
-
-    override fun resume(value: Unit) {
-    }
-
-    override fun resumeWithException(exception: Throwable) {
-        throw exception
-    }
-}
 
 fun builder(c: suspend () -> Unit) {
     c.startCoroutine(EmptyContinuation)
@@ -108,6 +102,6 @@ fun box() : String {
             checkContinuation(savedContinuation!!)
         }
     }
-    if (!continuationChanged) return "FAIL 5"
+    if (continuationChanged) return "FAIL 5"
     return "OK"
 }

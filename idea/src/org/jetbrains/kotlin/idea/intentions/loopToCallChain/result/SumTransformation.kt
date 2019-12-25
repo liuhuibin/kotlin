@@ -1,23 +1,11 @@
 /*
- * Copyright 2010-2016 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.intentions.loopToCallChain.result
 
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
-import org.jetbrains.kotlin.descriptors.VariableDescriptor
 import org.jetbrains.kotlin.idea.caches.resolve.analyze
 import org.jetbrains.kotlin.idea.caches.resolve.resolveToDescriptorIfAny
 import org.jetbrains.kotlin.idea.intentions.loopToCallChain.*
@@ -29,8 +17,8 @@ import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 import org.jetbrains.kotlin.types.KotlinType
 
 abstract class SumTransformationBase(
-        loop: KtForExpression,
-        initialization: VariableInitialization
+    loop: KtForExpression,
+    initialization: VariableInitialization
 ) : AssignToVariableResultTransformation(loop, initialization) {
 
     override fun generateCode(chainedCallGenerator: ChainedCallGenerator): KtExpression {
@@ -38,11 +26,10 @@ abstract class SumTransformationBase(
 
         return if (initialization.initializer.isZeroConstant()) {
             call
-        }
-        else {
+        } else {
             KtPsiFactory(call).createExpressionByPattern(
-                    "$0 + $1", initialization.initializer, call,
-                    reformat = chainedCallGenerator.reformat
+                "$0 + $1", initialization.initializer, call,
+                reformat = chainedCallGenerator.reformat
             )
         }
     }
@@ -65,13 +52,14 @@ abstract class SumTransformationBase(
             val statement = state.statements.singleOrNull() as? KtBinaryExpression ?: return null
             if (statement.operationToken != KtTokens.PLUSEQ) return null
 
-            val variableInitialization = statement.left.findVariableInitializationBeforeLoop(state.outerLoop, checkNoOtherUsagesInLoop = true)
-                                         ?: return null
+            val variableInitialization =
+                statement.left.findVariableInitializationBeforeLoop(state.outerLoop, checkNoOtherUsagesInLoop = true)
+                    ?: return null
 
             val value = statement.right ?: return null
 
             val valueType = value.typeWithSmartCast()?.toSupportedType() ?: return null
-            val sumType = (variableInitialization.variable.resolveToDescriptorIfAny() as? VariableDescriptor)?.type?.toSupportedType() ?: return null
+            val sumType = variableInitialization.variable.resolveToDescriptorIfAny()?.type?.toSupportedType() ?: return null
 
             val conversionFunctionName = when (sumType) {
                 SupportedType.INT -> {
@@ -108,7 +96,8 @@ abstract class SumTransformationBase(
             }
 
             if (state.indexVariable != null) {
-                val mapTransformation = MapTransformation(state.outerLoop, state.inputVariable, state.indexVariable, byExpression, mapNotNull = false)
+                val mapTransformation =
+                    MapTransformation(state.outerLoop, state.inputVariable, state.indexVariable, byExpression, mapNotNull = false)
                 val sumTransformation = SumTransformation(state.outerLoop, variableInitialization)
                 return TransformationMatch.Result(sumTransformation, mapTransformation)
             }
@@ -125,7 +114,8 @@ abstract class SumTransformationBase(
                 }
             }
 
-            val transformation = SumByTransformation(state.outerLoop, variableInitialization, state.inputVariable, byExpression, sumByFunctionName)
+            val transformation =
+                SumByTransformation(state.outerLoop, variableInitialization, state.inputVariable, byExpression, sumByFunctionName)
             return TransformationMatch.Result(transformation)
         }
 
@@ -148,7 +138,7 @@ abstract class SumTransformationBase(
         private fun KtExpression.typeWithSmartCast(): KotlinType? {
             val bindingContext = analyze(BodyResolveMode.PARTIAL)
             return bindingContext[BindingContext.SMARTCAST, this]?.defaultType
-                   ?: bindingContext.getType(this)
+                ?: bindingContext.getType(this)
         }
     }
 }
@@ -163,11 +153,11 @@ class SumTransformation(loop: KtForExpression, initialization: VariableInitializ
 }
 
 class SumByTransformation(
-        loop: KtForExpression,
-        initialization: VariableInitialization,
-        private val inputVariable: KtCallableDeclaration,
-        private val byExpression: KtExpression,
-        private val functionName: String
+    loop: KtForExpression,
+    initialization: VariableInitialization,
+    private val inputVariable: KtCallableDeclaration,
+    private val byExpression: KtExpression,
+    private val functionName: String
 ) : SumTransformationBase(loop, initialization) {
 
     override val presentation: String

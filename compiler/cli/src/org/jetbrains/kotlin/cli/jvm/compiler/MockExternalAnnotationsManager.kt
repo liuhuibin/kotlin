@@ -21,7 +21,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.*
 
 class MockExternalAnnotationsManager : ExternalAnnotationsManager() {
-    override fun chooseAnnotationsPlace(element: PsiElement): AnnotationPlace? = null
+    override fun chooseAnnotationsPlace(element: PsiElement): AnnotationPlace = AnnotationPlace.NOWHERE
 
     override fun isExternalAnnotationWritable(listOwner: PsiModifierListOwner, annotationFQN: String): Boolean = false
     override fun isExternalAnnotation(annotation: PsiAnnotation): Boolean = false
@@ -30,7 +30,12 @@ class MockExternalAnnotationsManager : ExternalAnnotationsManager() {
     override fun findExternalAnnotation(listOwner: PsiModifierListOwner, annotationFQN: String): PsiAnnotation? = null
     override fun findExternalAnnotations(listOwner: PsiModifierListOwner): Array<out PsiAnnotation>? = null
 
-    override fun annotateExternally(listOwner: PsiModifierListOwner, annotationFQName: String, fromFile: PsiFile, value: Array<out PsiNameValuePair>?) {
+    override fun annotateExternally(
+        listOwner: PsiModifierListOwner,
+        annotationFQName: String,
+        fromFile: PsiFile,
+        value: Array<out PsiNameValuePair>?
+    ) {
         throw UnsupportedOperationException("not implemented")
     }
 
@@ -38,11 +43,19 @@ class MockExternalAnnotationsManager : ExternalAnnotationsManager() {
         throw UnsupportedOperationException("not implemented")
     }
 
-    override fun editExternalAnnotation(listOwner: PsiModifierListOwner, annotationFQN: String, value: Array<out PsiNameValuePair>?): Boolean {
+    override fun editExternalAnnotation(
+        listOwner: PsiModifierListOwner,
+        annotationFQN: String,
+        value: Array<out PsiNameValuePair>?
+    ): Boolean {
         throw UnsupportedOperationException("not implemented")
     }
 
-    override fun hasAnnotationRootsForFile(file: VirtualFile): Boolean {
-        throw UnsupportedOperationException("not implemented")
-    }
+    override fun hasAnnotationRootsForFile(file: VirtualFile): Boolean = false
+
+    override fun findDefaultConstructorExternalAnnotations(aClass: PsiClass, annotationFQN: String): List<PsiAnnotation> = emptyList()
+
+    override fun findDefaultConstructorExternalAnnotations(aClass: PsiClass): List<PsiAnnotation> = emptyList()
+
+    override fun findExternalAnnotations(listOwner: PsiModifierListOwner, annotationFQN: String): List<PsiAnnotation> = emptyList()
 }

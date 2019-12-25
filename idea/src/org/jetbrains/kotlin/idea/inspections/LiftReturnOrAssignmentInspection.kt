@@ -17,6 +17,8 @@
 package org.jetbrains.kotlin.idea.inspections
 
 import com.intellij.codeInspection.*
+import com.intellij.codeInspection.ProblemHighlightType.GENERIC_ERROR_OR_WARNING
+import com.intellij.codeInspection.ProblemHighlightType.INFORMATION
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.idea.intentions.branchedTransformations.BranchedFoldingUtils
@@ -24,84 +26,120 @@ import org.jetbrains.kotlin.idea.intentions.branchedTransformations.isElseIf
 import org.jetbrains.kotlin.idea.intentions.branchedTransformations.lineCount
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.anyDescendantOfType
-import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
+import org.jetbrains.kotlin.psi.psiUtil.startOffset
 
-class LiftReturnOrAssignmentInspection : AbstractKotlinInspection() {
+class LiftReturnOrAssignmentInspection @JvmOverloads constructor(private val skipLongExpressions: Boolean = true) :
+    AbstractKotlinInspection() {
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, session: LocalInspectionToolSession) =
-            object : KtVisitorVoid() {
-                private fun visitIfOrWhenOrTry(expression: KtExpression, keyword: PsiElement) {
-                    if (expression.lineCount() > LINES_LIMIT) return
-                    if (expression.isElseIf()) return
-
-                    val foldableReturns = BranchedFoldingUtils.getFoldableReturns(expression)
-                    if (foldableReturns?.isNotEmpty() == true) {
-                        val hasOtherReturns = expression.anyDescendantOfType<KtReturnExpression> { it !in foldableReturns }
-                        val isSerious = !hasOtherReturns && foldableReturns.size > 1
-                        val verb = if (isSerious) "should" else "can"
-                        holder.registerProblemWithoutOfflineInformation(
-                                keyword,
-                                "Return $verb be lifted out of '${keyword.text}'",
-                                isOnTheFly,
-                                if (isSerious) ProblemHighlightType.GENERIC_ERROR_OR_WARNING
-                                else ProblemHighlightType.INFORMATION,
-                                LiftReturnOutFix(keyword.text)
-                        )
-                        return
-                    }
-                    val assignmentNumber = BranchedFoldingUtils.getFoldableAssignmentNumber(expression)
-                    if (assignmentNumber > 0) {
-                        val verb = if (assignmentNumber > 1) "should" else "can"
-                        holder.registerProblemWithoutOfflineInformation(
-                                keyword,
-                                "Assignment $verb be lifted out of '${keyword.text}'",
-                                isOnTheFly,
-                                if (assignmentNumber > 1) ProblemHighlightType.GENERIC_ERROR_OR_WARNING
-                                else ProblemHighlightType.INFORMATION,
-                                LiftAssignmentOutFix(keyword.text)
-                        )
-                    }
-                }
-
-                override fun visitIfExpression(expression: KtIfExpression) {
-                    super.visitIfExpression(expression)
-                    visitIfOrWhenOrTry(expression, expression.ifKeyword)
-                }
-
-                override fun visitWhenExpression(expression: KtWhenExpression) {
-                    super.visitWhenExpression(expression)
-                    visitIfOrWhenOrTry(expression, expression.whenKeyword)
-                }
-
-                override fun visitTryExpression(expression: KtTryExpression) {
-                    super.visitTryExpression(expression)
-                    expression.tryKeyword?.let {
-                        visitIfOrWhenOrTry(expression, it)
-                    }
+        object : KtVisitorVoid() {
+            override fun visitExpression(expression: KtExpression) {
+                val states = getState(expression, skipLongExpressions) ?: return
+                states.forEach { state ->
+                    registerProblem(
+                        expression,
+                        state.keyword,
+                        state.isSerious,
+                        when (state.liftType) {
+                            LiftType.LIFT_RETURN_OUT -> LiftReturnOutFix(state.keyword.text)
+                            LiftType.LIFT_ASSIGNMENT_OUT -> LiftAssignmentOutFix(state.keyword.text)
+                        },
+                        state.highlightElement,
+                        state.highlightType
+                    )
                 }
             }
 
-    private class LiftReturnOutFix (private val keyword: String) : LocalQuickFix {
+            private fun registerProblem(
+                expression: KtExpression,
+                keyword: PsiElement,
+                isSerious: Boolean,
+                fix: LocalQuickFix,
+                highlightElement: PsiElement = keyword,
+                highlightType: ProblemHighlightType = if (isSerious) GENERIC_ERROR_OR_WARNING else INFORMATION
+            ) {
+                val subject = if (fix is LiftReturnOutFix) "Return" else "Assignment"
+                val verb = if (isSerious) "should" else "can"
+                holder.registerProblemWithoutOfflineInformation(
+                    expression,
+                    "$subject $verb be lifted out of '${keyword.text}'",
+                    isOnTheFly,
+                    highlightType,
+                    highlightElement.textRange?.shiftRight(-expression.startOffset),
+                    fix
+                )
+            }
+
+        }
+
+    private class LiftReturnOutFix(private val keyword: String) : LocalQuickFix {
         override fun getName() = "Lift return out of '$keyword'"
 
         override fun getFamilyName() = name
 
         override fun applyFix(project: Project, descriptor: ProblemDescriptor) {
-            BranchedFoldingUtils.foldToReturn(descriptor.psiElement.getParentOfType(true)!!)
+            val replaced = BranchedFoldingUtils.foldToReturn(descriptor.psiElement as KtExpression)
+            replaced.findExistingEditor()?.caretModel?.moveToOffset(replaced.startOffset)
         }
     }
 
-    private class LiftAssignmentOutFix (private val keyword: String) : LocalQuickFix {
+    private class LiftAssignmentOutFix(private val keyword: String) : LocalQuickFix {
         override fun getName() = "Lift assignment out of '$keyword'"
 
         override fun getFamilyName() = name
 
         override fun applyFix(project: Project, descriptor: ProblemDescriptor) {
-            BranchedFoldingUtils.foldToAssignment(descriptor.psiElement.getParentOfType(true)!!)
+            BranchedFoldingUtils.foldToAssignment(descriptor.psiElement as KtExpression)
         }
     }
 
     companion object {
-        private val LINES_LIMIT = 15
+        private const val LINES_LIMIT = 15
+
+        fun getState(expression: KtExpression, skipLongExpressions: Boolean) = when (expression) {
+            is KtWhenExpression -> getStateForWhenOrTry(expression, expression.whenKeyword, skipLongExpressions)
+            is KtIfExpression -> getStateForWhenOrTry(expression, expression.ifKeyword, skipLongExpressions)
+            is KtTryExpression -> expression.tryKeyword?.let {
+                getStateForWhenOrTry(expression, it, skipLongExpressions)
+            }
+            else -> null
+        }
+
+        private fun getStateForWhenOrTry(
+            expression: KtExpression,
+            keyword: PsiElement,
+            skipLongExpressions: Boolean
+        ): List<LiftState>? {
+            if (skipLongExpressions && expression.lineCount() > LINES_LIMIT) return null
+            if (expression.isElseIf()) return null
+
+            val foldableReturns = BranchedFoldingUtils.getFoldableReturns(expression)
+            if (foldableReturns?.isNotEmpty() == true) {
+                val hasOtherReturns = expression.anyDescendantOfType<KtReturnExpression> { it !in foldableReturns }
+                val isSerious = !hasOtherReturns && foldableReturns.size > 1
+                return foldableReturns.map {
+                    LiftState(keyword, isSerious, LiftType.LIFT_RETURN_OUT, it, INFORMATION)
+                } + LiftState(keyword, isSerious, LiftType.LIFT_RETURN_OUT)
+            }
+
+            val assignmentNumber = BranchedFoldingUtils.getFoldableAssignmentNumber(expression)
+            if (assignmentNumber > 0) {
+                val isSerious = assignmentNumber > 1
+                return listOf(LiftState(keyword, isSerious, LiftType.LIFT_ASSIGNMENT_OUT))
+            }
+            return null
+        }
+
+        enum class LiftType {
+            LIFT_RETURN_OUT, LIFT_ASSIGNMENT_OUT
+        }
+
+        data class LiftState(
+            val keyword: PsiElement,
+            val isSerious: Boolean,
+            val liftType: LiftType,
+            val highlightElement: PsiElement = keyword,
+            val highlightType: ProblemHighlightType = if (isSerious) GENERIC_ERROR_OR_WARNING else INFORMATION
+        )
     }
 }

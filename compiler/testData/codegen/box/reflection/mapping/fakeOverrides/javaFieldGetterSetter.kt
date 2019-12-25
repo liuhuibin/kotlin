@@ -1,6 +1,5 @@
-// IGNORE_BACKEND: JS_IR
-// TODO: muted automatically, investigate should it be ran for JS or not
-// IGNORE_BACKEND: JS, NATIVE
+// IGNORE_BACKEND_FIR: JVM_IR
+// TARGET_BACKEND: JVM
 
 // WITH_REFLECT
 // KT-8131 Cannot find backing field in ancestor class via reflection

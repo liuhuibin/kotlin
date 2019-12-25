@@ -1,130 +1,75 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.backend.common.lower
 
 import org.jetbrains.kotlin.backend.common.ClassLoweringPass
 import org.jetbrains.kotlin.backend.common.CommonBackendContext
-import org.jetbrains.kotlin.descriptors.CallableMemberDescriptor
-import org.jetbrains.kotlin.descriptors.Modality
-import org.jetbrains.kotlin.descriptors.SourceElement
-import org.jetbrains.kotlin.descriptors.Visibilities
-import org.jetbrains.kotlin.descriptors.annotations.Annotations
-import org.jetbrains.kotlin.descriptors.impl.SimpleFunctionDescriptorImpl
-import org.jetbrains.kotlin.ir.IrElement
+import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
 import org.jetbrains.kotlin.ir.IrStatement
-import org.jetbrains.kotlin.ir.declarations.IrAnonymousInitializer
-import org.jetbrains.kotlin.ir.declarations.IrClass
-import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
-import org.jetbrains.kotlin.ir.declarations.IrField
-import org.jetbrains.kotlin.ir.declarations.impl.IrFunctionImpl
+import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrInstanceInitializerCall
-import org.jetbrains.kotlin.ir.expressions.impl.IrBlockBodyImpl
+import org.jetbrains.kotlin.ir.expressions.IrStatementOriginImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrBlockImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrGetValueImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrSetFieldImpl
 import org.jetbrains.kotlin.ir.util.deepCopyWithSymbols
-import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
-import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
-import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
-import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.resolve.DescriptorUtils
-import org.jetbrains.kotlin.resolve.descriptorUtil.builtIns
-import java.util.*
 
+object SYNTHESIZED_INIT_BLOCK : IrStatementOriginImpl("SYNTHESIZED_INIT_BLOCK")
 
-class InitializersLowering(
-    val context: CommonBackendContext,
-    val declarationOrigin: IrDeclarationOrigin,
-    private val clinitNeeded: Boolean
-) : ClassLoweringPass {
+open class InitializersLowering(context: CommonBackendContext) : InitializersLoweringBase(context) {
     override fun lower(irClass: IrClass) {
-        val classInitializersBuilder = ClassInitializersBuilder(irClass)
-        irClass.acceptChildrenVoid(classInitializersBuilder)
-
-        classInitializersBuilder.transformInstanceInitializerCallsInConstructors(irClass)
-
-        if (clinitNeeded && classInitializersBuilder.staticInitializerStatements.isNotEmpty())
-            classInitializersBuilder.createStaticInitializationMethod(irClass)
-    }
-
-    private inner class ClassInitializersBuilder(val irClass: IrClass) : IrElementVisitorVoid {
-        val staticInitializerStatements = ArrayList<IrStatement>()
-
-        val instanceInitializerStatements = ArrayList<IrStatement>()
-
-        override fun visitElement(element: IrElement) {
-            // skip everything else
+        val instanceInitializerStatements = extractInitializers(irClass) {
+            (it is IrField && !it.isStatic) || (it is IrAnonymousInitializer && !it.isStatic)
         }
+        irClass.transformChildrenVoid(object : IrElementTransformerVoidWithContext() {
+            // Only transform constructors of current class.
+            override fun visitClassNew(declaration: IrClass) = declaration
 
-        override fun visitField(declaration: IrField) {
-            val irFieldInitializer = declaration.initializer?.expression ?: return
+            override fun visitSimpleFunction(declaration: IrSimpleFunction) = declaration
 
-            val receiver =
-                if (declaration.descriptor.dispatchReceiverParameter != null) // TODO isStaticField
-                    IrGetValueImpl(
-                        irFieldInitializer.startOffset, irFieldInitializer.endOffset,
-                        irClass.thisReceiver!!.symbol
-                    )
-                else null
-            val irSetField = IrSetFieldImpl(
-                irFieldInitializer.startOffset, irFieldInitializer.endOffset,
-                declaration.symbol,
-                receiver,
-                irFieldInitializer,
-                null, null
-            )
+            override fun visitInstanceInitializerCall(expression: IrInstanceInitializerCall): IrExpression =
+                IrBlockImpl(irClass.startOffset, irClass.endOffset, context.irBuiltIns.unitType, null, instanceInitializerStatements)
+                    .deepCopyWithSymbols(currentScope!!.scope.getLocalDeclarationParent())
+        })
+    }
+}
 
-            if (DescriptorUtils.isStaticDeclaration(declaration.descriptor)) {
-                staticInitializerStatements.add(irSetField)
-            } else {
-                instanceInitializerStatements.add(irSetField)
+abstract class InitializersLoweringBase(open val context: CommonBackendContext) : ClassLoweringPass {
+    protected fun extractInitializers(irClass: IrClass, filter: (IrDeclaration) -> Boolean) =
+        irClass.declarations.filter(filter).mapNotNull {
+            when (it) {
+                is IrField -> handleField(irClass, it)
+                is IrAnonymousInitializer -> handleAnonymousInitializer(it)
+                else -> null
             }
+        }.also {
+            irClass.declarations.removeAll { it is IrAnonymousInitializer && filter(it) }
         }
 
-        override fun visitAnonymousInitializer(declaration: IrAnonymousInitializer) {
-            instanceInitializerStatements.addAll(declaration.body.statements)
+    protected open fun shouldEraseFieldInitializer(irField: IrField): Boolean = irField.correspondingPropertySymbol?.owner?.isConst != true
+
+    private fun handleField(irClass: IrClass, declaration: IrField): IrStatement? =
+        declaration.initializer?.run {
+            val receiver = if (!declaration.isStatic) // TODO isStaticField
+                IrGetValueImpl(startOffset, endOffset, irClass.thisReceiver!!.type, irClass.thisReceiver!!.symbol)
+            else
+                null
+            val value = if (shouldEraseFieldInitializer(declaration)) {
+                declaration.initializer = null
+                expression
+            } else {
+                expression.deepCopyWithSymbols()
+            }
+            IrSetFieldImpl(startOffset, endOffset, declaration.symbol, receiver, value, context.irBuiltIns.unitType)
         }
 
-        fun transformInstanceInitializerCallsInConstructors(irClass: IrClass) {
-            irClass.transformChildrenVoid(object : IrElementTransformerVoid() {
-                override fun visitInstanceInitializerCall(expression: IrInstanceInitializerCall): IrExpression {
-                    return IrBlockImpl(irClass.startOffset, irClass.endOffset, context.builtIns.unitType, null,
-                                       instanceInitializerStatements.map { it.copy(irClass) })
-                }
-            })
+    private fun handleAnonymousInitializer(declaration: IrAnonymousInitializer): IrStatement =
+        with(declaration) {
+            IrBlockImpl(startOffset, endOffset, context.irBuiltIns.unitType, SYNTHESIZED_INIT_BLOCK, body.statements)
         }
-
-        fun createStaticInitializationMethod(irClass: IrClass) {
-            val staticInitializerDescriptor = SimpleFunctionDescriptorImpl.create(
-                irClass.descriptor, Annotations.EMPTY, clinitName,
-                CallableMemberDescriptor.Kind.SYNTHESIZED,
-                SourceElement.NO_SOURCE
-            )
-            staticInitializerDescriptor.initialize(
-                null, null, emptyList(), emptyList(),
-                irClass.descriptor.builtIns.unitType,
-                Modality.FINAL, Visibilities.PUBLIC
-            )
-            irClass.declarations.add(
-                IrFunctionImpl(
-                    irClass.startOffset, irClass.endOffset, declarationOrigin,
-                    staticInitializerDescriptor,
-                    IrBlockBodyImpl(irClass.startOffset, irClass.endOffset,
-                                    staticInitializerStatements.map { it.copy(irClass) })
-                )
-            )
-        }
-    }
-
-    companion object {
-        val clinitName = Name.special("<clinit>")
-
-        fun IrStatement.copy(containingDeclaration: IrClass) = deepCopyWithSymbols(containingDeclaration)
-        fun IrExpression.copy(containingDeclaration: IrClass) = deepCopyWithSymbols(containingDeclaration)
-    }
 }

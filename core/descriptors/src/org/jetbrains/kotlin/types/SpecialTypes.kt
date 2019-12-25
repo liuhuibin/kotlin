@@ -20,8 +20,11 @@ import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
 import org.jetbrains.kotlin.storage.StorageManager
+import org.jetbrains.kotlin.types.checker.KotlinTypeRefiner
 import org.jetbrains.kotlin.types.checker.NewTypeVariableConstructor
 import org.jetbrains.kotlin.types.checker.NullabilityChecker
+import org.jetbrains.kotlin.types.model.DefinitelyNotNullTypeMarker
+import org.jetbrains.kotlin.types.refinement.TypeRefinement
 import org.jetbrains.kotlin.types.typeUtil.canHaveUndefinedNullability
 
 abstract class DelegatingSimpleType : SimpleType() {
@@ -32,6 +35,13 @@ abstract class DelegatingSimpleType : SimpleType() {
     override val arguments: List<TypeProjection> get() = delegate.arguments
     override val isMarkedNullable: Boolean get() = delegate.isMarkedNullable
     override val memberScope: MemberScope get() = delegate.memberScope
+
+    @TypeRefinement
+    abstract fun replaceDelegate(delegate: SimpleType): DelegatingSimpleType
+
+    @TypeRefinement
+    override fun refine(kotlinTypeRefiner: KotlinTypeRefiner): SimpleType =
+        replaceDelegate(kotlinTypeRefiner.refineType(delegate) as SimpleType)
 }
 
 class AbbreviatedType(override val delegate: SimpleType, val abbreviation: SimpleType) : DelegatingSimpleType() {
@@ -42,6 +52,17 @@ class AbbreviatedType(override val delegate: SimpleType, val abbreviation: Simpl
 
     override fun makeNullableAsSpecified(newNullability: Boolean)
             = AbbreviatedType(delegate.makeNullableAsSpecified(newNullability), abbreviation.makeNullableAsSpecified(newNullability))
+
+    @TypeRefinement
+    override fun replaceDelegate(delegate: SimpleType) = AbbreviatedType(delegate, abbreviation)
+
+    @TypeRefinement
+    @UseExperimental(TypeRefinement::class)
+    override fun refine(kotlinTypeRefiner: KotlinTypeRefiner): AbbreviatedType =
+        AbbreviatedType(
+            kotlinTypeRefiner.refineType(delegate) as SimpleType,
+            kotlinTypeRefiner.refineType(abbreviation) as SimpleType
+        )
 }
 
 fun KotlinType.getAbbreviatedType(): AbbreviatedType? = unwrap() as? AbbreviatedType
@@ -52,15 +73,26 @@ fun SimpleType.withAbbreviation(abbreviatedType: SimpleType): SimpleType {
     return AbbreviatedType(this, abbreviatedType)
 }
 
-class LazyWrappedType(storageManager: StorageManager, computation: () -> KotlinType): WrappedType() {
+class LazyWrappedType(
+    private val storageManager: StorageManager,
+    private val computation: () -> KotlinType
+) : WrappedType() {
     private val lazyValue = storageManager.createLazyValue(computation)
 
     override val delegate: KotlinType get() = lazyValue()
 
     override fun isComputed(): Boolean = lazyValue.isComputed()
+
+    @TypeRefinement
+    @UseExperimental(TypeRefinement::class)
+    override fun refine(kotlinTypeRefiner: KotlinTypeRefiner) = LazyWrappedType(storageManager) {
+        kotlinTypeRefiner.refineType(computation())
+    }
 }
 
-class DefinitelyNotNullType private constructor(val original: SimpleType) : DelegatingSimpleType(), CustomTypeVariable {
+class DefinitelyNotNullType private constructor(val original: SimpleType) : DelegatingSimpleType(), CustomTypeVariable,
+    DefinitelyNotNullTypeMarker {
+
     companion object {
         internal fun makeDefinitelyNotNull(type: UnwrappedType): DefinitelyNotNullType? {
             return when {
@@ -81,8 +113,8 @@ class DefinitelyNotNullType private constructor(val original: SimpleType) : Dele
             }
         }
 
-        fun makesSenseToBeDefinitelyNotNull(type: UnwrappedType): Boolean =
-                type.canHaveUndefinedNullability() && !NullabilityChecker.isSubtypeOfAny(type)
+        private fun makesSenseToBeDefinitelyNotNull(type: UnwrappedType): Boolean =
+            type.canHaveUndefinedNullability() && !NullabilityChecker.isSubtypeOfAny(type)
     }
 
     override val delegate: SimpleType
@@ -105,13 +137,31 @@ class DefinitelyNotNullType private constructor(val original: SimpleType) : Dele
             if (newNullability) delegate.makeNullableAsSpecified(newNullability) else this
 
     override fun toString(): String = "$delegate!!"
+
+    @TypeRefinement
+    override fun replaceDelegate(delegate: SimpleType) = DefinitelyNotNullType(delegate)
 }
 
 val KotlinType.isDefinitelyNotNullType: Boolean
     get() = unwrap() is DefinitelyNotNullType
 
 fun SimpleType.makeSimpleTypeDefinitelyNotNullOrNotNull(): SimpleType =
-        DefinitelyNotNullType.makeDefinitelyNotNull(this) ?: makeNullableAsSpecified(false)
+    DefinitelyNotNullType.makeDefinitelyNotNull(this)
+        ?: makeIntersectionTypeDefinitelyNotNullOrNotNull()
+        ?: makeNullableAsSpecified(false)
 
 fun UnwrappedType.makeDefinitelyNotNullOrNotNull(): UnwrappedType =
-        DefinitelyNotNullType.makeDefinitelyNotNull(this) ?: makeNullableAsSpecified(false)
+    DefinitelyNotNullType.makeDefinitelyNotNull(this)
+        ?: makeIntersectionTypeDefinitelyNotNullOrNotNull()
+        ?: makeNullableAsSpecified(false)
+
+private fun KotlinType.makeIntersectionTypeDefinitelyNotNullOrNotNull(): SimpleType? {
+    val typeConstructor = constructor as? IntersectionTypeConstructor ?: return null
+    val definitelyNotNullConstructor = typeConstructor.makeDefinitelyNotNullOrNotNull() ?: return null
+
+    return definitelyNotNullConstructor.createType()
+}
+
+private fun IntersectionTypeConstructor.makeDefinitelyNotNullOrNotNull(): IntersectionTypeConstructor? {
+    return transformComponents({ TypeUtils.isNullableType(it) }, { it.unwrap().makeDefinitelyNotNullOrNotNull() })
+}

@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.caches.project
@@ -8,21 +8,27 @@ package org.jetbrains.kotlin.idea.caches.project
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.projectRoots.ProjectJdkTable
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.roots.JdkOrderEntry
 import com.intellij.openapi.roots.LibraryOrderEntry
 import com.intellij.openapi.roots.ModuleRootManager
-import com.intellij.openapi.roots.ProjectRootModificationTracker
-import com.intellij.psi.util.CachedValueProvider
-import org.jetbrains.kotlin.resolve.TargetPlatform
+import org.jetbrains.kotlin.caches.project.cacheInvalidatingOnRootModifications
+import org.jetbrains.kotlin.idea.util.getProjectJdkTableSafe
+import org.jetbrains.kotlin.platform.TargetPlatform
+import org.jetbrains.kotlin.platform.isCommon
+import org.jetbrains.kotlin.types.typeUtil.closure
 import java.util.concurrent.ConcurrentHashMap
 
-fun getModuleInfosFromIdeaModel(project: Project, platform: TargetPlatform): List<IdeaModuleInfo> {
-    val modelInfosCache = project.cached(CachedValueProvider {
-        CachedValueProvider.Result(collectModuleInfosFromIdeaModel(project), ProjectRootModificationTracker.getInstance(project))
-    })
-    return modelInfosCache.forPlatform(platform)
+/** null-platform means that we should get all modules */
+fun getModuleInfosFromIdeaModel(project: Project, platform: TargetPlatform? = null): List<IdeaModuleInfo> {
+    val modelInfosCache = project.cacheInvalidatingOnRootModifications {
+        collectModuleInfosFromIdeaModel(project)
+    }
+
+    return if (platform != null)
+        modelInfosCache.forPlatform(platform)
+    else
+        modelInfosCache.allModules()
 }
 
 private class IdeaModelInfosCache(
@@ -37,6 +43,8 @@ private class IdeaModelInfosCache(
             mergePlatformModules(moduleSourceInfos, platform) + libraryInfos + sdkInfos
         }
     }
+
+    fun allModules(): List<IdeaModuleInfo> = moduleSourceInfos + libraryInfos + sdkInfos
 }
 
 
@@ -60,7 +68,7 @@ private fun collectModuleInfosFromIdeaModel(
 
     return IdeaModelInfosCache(
         moduleSourceInfos = ideaModules.flatMap(Module::correspondingModuleInfos),
-        libraryInfos = ideaLibraries.map { LibraryInfo(project, it) },
+        libraryInfos = ideaLibraries.flatMap { createLibraryInfo(project, it) },
         sdkInfos = (sdksFromModulesDependencies + getAllProjectSdks()).filterNotNull().toSet().map { SdkInfo(project, it) }
     )
 }
@@ -69,7 +77,7 @@ private fun mergePlatformModules(
     allModules: List<ModuleSourceInfo>,
     platform: TargetPlatform
 ): List<IdeaModuleInfo> {
-    if (platform == TargetPlatform.Common) return allModules
+    if (platform.isCommon()) return allModules
 
     val platformModules =
         allModules.flatMap { module ->
@@ -77,13 +85,11 @@ private fun mergePlatformModules(
                 listOf(module to module.expectedBy)
             else emptyList()
         }.map { (module, expectedBys) ->
-            PlatformModuleInfo(module, expectedBys)
+            PlatformModuleInfo(module, expectedBys.closure(preserveOrder = true) { it.expectedBy }.toList())
         }
 
     val rest = allModules - platformModules.flatMap { it.containedModules }
     return rest + platformModules
 }
 
-internal fun getAllProjectSdks(): Collection<Sdk> {
-    return ProjectJdkTable.getInstance().allJdks.toList()
-}
+internal fun getAllProjectSdks(): Array<Sdk> = getProjectJdkTableSafe().allJdks

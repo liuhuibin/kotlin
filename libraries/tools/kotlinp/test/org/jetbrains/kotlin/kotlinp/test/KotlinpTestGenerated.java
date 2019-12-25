@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.kotlinp.test;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.kotlinp.test;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -22,16 +21,21 @@ import java.util.regex.Pattern;
 @RunWith(JUnit3RunnerWithInners.class)
 public class KotlinpTestGenerated extends AbstractKotlinpTest {
     private void runTest(String testDataFilePath) throws Exception {
-        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
 
     public void testAllFilesPresentInTestData() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("libraries/tools/kotlinp/testData"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("libraries/tools/kotlinp/testData"), Pattern.compile("^(.+)\\.kt$"), null, true);
     }
 
     @TestMetadata("Annotations.kt")
     public void testAnnotations() throws Exception {
         runTest("libraries/tools/kotlinp/testData/Annotations.kt");
+    }
+
+    @TestMetadata("Contracts.kt")
+    public void testContracts() throws Exception {
+        runTest("libraries/tools/kotlinp/testData/Contracts.kt");
     }
 
     @TestMetadata("Lambda.kt")
@@ -62,6 +66,11 @@ public class KotlinpTestGenerated extends AbstractKotlinpTest {
     @TestMetadata("PlatformType.kt")
     public void testPlatformType() throws Exception {
         runTest("libraries/tools/kotlinp/testData/PlatformType.kt");
+    }
+
+    @TestMetadata("Properties.kt")
+    public void testProperties() throws Exception {
+        runTest("libraries/tools/kotlinp/testData/Properties.kt");
     }
 
     @TestMetadata("SimpleClass.kt")

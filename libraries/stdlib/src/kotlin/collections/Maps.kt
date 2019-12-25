@@ -1,12 +1,14 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 @file:kotlin.jvm.JvmMultifileClass
 @file:kotlin.jvm.JvmName("MapsKt")
 
 package kotlin.collections
+
+import kotlin.contracts.*
 
 private object EmptyMap : Map<Any?, Nothing>, Serializable {
     private const val serialVersionUID: Long = 8246714829545688274
@@ -86,6 +88,8 @@ public fun <K, V> mutableMapOf(vararg pairs: Pair<K, V>): MutableMap<K, V> =
 
 /**
  * Returns an empty new [HashMap].
+ *
+ * @sample samples.collections.Maps.Instantiation.emptyHashMap
  */
 @SinceKotlin("1.1")
 @kotlin.internal.InlineOnly
@@ -141,10 +145,37 @@ private const val INT_MAX_POWER_OF_TWO: Int = Int.MAX_VALUE / 2 + 1
 public inline fun <K, V> Map<out K, V>.isNotEmpty(): Boolean = !isEmpty()
 
 /**
+ * Returns `true` if this nullable map is either null or empty.
+ * @sample samples.collections.Maps.Usage.mapIsNullOrEmpty
+ */
+@SinceKotlin("1.3")
+@kotlin.internal.InlineOnly
+public inline fun <K, V> Map<out K, V>?.isNullOrEmpty(): Boolean {
+    contract {
+        returns(false) implies (this@isNullOrEmpty != null)
+    }
+
+    return this == null || isEmpty()
+}
+
+/**
  * Returns the [Map] if its not `null`, or the empty [Map] otherwise.
+ *
+ * @sample samples.collections.Maps.Usage.mapOrEmpty
  */
 @kotlin.internal.InlineOnly
 public inline fun <K, V> Map<K, V>?.orEmpty(): Map<K, V> = this ?: emptyMap()
+
+/**
+ * Returns this map if it's not empty
+ * or the result of calling [defaultValue] function if the map is empty.
+ *
+ * @sample samples.collections.Maps.Usage.mapIfEmpty
+ */
+@SinceKotlin("1.3")
+@kotlin.internal.InlineOnly
+public inline fun <M, R> M.ifEmpty(defaultValue: () -> R): R where M : Map<*, *>, M : R =
+    if (isEmpty()) defaultValue() else this
 
 /**
  * Checks if the map contains the given key.
@@ -182,6 +213,8 @@ public inline fun <@kotlin.internal.OnlyInputTypes K> Map<out K, *>.containsKey(
  * Returns `true` if the map maps one or more keys to the specified [value].
  *
  * Allows to overcome type-safety restriction of `containsValue` that requires to pass a value of type `V`.
+ *
+ * @sample samples.collections.Maps.Usage.containsValue
  */
 @Suppress("EXTENSION_SHADOWED_BY_MEMBER") // false warning, extension takes precedence in some cases
 @kotlin.internal.InlineOnly
@@ -265,6 +298,8 @@ public fun <K, V> Map<K, V>.getValue(key: K): V = getOrImplicitDefault(key)
 /**
  * Returns the value for the given key. If the key is not found in the map, calls the [defaultValue] function,
  * puts its result into the map under the given key and returns it.
+ *
+ * Note that the operation is not guaranteed to be atomic if the map is being modified concurrently.
  *
  * @sample samples.collections.Maps.Usage.getOrPut
  */
@@ -455,6 +490,7 @@ public inline fun <K, V> Map<out K, V>.filterNot(predicate: (Map.Entry<K, V>) ->
  * Returns a new map containing all key-value pairs from the given collection of pairs.
  *
  * The returned map preserves the entry iteration order of the original collection.
+ * If any of two pairs would have the same key the last one gets added to the map.
  */
 public fun <K, V> Iterable<Pair<K, V>>.toMap(): Map<K, V> {
     if (this is Collection) {
@@ -477,6 +513,7 @@ public fun <K, V, M : MutableMap<in K, in V>> Iterable<Pair<K, V>>.toMap(destina
  * Returns a new map containing all key-value pairs from the given array of pairs.
  *
  * The returned map preserves the entry iteration order of the original array.
+ * If any of two pairs would have the same key the last one gets added to the map.
  */
 public fun <K, V> Array<out Pair<K, V>>.toMap(): Map<K, V> = when (size) {
     0 -> emptyMap()
@@ -494,6 +531,7 @@ public fun <K, V, M : MutableMap<in K, in V>> Array<out Pair<K, V>>.toMap(destin
  * Returns a new map containing all key-value pairs from the given sequence of pairs.
  *
  * The returned map preserves the entry iteration order of the original sequence.
+ * If any of two pairs would have the same key the last one gets added to the map.
  */
 public fun <K, V> Sequence<Pair<K, V>>.toMap(): Map<K, V> = toMap(LinkedHashMap<K, V>()).optimizeReadOnlyMap()
 

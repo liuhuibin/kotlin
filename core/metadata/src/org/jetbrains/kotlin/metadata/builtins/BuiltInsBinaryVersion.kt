@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.metadata.builtins
@@ -14,11 +14,12 @@ import java.io.InputStream
  * of the core protobuf messages (metadata.proto).
  */
 class BuiltInsBinaryVersion(vararg numbers: Int) : BinaryVersion(*numbers) {
-    override fun isCompatible() = this.isCompatibleTo(INSTANCE)
+    override fun isCompatible(): Boolean =
+        this.isCompatibleTo(INSTANCE)
 
     companion object {
         @JvmField
-        val INSTANCE = BuiltInsBinaryVersion(1, 0, 3)
+        val INSTANCE = BuiltInsBinaryVersion(1, 0, 7)
 
         @JvmField
         val INVALID_VERSION = BuiltInsBinaryVersion()

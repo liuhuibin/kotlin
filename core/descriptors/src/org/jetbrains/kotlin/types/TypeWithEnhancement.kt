@@ -19,7 +19,8 @@ package org.jetbrains.kotlin.types
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.renderer.DescriptorRenderer
 import org.jetbrains.kotlin.renderer.DescriptorRendererOptions
-import org.jetbrains.kotlin.resolve.scopes.MemberScope
+import org.jetbrains.kotlin.types.checker.KotlinTypeRefiner
+import org.jetbrains.kotlin.types.refinement.TypeRefinement
 
 interface TypeWithEnhancement {
     val origin: UnwrappedType
@@ -39,6 +40,17 @@ class SimpleTypeWithEnhancement(
 
     override fun makeNullableAsSpecified(newNullability: Boolean): SimpleType
             = origin.makeNullableAsSpecified(newNullability).wrapEnhancement(enhancement.unwrap().makeNullableAsSpecified(newNullability)) as SimpleType
+
+    @TypeRefinement
+    override fun replaceDelegate(delegate: SimpleType) = SimpleTypeWithEnhancement(delegate, enhancement)
+
+    @TypeRefinement
+    @UseExperimental(TypeRefinement::class)
+    override fun refine(kotlinTypeRefiner: KotlinTypeRefiner): SimpleTypeWithEnhancement =
+            SimpleTypeWithEnhancement(
+                kotlinTypeRefiner.refineType(delegate) as SimpleType,
+                kotlinTypeRefiner.refineType(enhancement)
+            )
 }
 
 class FlexibleTypeWithEnhancement(
@@ -53,10 +65,22 @@ class FlexibleTypeWithEnhancement(
     override fun makeNullableAsSpecified(newNullability: Boolean): UnwrappedType
             = origin.makeNullableAsSpecified(newNullability).wrapEnhancement(enhancement.unwrap().makeNullableAsSpecified(newNullability))
 
-    override fun render(renderer: DescriptorRenderer, options: DescriptorRendererOptions): String
-            = origin.render(renderer, options)
+    override fun render(renderer: DescriptorRenderer, options: DescriptorRendererOptions): String {
+        if (options.enhancedTypes) {
+            return renderer.renderType(enhancement)
+        }
+        return origin.render(renderer, options)
+    }
 
     override val delegate: SimpleType get() = origin.delegate
+
+    @TypeRefinement
+    @UseExperimental(TypeRefinement::class)
+    override fun refine(kotlinTypeRefiner: KotlinTypeRefiner) =
+        FlexibleTypeWithEnhancement(
+            kotlinTypeRefiner.refineType(origin) as FlexibleType,
+            kotlinTypeRefiner.refineType(enhancement)
+        )
 }
 
 fun KotlinType.getEnhancement(): KotlinType? = when (this) {

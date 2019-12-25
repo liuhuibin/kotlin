@@ -40,10 +40,9 @@ class CompilerApiTest : KotlinIntegrationTestBase() {
     private val compilerLibDir = getCompilerLib()
 
     val compilerClassPath = listOf(
-            File(compilerLibDir, "kotlin-compiler.jar"))
-    val scriptRuntimeClassPath = listOf(
-            File(compilerLibDir, "kotlin-runtime.jar"),
-            File(compilerLibDir, "kotlin-script-runtime.jar"))
+            File(compilerLibDir, "kotlin-compiler.jar"),
+            File(compilerLibDir, "kotlin-daemon.jar")
+    )
     val compilerId by lazy(LazyThreadSafetyMode.NONE) { CompilerId.makeCompilerId(compilerClassPath) }
 
     private fun compileLocally(messageCollector: TestMessageCollector, vararg args: String): Pair<Int, Collection<OutputMessageUtil.Output>> {
@@ -147,7 +146,7 @@ class CompilerApiTest : KotlinIntegrationTestBase() {
         Assert.assertEquals(0, code)
         Assert.assertTrue(outputs.isNotEmpty())
         Assert.assertEquals(File(tmpdir, "Script.class").absolutePath, outputs.first().outputFile?.absolutePath)
-        runScriptWithArgs(getSimpleScriptBaseDir(), "script", "Script", scriptRuntimeClassPath + tmpdir, "hi", "there")
+        runScriptWithArgs(getSimpleScriptBaseDir(), "script", "Script", listOf(tmpdir), "hi", "there")
     }
 
     fun testSimpleScript() {
@@ -168,7 +167,7 @@ class CompilerApiTest : KotlinIntegrationTestBase() {
                 Assert.assertEquals(0, code)
                 Assert.assertTrue(outputs.isNotEmpty())
                 Assert.assertEquals(File(tmpdir, "Script.class").absolutePath, outputs.first().outputFile?.absolutePath)
-                runScriptWithArgs(getSimpleScriptBaseDir(), "script", "Script", scriptRuntimeClassPath + tmpdir, "hi", "there")
+                runScriptWithArgs(getSimpleScriptBaseDir(), "script", "Script", listOf(tmpdir), "hi", "there")
             }
             finally {
                 KotlinCompilerClient.shutdownCompileService(compilerId, daemonOptions)

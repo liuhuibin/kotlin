@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.resolve.calls.callResolverUtil
@@ -90,11 +90,22 @@ fun CallableDescriptor.hasInferredReturnType(constraintSystem: ConstraintSystem)
     return true
 }
 
+private fun filterOutTypeParameters(upperBounds: List<KotlinType>, candidateDescriptor: CallableDescriptor): List<KotlinType> {
+    if (upperBounds.size < 2) return upperBounds
+    val result = upperBounds.filterNot {
+        val declarationDescriptor = it.constructor.declarationDescriptor
+        declarationDescriptor is TypeParameterDescriptor && declarationDescriptor.containingDeclaration == candidateDescriptor
+    }
+    if (result.isEmpty()) return upperBounds
+    return result
+}
+
 fun getErasedReceiverType(receiverParameterDescriptor: ReceiverParameterDescriptor, descriptor: CallableDescriptor): KotlinType {
     var receiverType = receiverParameterDescriptor.type
     for (typeParameter in descriptor.typeParameters) {
         if (typeParameter.typeConstructor == receiverType.constructor) {
-            receiverType = TypeIntersector.getUpperBoundsAsType(typeParameter)
+            val properUpperBounds = filterOutTypeParameters(typeParameter.upperBounds, descriptor)
+            receiverType = TypeIntersector.intersectUpperBounds(typeParameter, properUpperBounds)
         }
     }
     val fakeTypeArguments = ContainerUtil.newSmartList<TypeProjection>()
@@ -134,7 +145,7 @@ fun isBinaryRemOperator(call: Call): Boolean {
     val operator = callElement.operationToken
     if (operator !is KtToken) return false
 
-    val name = OperatorConventions.getNameForOperationSymbol(operator, true, true)
+    val name = OperatorConventions.getNameForOperationSymbol(operator, true, true) ?: return false
     return name in OperatorConventions.REM_TO_MOD_OPERATION_NAMES.keys
 }
 
@@ -204,7 +215,10 @@ fun getEffectiveExpectedTypeForSingleArgument(
         return if (parameterDescriptor.varargElementType == null) DONT_CARE else parameterDescriptor.type
     }
 
-    if (arrayAssignmentToVarargInNamedFormInAnnotation(parameterDescriptor, argument, languageVersionSettings, trace)) {
+    if (
+        arrayAssignmentToVarargInNamedFormInAnnotation(parameterDescriptor, argument, languageVersionSettings, trace) ||
+        arrayAssignmentToVarargInNamedFormInFunction(parameterDescriptor, argument, languageVersionSettings, trace)
+    ) {
         return parameterDescriptor.type
     }
 
@@ -224,6 +238,17 @@ private fun arrayAssignmentToVarargInNamedFormInAnnotation(
     if (!languageVersionSettings.supportsFeature(LanguageFeature.AssigningArraysToVarargsInNamedFormInAnnotations)) return false
 
     if (!isParameterOfAnnotation(parameterDescriptor)) return false
+
+    return argument.isNamed() && parameterDescriptor.isVararg && isArrayOrArrayLiteral(argument, trace)
+}
+
+private fun arrayAssignmentToVarargInNamedFormInFunction(
+    parameterDescriptor: ValueParameterDescriptor,
+    argument: ValueArgument,
+    languageVersionSettings: LanguageVersionSettings,
+    trace: BindingTrace
+): Boolean {
+    if (!languageVersionSettings.supportsFeature(LanguageFeature.AllowAssigningArrayElementsToVarargsInNamedFormForFunctions)) return false
 
     return argument.isNamed() && parameterDescriptor.isVararg && isArrayOrArrayLiteral(argument, trace)
 }

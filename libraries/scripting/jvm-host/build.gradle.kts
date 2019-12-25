@@ -1,6 +1,4 @@
 
-import org.jetbrains.kotlin.gradle.dsl.Coroutines
-
 plugins {
     kotlin("jvm")
     id("jps-compatible")
@@ -8,14 +6,21 @@ plugins {
 
 jvmTarget = "1.6"
 
+publish()
+
 dependencies {
     compile(project(":kotlin-script-runtime"))
-    compile(projectDist(":kotlin-stdlib"))
+    compile(kotlinStdlib())
     compile(project(":kotlin-scripting-common"))
     compile(project(":kotlin-scripting-jvm"))
-    compile(project(":kotlin-script-util"))
+    compileOnly(project(":kotlin-scripting-compiler"))
     compileOnly(project(":compiler:cli"))
-    compileOnly(intellijCoreDep())
+    compileOnly(project(":kotlin-reflect-api"))
+    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+    publishedRuntime(project(":kotlin-compiler"))
+    publishedRuntime(project(":kotlin-scripting-compiler"))
+    publishedRuntime(project(":kotlin-reflect"))
+    publishedRuntime(commonDep("org.jetbrains.intellij.deps", "trove4j"))
 }
 
 sourceSets {
@@ -23,9 +28,9 @@ sourceSets {
     "test" {}
 }
 
-kotlin.experimental.coroutines = Coroutines.ENABLE
+tasks.withType<org.jetbrains.kotlin.gradle.dsl.KotlinCompile<*>> {
+    kotlinOptions.freeCompilerArgs += "-Xallow-kotlin-package"
+}
 
 standardPublicJars()
-
-publish()
 

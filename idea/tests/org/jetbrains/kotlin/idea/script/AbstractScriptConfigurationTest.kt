@@ -1,118 +1,57 @@
 /*
- * Copyright 2010-2016 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.script
 
-import com.intellij.codeInsight.highlighting.HighlightUsagesHandler
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.extensions.Extensions
 import com.intellij.openapi.module.JavaModuleType
 import com.intellij.openapi.module.Module
+import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.roots.ModuleRootModificationUtil
+import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.PlatformTestCase
-import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.PsiTestUtil
-import com.intellij.testFramework.exceptionCases.AbstractExceptionCase
+import com.intellij.util.ui.UIUtil
+import org.jdom.Element
 import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.idea.completion.test.KotlinCompletionTestCase
+import org.jetbrains.kotlin.idea.core.script.IdeScriptReportSink
+import org.jetbrains.kotlin.idea.core.script.ScriptConfigurationManager.Companion.updateScriptDependenciesSynchronously
 import org.jetbrains.kotlin.idea.core.script.ScriptDefinitionContributor
 import org.jetbrains.kotlin.idea.core.script.ScriptDefinitionsManager
-import org.jetbrains.kotlin.idea.core.script.ScriptDependenciesManager.Companion.updateScriptDependenciesSynchronously
-import org.jetbrains.kotlin.idea.core.script.isScriptDependenciesUpdaterDisabled
-import org.jetbrains.kotlin.idea.navigation.GotoCheck
+import org.jetbrains.kotlin.idea.core.script.isScriptChangesNotifierDisabled
+import org.jetbrains.kotlin.idea.core.script.settings.KotlinScriptingSettings
+import org.jetbrains.kotlin.idea.highlighter.KotlinHighlightingUtil
+import org.jetbrains.kotlin.idea.test.PluginTestCaseBase
 import org.jetbrains.kotlin.idea.util.application.runWriteAction
-import org.jetbrains.kotlin.test.InTextDirectivesUtils
+import org.jetbrains.kotlin.idea.util.getProjectJdkTableSafe
+import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.scripting.definitions.findScriptDefinition
 import org.jetbrains.kotlin.test.KotlinTestUtils
 import org.jetbrains.kotlin.test.MockLibraryUtil
+import org.jetbrains.kotlin.test.TestJdkKind
 import org.jetbrains.kotlin.test.util.addDependency
 import org.jetbrains.kotlin.test.util.projectLibrary
-import org.jetbrains.kotlin.test.util.renderAsGotoImplementation
 import org.jetbrains.kotlin.utils.PathUtil
-import org.junit.Assert
-import org.junit.ComparisonFailure
+import org.jetbrains.kotlin.utils.PathUtil.KOTLIN_JAVA_SCRIPT_RUNTIME_JAR
+import org.jetbrains.kotlin.utils.PathUtil.KOTLIN_SCRIPTING_COMMON_JAR
+import org.jetbrains.kotlin.utils.PathUtil.KOTLIN_SCRIPTING_JVM_JAR
 import java.io.File
 import java.util.regex.Pattern
 import kotlin.script.dependencies.Environment
+import kotlin.script.experimental.api.ScriptDiagnostic
 
-
-abstract class AbstractScriptConfigurationHighlightingTest : AbstractScriptConfigurationTest() {
-    fun doTest(path: String) {
-        configureScriptFile(path)
-
-        // Highlight references at caret
-        HighlightUsagesHandler.invoke(project, editor, myFile)
-
-        checkHighlighting(
-            editor,
-            InTextDirectivesUtils.isDirectiveDefined(file.text, "// CHECK_WARNINGS"),
-            InTextDirectivesUtils.isDirectiveDefined(file.text, "// CHECK_INFOS"))
-    }
-
-    fun doComplexTest(path: String) {
-        configureScriptFile(path)
-        assertException(object : AbstractExceptionCase<ComparisonFailure>() {
-            override fun getExpectedExceptionClass(): Class<ComparisonFailure> = ComparisonFailure::class.java
-
-            override fun tryClosure() {
-                checkHighlighting(editor, false, false)
-            }
-        })
-
-        updateScriptDependenciesSynchronously(myFile.virtualFile, project)
-        checkHighlighting(editor, false, false)
-    }
-
-    override fun setUp() {
-        super.setUp()
-        ApplicationManager.getApplication().isScriptDependenciesUpdaterDisabled = true
-    }
-
-    override fun tearDown() {
-        ApplicationManager.getApplication().isScriptDependenciesUpdaterDisabled = false
-        super.tearDown()
-    }
-}
-
-abstract class AbstractScriptConfigurationNavigationTest : AbstractScriptConfigurationTest() {
-
-    fun doTest(path: String) {
-        configureScriptFile(path)
-        val reference = file!!.findReferenceAt(myEditor.caretModel.offset)!!
-
-        val resolved = reference.resolve()!!.navigationElement!!
-
-        val expectedReference = InTextDirectivesUtils.findStringWithPrefixes(file.text, "// REF:")
-        val actualReference = resolved.renderAsGotoImplementation()
-
-        Assert.assertEquals(expectedReference, actualReference)
-
-        val expectedFile = InTextDirectivesUtils.findStringWithPrefixes(file.text, "// FILE:")
-        val actualFile = GotoCheck.getFileWithDir(resolved)
-
-        Assert.assertEquals(expectedFile, actualFile)
-    }
-}
-
-private val validKeys = setOf("sources", "classpath", "imports")
+private val validKeys = setOf("javaHome", "sources", "classpath", "imports", "template-classes-names")
 private const val useDefaultTemplate = "// DEPENDENCIES:"
+private const val templatesSettings = "// TEMPLATES: "
+
 // some bugs can only be reproduced when some module and script have intersecting library dependencies
 private const val configureConflictingModule = "// CONFLICTING_MODULE"
 
@@ -131,11 +70,29 @@ abstract class AbstractScriptConfigurationTest : KotlinCompletionTestCase() {
         // do not create default module
     }
 
-    private fun findMainScript(testDir: String) = File(testDir).walkTopDown().find { it.name == SCRIPT_NAME }
+    private fun findMainScript(testDir: String): File {
+        val scriptFile = File(testDir).walkTopDown().find { it.name == SCRIPT_NAME }
+        if (scriptFile != null) return scriptFile
+
+        return File(testDir).walkTopDown().singleOrNull { it.name.contains("script") }
             ?: error("Couldn't find $SCRIPT_NAME file in $testDir")
+    }
+
+    private val sdk by lazy {
+        val jdk = PluginTestCaseBase.jdk(TestJdkKind.MOCK_JDK)
+        runWriteAction {
+            getProjectJdkTableSafe().addJdk(jdk, testRootDisposable)
+            ProjectRootManager.getInstance(project).projectSdk = jdk
+        }
+        jdk
+    }
 
     protected fun configureScriptFile(path: String) {
         val mainScriptFile = findMainScript(path)
+        configureScriptFile(path, mainScriptFile)
+    }
+
+    protected fun configureScriptFile(path: String, mainScriptFile: File) {
         val environment = createScriptEnvironment(mainScriptFile)
         registerScriptTemplateProvider(environment)
 
@@ -149,20 +106,85 @@ abstract class AbstractScriptConfigurationTest : KotlinCompletionTestCase() {
             ModuleRootModificationUtil.addDependency(myModule, newModule)
         }
 
+        if (module != null) {
+            module.addDependency(
+                projectLibrary(
+                    "script-runtime",
+                    classesRoot = VfsUtil.findFileByIoFile(PathUtil.kotlinPathsForDistDirectory.scriptRuntimePath, true)
+                )
+            )
+
+            if (environment["template-classes"] != null) {
+                module.addDependency(
+                    projectLibrary(
+                        "script-template-library",
+                        classesRoot = VfsUtil.findFileByIoFile(environment["template-classes"] as File, true)
+                    )
+                )
+            }
+        }
+
         if (configureConflictingModule in environment) {
-            val sharedLib = LocalFileSystem.getInstance().findFileByIoFile(environment["lib-classes"] as File)!!
+            val sharedLib = VfsUtil.findFileByIoFile(environment["lib-classes"] as File, true)!!
             if (module == null) {
+                // Force create module if it doesn't exist
                 myModule = createTestModuleByName("mainModule")
             }
             module.addDependency(projectLibrary("sharedLib", classesRoot = sharedLib))
         }
 
+        if (module != null) {
+            ModuleRootModificationUtil.updateModel(module) { model ->
+                model.sdk = sdk
+            }
+        }
+
         createFileAndSyncDependencies(mainScriptFile)
+    }
+
+    private val oldScripClasspath: String? = System.getProperty("kotlin.script.classpath")
+
+    private var settings: Element? = null
+
+    override fun setUp() {
+        super.setUp()
+        ApplicationManager.getApplication().isScriptChangesNotifierDisabled = true
+
+        settings = KotlinScriptingSettings.getInstance(project).state
+
+        ScriptDefinitionsManager.getInstance(project).getAllDefinitions().forEach {
+            KotlinScriptingSettings.getInstance(project).setEnabled(it, false)
+        }
+
+        setUpTestProject()
+    }
+
+    open fun setUpTestProject() {
+
+    }
+
+    override fun tearDown() {
+        ApplicationManager.getApplication().isScriptChangesNotifierDisabled = false
+
+        System.setProperty("kotlin.script.classpath", oldScripClasspath ?: "")
+
+        settings?.let {
+            KotlinScriptingSettings.getInstance(project).loadState(it)
+        }
+
+        super.tearDown()
+    }
+
+    override fun getTestProjectJdk(): Sdk {
+        return PluginTestCaseBase.mockJdk()
     }
 
     private fun createTestModuleByName(name: String): Module {
         val newModuleDir = runWriteAction { VfsUtil.createDirectoryIfMissing(project.baseDir, name) }
-        val newModule = createModuleAtWrapper(name, project, JavaModuleType.getModuleType(), newModuleDir.path)
+        val newModule = createModuleAt(name, project, JavaModuleType.getModuleType(), newModuleDir.path)
+
+        // Return type was changed, but it's not used. BUNCH: 183
+        @Suppress("MissingRecentApi")
         PsiTestUtil.addSourceContentToRoots(newModule, newModuleDir)
         return newModule
     }
@@ -177,14 +199,22 @@ abstract class AbstractScriptConfigurationTest : KotlinCompletionTestCase() {
         val defaultEnvironment = defaultEnvironment(scriptFile.parent + File.separator)
         val env = mutableMapOf<String, Any?>()
         scriptFile.forEachLine { line ->
-            line.trim().takeIf { useDefaultTemplate in it }?.substringAfter(useDefaultTemplate)?.split(";")?.forEach { entry ->
-                val (key, values) = entry.splitOrEmpty(":").map { it.trim() }
-                assert(key in validKeys) { "Unexpected key: $key" }
-                env[key] = values.split(",").map {
-                    val str = it.trim()
-                    defaultEnvironment[str] ?: str
+
+            fun iterateKeysInLine(prefix: String) {
+                if (line.contains(prefix)) {
+                    line.trim().substringAfter(prefix).split(";").forEach { entry ->
+                        val (key, values) = entry.splitOrEmpty(":").map { it.trim() }
+                        assert(key in validKeys) { "Unexpected key: $key" }
+                        env[key] = values.split(",").map {
+                            val str = it.trim()
+                            defaultEnvironment[str] ?: str
+                        }
+                    }
                 }
             }
+
+            iterateKeysInLine(useDefaultTemplate)
+            iterateKeysInLine(templatesSettings)
 
             switches.forEach {
                 if (it in line) {
@@ -192,16 +222,34 @@ abstract class AbstractScriptConfigurationTest : KotlinCompletionTestCase() {
                 }
             }
         }
-        if (env[useDefaultTemplate] == true && defaultEnvironment["template-classes"] != null) {
-            error("Script configuration should be defined by either '$useDefaultTemplate' clause or via template in 'template' directory")
+
+        if (env[useDefaultTemplate] != true && env["template-classes-names"] == null) {
+            env["template-classes-names"] = listOf("custom.scriptDefinition.Template")
         }
+
+        val jdkKind = when ((env["javaHome"] as? List<String>)?.singleOrNull()) {
+            "9" -> TestJdkKind.FULL_JDK_9
+            else -> TestJdkKind.MOCK_JDK
+        }
+        runWriteAction {
+            val jdk = PluginTestCaseBase.jdk(jdkKind)
+            getProjectJdkTableSafe().addJdk(jdk, testRootDisposable)
+            env["javaHome"] = File(jdk.homePath)
+        }
+
         env.putAll(defaultEnvironment)
         return env
     }
 
     private fun defaultEnvironment(path: String): Map<String, File?> {
         val templateOutDir = File("${path}template").takeIf { it.isDirectory }?.let {
-            compileLibToDir(it, PathUtil.kotlinPathsForDistDirectory.scriptRuntimePath.path)
+            compileLibToDir(it, *scriptClasspath())
+        } ?: File("idea/testData/script/definition/defaultTemplate").takeIf { it.isDirectory }?.let {
+            compileLibToDir(it, *scriptClasspath())
+        }
+
+        if (templateOutDir != null) {
+            System.setProperty("kotlin.script.classpath", templateOutDir.path)
         }
 
         val libSrcDir = File("${path}lib").takeIf { it.isDirectory }
@@ -217,29 +265,57 @@ abstract class AbstractScriptConfigurationTest : KotlinCompletionTestCase() {
         )
     }
 
-    private fun createFileAndSyncDependencies(scriptFile: File) {
+    private fun scriptClasspath(): Array<String> {
+        return with(PathUtil.kotlinPathsForDistDirectory) {
+            arrayOf(
+                File(libPath, KOTLIN_JAVA_SCRIPT_RUNTIME_JAR).path,
+                File(libPath, KOTLIN_SCRIPTING_COMMON_JAR).path,
+                File(libPath, KOTLIN_SCRIPTING_JVM_JAR).path
+            )
+        }
+    }
+
+    protected fun createFileAndSyncDependencies(scriptFile: File) {
         var script: VirtualFile? = null
         if (module != null) {
-            script = module.moduleFile?.parent?.findChild(SCRIPT_NAME)
+            script = module.moduleFile?.parent?.findChild(scriptFile.name)
         }
 
         if (script == null) {
-            val target = File(project.basePath, SCRIPT_NAME)
+            val target = File(project.basePath, scriptFile.name)
             scriptFile.copyTo(target)
-            script = LocalFileSystem.getInstance().findFileByPath(target.path)
+            script = VfsUtil.findFileByIoFile(target, true)
         }
 
-        assert(script != null)
-        configureByExistingFile(script!!)
+        if (script == null) error("Test file with script couldn't be found in test project")
 
-        updateScriptDependenciesSynchronously(script, project)
-        VfsUtil.markDirtyAndRefresh(false, true, true, project.baseDir)
+        configureByExistingFile(script)
+        loadScriptConfigurationSynchronously(script)
+    }
+
+    protected open fun loadScriptConfigurationSynchronously(script: VirtualFile) {
+        updateScriptDependenciesSynchronously(myFile, project)
+
         // This is needed because updateScriptDependencies invalidates psiFile that was stored in myFile field
+        VfsUtil.markDirtyAndRefresh(false, true, true, project.baseDir)
         myFile = psiManager.findFile(script)
+
+        checkHighlighting()
+    }
+
+    protected fun checkHighlighting(file: KtFile = myFile as KtFile) {
+        val reports = IdeScriptReportSink.getReports(file)
+        val isFatalErrorPresent = reports.any { it.severity == ScriptDiagnostic.Severity.FATAL }
+        assert(isFatalErrorPresent || KotlinHighlightingUtil.shouldHighlight(file)) {
+            "Highlighting is switched off for ${file.virtualFile.path}\n" +
+                    "reports=$reports\n" +
+                    "scriptDefinition=${file.findScriptDefinition()}"
+        }
     }
 
     private fun compileLibToDir(srcDir: File, vararg classpath: String): File {
-        val outDir = KotlinTestUtils.tmpDir("${getTestName(false)}${srcDir.name}Out")
+        //TODO: tmpDir would be enough, but there is tricky fail under AS otherwise
+        val outDir = KotlinTestUtils.tmpDirForReusableFolder("${getTestName(false)}${srcDir.name}Out")
 
         val kotlinSourceFiles = FileUtil.findFilesByMask(Pattern.compile(".+\\.kt$"), srcDir)
         if (kotlinSourceFiles.isNotEmpty()) {
@@ -263,12 +339,15 @@ abstract class AbstractScriptConfigurationTest : KotlinCompletionTestCase() {
             CustomScriptTemplateProvider(environment)
         }
 
-        PlatformTestUtil.registerExtension(
-            Extensions.getArea(project),
+        addExtensionPointInTest(
             ScriptDefinitionContributor.EP_NAME,
+            project,
             provider,
             testRootDisposable
         )
+
         ScriptDefinitionsManager.getInstance(project).reloadScriptDefinitions()
+
+        UIUtil.dispatchAllInvocationEvents()
     }
 }

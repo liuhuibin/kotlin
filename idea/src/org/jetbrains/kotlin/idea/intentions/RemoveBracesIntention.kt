@@ -22,6 +22,8 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiWhiteSpace
 import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.psi.psiUtil.endOffset
+import org.jetbrains.kotlin.psi.psiUtil.startOffset
 
 class RemoveBracesIntention : SelfTargetingIntention<KtElement>(KtElement::class.java, "Remove braces") {
 
@@ -35,8 +37,7 @@ class RemoveBracesIntention : SelfTargetingIntention<KtElement>(KtElement::class
     override fun isApplicableTo(element: KtElement, caretOffset: Int): Boolean {
         val block = element.findChildBlock() ?: return false
         val singleStatement = block.statements.singleOrNull() ?: return false
-        val container = block.parent
-        when (container) {
+        when (val container = block.parent) {
             is KtContainerNode -> {
                 if (singleStatement is KtIfExpression) {
                     val elseExpression = (container.parent as? KtIfExpression)?.`else`
@@ -50,6 +51,7 @@ class RemoveBracesIntention : SelfTargetingIntention<KtElement>(KtElement::class
             is KtWhenEntry -> {
                 text = "Remove braces from 'when' entry"
                 return singleStatement !is KtNamedDeclaration
+                        && !(singleStatement is KtLambdaExpression && singleStatement.functionLiteral.arrow == null)
             }
             else -> return false
         }
@@ -57,15 +59,16 @@ class RemoveBracesIntention : SelfTargetingIntention<KtElement>(KtElement::class
 
     override fun applyTo(element: KtElement, editor: Editor?) {
         val block = element.findChildBlock() ?: return
+        val factory = KtPsiFactory(element)
         val statement = block.statements.single()
+        val caretOnAfterStatement = if (editor != null) editor.caretModel.offset >= statement.endOffset else false
 
         val container = block.parent
         val construct = container.parent as KtExpression
         handleComments(construct, block)
 
         val newElement = block.replace(statement.copy())
-
-        val factory = KtPsiFactory(block)
+        editor?.caretModel?.moveToOffset(if (caretOnAfterStatement) newElement.endOffset else newElement.startOffset)
 
         if (construct is KtDoWhileExpression) {
             newElement.parent!!.addAfter(factory.createNewLine(), newElement)
@@ -74,8 +77,12 @@ class RemoveBracesIntention : SelfTargetingIntention<KtElement>(KtElement::class
         if (construct is KtIfExpression &&
             container.node.elementType == KtNodeTypes.ELSE &&
             construct.parent is KtExpression &&
-            construct.parent !is KtStatementExpression) {
-            construct.replace(factory.createExpressionByPattern("($0)", construct))
+            construct.parent !is KtStatementExpression
+        ) {
+            val replaced = construct.replace(factory.createExpressionByPattern("($0)", construct))
+            (replaced.children[0] as? KtIfExpression)?.`else`?.let {
+                editor?.caretModel?.moveToOffset(if (caretOnAfterStatement) it.endOffset else it.startOffset)
+            }
         }
     }
 

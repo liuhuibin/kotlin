@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.codegen
@@ -10,7 +10,6 @@ import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodParameterKind
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodParameterSignature
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodSignature
 import org.jetbrains.kotlin.types.KotlinType
-import org.jetbrains.org.objectweb.asm.Opcodes
 import org.jetbrains.org.objectweb.asm.Opcodes.INVOKESPECIAL
 import org.jetbrains.org.objectweb.asm.Opcodes.INVOKESTATIC
 import org.jetbrains.org.objectweb.asm.Type
@@ -21,18 +20,20 @@ import org.jetbrains.org.objectweb.asm.util.Printer
 class CallableMethod(
     override val owner: Type,
     private val defaultImplOwner: Type?,
-    private val defaultMethodDesc: String,
+    computeDefaultMethodDesc: () -> String,
     private val signature: JvmMethodSignature,
-    private val invokeOpcode: Int,
+    val invokeOpcode: Int,
     override val dispatchReceiverType: Type?,
     override val dispatchReceiverKotlinType: KotlinType?,
     override val extensionReceiverType: Type?,
     override val extensionReceiverKotlinType: KotlinType?,
     override val generateCalleeType: Type?,
     override val returnKotlinType: KotlinType?,
-    private val isInterfaceMethod: Boolean = Opcodes.INVOKEINTERFACE == invokeOpcode,
-    private val isDefaultMethodInInterface: Boolean = false
+    val isInterfaceMethod: Boolean,
+    private val isDefaultMethodInInterface: Boolean
 ) : Callable {
+    private val defaultMethodDesc: String by lazy(LazyThreadSafetyMode.PUBLICATION, computeDefaultMethodDesc)
+
     fun getValueParameters(): List<JvmMethodParameterSignature> =
         signature.valueParameters
 
@@ -44,7 +45,6 @@ class CallableMethod(
 
     override val parameterTypes: Array<Type>
         get() = getAsmMethod().argumentTypes
-
 
     override fun genInvokeInstruction(v: InstructionAdapter) {
         v.visitMethodInsn(

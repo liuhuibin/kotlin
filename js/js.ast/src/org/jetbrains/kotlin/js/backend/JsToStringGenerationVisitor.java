@@ -605,6 +605,8 @@ public class JsToStringGenerationVisitor extends JsVisitor {
 
     @Override
     public void visitFunction(@NotNull JsFunction x) {
+        pushSourceInfo(x.getSource());
+
         p.print(CHARS_FUNCTION);
         space();
         if (x.getName() != null) {
@@ -624,10 +626,12 @@ public class JsToStringGenerationVisitor extends JsVisitor {
         lineBreakAfterBlock = false;
 
         sourceLocationConsumer.pushSourceInfo(null);
-        printJsBlock(x.getBody(), true, x.getSource());
+        printJsBlock(x.getBody(), true, x.getBody().getSource());
         sourceLocationConsumer.popSourceInfo();
 
         needSemi = true;
+
+        popSourceInfo();
     }
 
     @Override
@@ -648,6 +652,10 @@ public class JsToStringGenerationVisitor extends JsVisitor {
             thenStmt = new JsBlock(thenStmt);
         }
         nestedPush(thenStmt);
+
+        if (thenStmt instanceof JsBlock) {
+            lineBreakAfterBlock = false;
+        }
 
         sourceLocationConsumer.pushSourceInfo(null);
         accept(thenStmt);
@@ -980,6 +988,7 @@ public class JsToStringGenerationVisitor extends JsVisitor {
     public void visitTry(@NotNull JsTry x) {
         p.print(CHARS_TRY);
         spaceOpt();
+        lineBreakAfterBlock = false;
         accept(x.getTryBlock());
 
         acceptList(x.getCatches());
@@ -1035,6 +1044,14 @@ public class JsToStringGenerationVisitor extends JsVisitor {
         }
 
         popSourceInfo();
+    }
+
+    @Override
+    public void visitSingleLineComment(@NotNull JsSingleLineComment comment) {
+        p.print("//");
+        p.print(comment.getText());
+        needSemi = false;
+        newline();
     }
 
     @Override

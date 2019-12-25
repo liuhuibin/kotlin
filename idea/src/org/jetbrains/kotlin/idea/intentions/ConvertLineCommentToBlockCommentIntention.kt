@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.intentions
@@ -23,6 +23,7 @@ class ConvertLineCommentToBlockCommentIntention : SelfTargetingIntention<PsiComm
     }
 
     override fun applyTo(element: PsiComment, editor: Editor?) {
+        val project = element.project
         var firstComment = element
         while (true) {
             firstComment = firstComment.prevComment() ?: break
@@ -48,7 +49,7 @@ class ConvertLineCommentToBlockCommentIntention : SelfTargetingIntention<PsiComm
             (it.prevSibling as? PsiWhiteSpace)?.delete()
             it.delete()
         }
-        firstComment.replace(KtPsiFactory(element).createComment(blockComment))
+        firstComment.replace(KtPsiFactory(project).createComment(blockComment))
     }
 
 }

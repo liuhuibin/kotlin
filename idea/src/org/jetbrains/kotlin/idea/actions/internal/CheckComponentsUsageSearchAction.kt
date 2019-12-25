@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2016 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.actions.internal
@@ -38,24 +27,25 @@ import javax.swing.SwingUtilities
 
 class CheckComponentsUsageSearchAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
-        val selectedFiles = selectedKotlinFiles(e).toList()
-        val project = CommonDataKeys.PROJECT.getData(e.dataContext)!!
+        val project = CommonDataKeys.PROJECT.getData(e.dataContext) ?: return
+        val selectedKotlinFiles = selectedKotlinFiles(e).toList()
 
         ProgressManager.getInstance().runProcessWithProgressSynchronously(
-                {
-                    runReadAction { process(selectedFiles, project) }
-                },
-                "Checking Data Classes",
-                true,
-                project)
+            {
+                runReadAction { process(selectedKotlinFiles, project) }
+            },
+            "Checking Data Classes",
+            true,
+            project
+        )
     }
 
     private fun process(files: Collection<KtFile>, project: Project) {
         val dataClasses = files.asSequence()
-                .flatMap { it.declarations.asSequence() }
-                .filterIsInstance<KtClass>()
-                .filter { it.isData() }
-                .toList()
+            .flatMap { it.declarations.asSequence() }
+            .filterIsInstance<KtClass>()
+            .filter { it.isData() }
+            .toList()
 
         val progressIndicator = ProgressManager.getInstance().progressIndicator
         for ((i, dataClass) in dataClasses.withIndex()) {
@@ -67,24 +57,32 @@ class CheckComponentsUsageSearchAction : AnAction() {
                 try {
                     var smartRefsCount = 0
                     var goldRefsCount = 0
-                    ProgressManager.getInstance().runProcess({
-                        ExpressionsOfTypeProcessor.mode = ExpressionsOfTypeProcessor.Mode.ALWAYS_SMART
+                    ProgressManager.getInstance().runProcess(
+                        {
+                            ExpressionsOfTypeProcessor.mode =
+                                ExpressionsOfTypeProcessor.Mode.ALWAYS_SMART
 
-                        smartRefsCount = ReferencesSearch.search(parameter).findAll().size
+                            smartRefsCount = ReferencesSearch.search(parameter).findAll().size
 
-                        ExpressionsOfTypeProcessor.mode = ExpressionsOfTypeProcessor.Mode.ALWAYS_PLAIN
+                            ExpressionsOfTypeProcessor.mode =
+                                ExpressionsOfTypeProcessor.Mode.ALWAYS_PLAIN
 
-                        goldRefsCount = ReferencesSearch.search(parameter).findAll().size
-                    }, EmptyProgressIndicator())
+                            goldRefsCount = ReferencesSearch.search(parameter).findAll().size
+                        }, EmptyProgressIndicator()
+                    )
 
                     if (smartRefsCount != goldRefsCount) {
                         SwingUtilities.invokeLater {
-                            Messages.showInfoMessage(project, "Difference found for data class ${dataClass.fqName?.asString()}. Found $smartRefsCount usage(s) but $goldRefsCount expected", "Error")
+                            Messages.showInfoMessage(
+                                project,
+                                "Difference found for data class ${dataClass.fqName
+                                    ?.asString()}. Found $smartRefsCount usage(s) but $goldRefsCount expected",
+                                "Error"
+                            )
                         }
                         return
                     }
-                }
-                finally {
+                } finally {
                     ExpressionsOfTypeProcessor.mode = ExpressionsOfTypeProcessor.Mode.PLAIN_WHEN_NEEDED
                 }
             }
@@ -101,10 +99,9 @@ class CheckComponentsUsageSearchAction : AnAction() {
         if (!ApplicationManager.getApplication().isInternal) {
             e.presentation.isVisible = false
             e.presentation.isEnabled = false
-        }
-        else {
+        } else {
             e.presentation.isVisible = true
-            e.presentation.isEnabled = selectedKotlinFiles(e).any()
+            e.presentation.isEnabled = true
         }
     }
 
@@ -117,8 +114,8 @@ class CheckComponentsUsageSearchAction : AnAction() {
     private fun allKotlinFiles(filesOrDirs: Array<VirtualFile>, project: Project): Sequence<KtFile> {
         val manager = PsiManager.getInstance(project)
         return allFiles(filesOrDirs)
-                .asSequence()
-                .mapNotNull { manager.findFile(it) as? KtFile }
+            .asSequence()
+            .mapNotNull { manager.findFile(it) as? KtFile }
     }
 
     private fun allFiles(filesOrDirs: Array<VirtualFile>): Collection<VirtualFile> {

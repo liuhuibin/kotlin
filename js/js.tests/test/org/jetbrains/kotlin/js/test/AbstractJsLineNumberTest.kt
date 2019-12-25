@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.js.test
@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.serialization.js.ModuleKind
 import org.jetbrains.kotlin.test.KotlinTestUtils
 import org.jetbrains.kotlin.test.KotlinTestWithEnvironment
+import org.jetbrains.kotlin.test.TestFiles
 import org.jetbrains.kotlin.utils.DFS
 import java.io.ByteArrayOutputStream
 import java.io.Closeable
@@ -45,7 +46,7 @@ abstract class AbstractJsLineNumberTest : KotlinTestWithEnvironment() {
         val sourceCode = file.readText()
 
         TestFileFactoryImpl().use { testFactory ->
-            val inputFiles = KotlinTestUtils.createTestFiles(file.name, sourceCode, testFactory, true, "")
+            val inputFiles = TestFiles.createTestFiles(file.name, sourceCode, testFactory, true, "")
             val modules = inputFiles
                     .map { it.module }.distinct()
                     .associateBy { it.name }
@@ -55,7 +56,7 @@ abstract class AbstractJsLineNumberTest : KotlinTestWithEnvironment() {
             orderedModules.asReversed().forEach { module ->
                 val baseOutputPath = module.outputFileName(file)
 
-                val translator = K2JSTranslator(createConfig(module, file, modules))
+                val translator = K2JSTranslator(createConfig(module, file, modules), false)
                 val units = module.files.map { TranslationUnit.SourceFile(createPsiFile(it.fileName)) }
                 val translationResult = translator.translateUnits(ExceptionThrowingReporter, units, MainCallParameters.noCall())
 
@@ -134,7 +135,7 @@ abstract class AbstractJsLineNumberTest : KotlinTestWithEnvironment() {
         return psiManager.findFile(fileSystem.findFileByPath(fileName)!!) as KtFile
     }
 
-    private inner class TestFileFactoryImpl : KotlinTestUtils.TestFileFactory<TestModule, TestFile>, Closeable {
+    private inner class TestFileFactoryImpl : TestFiles.TestFileFactory<TestModule, TestFile>, Closeable {
         private val tmpDir = KotlinTestUtils.tmpDir("js-tests")
         private val defaultModule = TestModule(BasicBoxTest.TEST_MODULE, emptyList())
 

@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.codeInsight;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.idea.codeInsight;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -24,16 +23,11 @@ public class InspectionTestGenerated extends AbstractInspectionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Intentions extends AbstractInspectionTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInIntentions() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentInSingleGeneratedClass(this.getClass(), new File("idea/testData/intentions"), Pattern.compile("^(inspections\\.test)$"), TargetBackend.ANY);
-        }
-
-        @TestMetadata("branched/ifThenToElvis/inspectionData/inspections.test")
-        public void testBranched_ifThenToElvis_inspectionData_Inspections_test() throws Exception {
-            runTest("idea/testData/intentions/branched/ifThenToElvis/inspectionData/inspections.test");
+            KotlinTestUtils.assertAllTestsPresentInSingleGeneratedClassWithExcluded(this.getClass(), new File("idea/testData/intentions"), Pattern.compile("^(inspections\\.test)$"), null);
         }
 
         @TestMetadata("convertToStringTemplate/inspectionData/inspections.test")
@@ -72,7 +66,7 @@ public class InspectionTestGenerated extends AbstractInspectionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Inspections extends AbstractInspectionTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         @TestMetadata("addVarianceModifier/inspectionData/inspections.test")
@@ -81,7 +75,7 @@ public class InspectionTestGenerated extends AbstractInspectionTest {
         }
 
         public void testAllFilesPresentInInspections() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentInSingleGeneratedClass(this.getClass(), new File("idea/testData/inspections"), Pattern.compile("^(inspections\\.test)$"), TargetBackend.ANY);
+            KotlinTestUtils.assertAllTestsPresentInSingleGeneratedClassWithExcluded(this.getClass(), new File("idea/testData/inspections"), Pattern.compile("^(inspections\\.test)$"), null);
         }
 
         @TestMetadata("allOpenSimple/inspectionData/inspections.test")
@@ -144,6 +138,11 @@ public class InspectionTestGenerated extends AbstractInspectionTest {
             runTest("idea/testData/inspections/coroutines/asyncResultUnused/inspectionData/inspections.test");
         }
 
+        @TestMetadata("coroutines/directUseOfResultType/inspectionData/inspections.test")
+        public void testCoroutines_directUseOfResultType_inspectionData_Inspections_test() throws Exception {
+            runTest("idea/testData/inspections/coroutines/directUseOfResultType/inspectionData/inspections.test");
+        }
+
         @TestMetadata("dataClassPrivateConstructor/inspectionData/inspections.test")
         public void testDataClassPrivateConstructor_inspectionData_Inspections_test() throws Exception {
             runTest("idea/testData/inspections/dataClassPrivateConstructor/inspectionData/inspections.test");
@@ -167,6 +166,11 @@ public class InspectionTestGenerated extends AbstractInspectionTest {
         @TestMetadata("equalsAndHashCode/inspectionData/inspections.test")
         public void testEqualsAndHashCode_inspectionData_Inspections_test() throws Exception {
             runTest("idea/testData/inspections/equalsAndHashCode/inspectionData/inspections.test");
+        }
+
+        @TestMetadata("forEachParameterNotUsed/inspectionData/inspections.test")
+        public void testForEachParameterNotUsed_inspectionData_Inspections_test() throws Exception {
+            runTest("idea/testData/inspections/forEachParameterNotUsed/inspectionData/inspections.test");
         }
 
         @TestMetadata("gradleWrongPluginVersion/inspectionData/inspections.test")
@@ -204,6 +208,11 @@ public class InspectionTestGenerated extends AbstractInspectionTest {
             runTest("idea/testData/inspections/memberVisibilityCanBePrivate/inspectionData/inspections.test");
         }
 
+        @TestMetadata("migrationFromClosedRange/inspectionData/inspections.test")
+        public void testMigrationFromClosedRange_inspectionData_Inspections_test() throws Exception {
+            runTest("idea/testData/inspections/migrationFromClosedRange/inspectionData/inspections.test");
+        }
+
         @TestMetadata("naming/class/inspectionData/inspections.test")
         public void testNaming_class_inspectionData_Inspections_test() throws Exception {
             runTest("idea/testData/inspections/naming/class/inspectionData/inspections.test");
@@ -222,6 +231,11 @@ public class InspectionTestGenerated extends AbstractInspectionTest {
         @TestMetadata("naming/objectProperty/inspectionData/inspections.test")
         public void testNaming_objectProperty_inspectionData_Inspections_test() throws Exception {
             runTest("idea/testData/inspections/naming/objectProperty/inspectionData/inspections.test");
+        }
+
+        @TestMetadata("naming/package/inspectionData/inspections.test")
+        public void testNaming_package_inspectionData_Inspections_test() throws Exception {
+            runTest("idea/testData/inspections/naming/package/inspectionData/inspections.test");
         }
 
         @TestMetadata("naming/privateProperty/inspectionData/inspections.test")
@@ -297,6 +311,16 @@ public class InspectionTestGenerated extends AbstractInspectionTest {
         @TestMetadata("redundantVisibilityModifier/inspectionData/inspections.test")
         public void testRedundantVisibilityModifier_inspectionData_Inspections_test() throws Exception {
             runTest("idea/testData/inspections/redundantVisibilityModifier/inspectionData/inspections.test");
+        }
+
+        @TestMetadata("redundantVisibilityModifierWithExplicitApi/inspectionData/inspections.test")
+        public void testRedundantVisibilityModifierWithExplicitApi_inspectionData_Inspections_test() throws Exception {
+            runTest("idea/testData/inspections/redundantVisibilityModifierWithExplicitApi/inspectionData/inspections.test");
+        }
+
+        @TestMetadata("redundantWith/inspectionData/inspections.test")
+        public void testRedundantWith_inspectionData_Inspections_test() throws Exception {
+            runTest("idea/testData/inspections/redundantWith/inspectionData/inspections.test");
         }
 
         @TestMetadata("reformat/inspectionData/inspections.test")
@@ -389,6 +413,11 @@ public class InspectionTestGenerated extends AbstractInspectionTest {
             runTest("idea/testData/inspections/unusedSymbol/function/inspectionData/inspections.test");
         }
 
+        @TestMetadata("unusedSymbol/functionMain/inspectionData/inspections.test")
+        public void testUnusedSymbol_functionMain_inspectionData_Inspections_test() throws Exception {
+            runTest("idea/testData/inspections/unusedSymbol/functionMain/inspectionData/inspections.test");
+        }
+
         @TestMetadata("unusedSymbol/js/inspectionData/inspections.test")
         public void testUnusedSymbol_js_inspectionData_Inspections_test() throws Exception {
             runTest("idea/testData/inspections/unusedSymbol/js/inspectionData/inspections.test");
@@ -430,11 +459,16 @@ public class InspectionTestGenerated extends AbstractInspectionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class InspectionsLocal extends AbstractInspectionTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInInspectionsLocal() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentInSingleGeneratedClass(this.getClass(), new File("idea/testData/inspectionsLocal"), Pattern.compile("^(inspections\\.test)$"), TargetBackend.ANY);
+            KotlinTestUtils.assertAllTestsPresentInSingleGeneratedClassWithExcluded(this.getClass(), new File("idea/testData/inspectionsLocal"), Pattern.compile("^(inspections\\.test)$"), null);
+        }
+
+        @TestMetadata("branched/ifThenToElvis/inspectionData/inspections.test")
+        public void testBranched_ifThenToElvis_inspectionData_Inspections_test() throws Exception {
+            runTest("idea/testData/inspectionsLocal/branched/ifThenToElvis/inspectionData/inspections.test");
         }
 
         @TestMetadata("branched/ifThenToSafeAccess/inspectionData/inspections.test")

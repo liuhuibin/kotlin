@@ -1,31 +1,28 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.checkers;
 
-import com.intellij.openapi.util.io.FileUtil;
-import kotlin.collections.CollectionsKt;
 import kotlin.io.FilesKt;
 import kotlin.text.Charsets;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.kotlin.cli.common.config.ContentRootsKt;
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment;
 import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime;
 import org.jetbrains.kotlin.config.CompilerConfiguration;
-import org.jetbrains.kotlin.config.ContentRootsKt;
 import org.jetbrains.kotlin.config.JVMConfigurationKeys;
-import org.jetbrains.kotlin.script.StandardScriptDefinition;
-import org.jetbrains.kotlin.test.ConfigurationKind;
-import org.jetbrains.kotlin.test.InTextDirectivesUtils;
-import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TestJdkKind;
+import org.jetbrains.kotlin.parsing.KotlinParserDefinition;
+import org.jetbrains.kotlin.test.*;
 import org.jetbrains.kotlin.test.testFramework.KtUsefulTestCase;
 
 import java.io.File;
 import java.util.*;
+
+import static org.jetbrains.kotlin.script.ScriptTestUtilKt.loadScriptingPlugin;
 
 public abstract class KotlinMultiFileTestWithJava<M, F> extends KtUsefulTestCase {
     protected File javaFilesDir;
@@ -43,13 +40,6 @@ public abstract class KotlinMultiFileTestWithJava<M, F> extends KtUsefulTestCase
         coroutinesPackage = "";
     }
 
-    @Override
-    protected void tearDown() throws Exception {
-        if (javaFilesDir != null) FileUtil.delete(javaFilesDir);
-        if (kotlinSourceRoot != null) FileUtil.delete(kotlinSourceRoot);
-        super.tearDown();
-    }
-
     public class ModuleAndDependencies {
         final M module;
         final List<String> dependencies;
@@ -63,6 +53,11 @@ public abstract class KotlinMultiFileTestWithJava<M, F> extends KtUsefulTestCase
     }
 
     @NotNull
+    protected Boolean isScriptingNeeded(@NotNull File file) {
+        return file.getName().endsWith(KotlinParserDefinition.STD_SCRIPT_EXT);
+    }
+
+    @NotNull
     protected KotlinCoreEnvironment createEnvironment(@NotNull File file) {
         CompilerConfiguration configuration = KotlinTestUtils.newConfiguration(
                 getConfigurationKind(),
@@ -70,10 +65,16 @@ public abstract class KotlinMultiFileTestWithJava<M, F> extends KtUsefulTestCase
                 getClasspath(file),
                 isJavaSourceRootNeeded() ? Collections.singletonList(javaFilesDir) : Collections.emptyList()
         );
-        configuration.add(JVMConfigurationKeys.SCRIPT_DEFINITIONS, StandardScriptDefinition.INSTANCE);
+        if (isScriptingNeeded(file)) {
+            loadScriptingPlugin(configuration);
+        }
         if (isKotlinSourceRootNeeded()) {
             ContentRootsKt.addKotlinSourceRoot(configuration, kotlinSourceRoot.getPath());
         }
+
+        // Currently, we're testing IDE behavior when generating the .txt files for comparison, but this can be changed.
+        // The main difference is the fact that the new class file reading implementation doesn't load parameter names from JDK classes.
+        configuration.put(JVMConfigurationKeys.USE_PSI_CLASS_FILES_READING, true);
 
         performCustomConfiguration(configuration);
         return KotlinCoreEnvironment.createForTests(getTestRootDisposable(), configuration, getEnvironmentConfigFiles());
@@ -104,12 +105,13 @@ public abstract class KotlinMultiFileTestWithJava<M, F> extends KtUsefulTestCase
         result.add(KotlinTestUtils.getAnnotationsJar());
         result.addAll(getExtraClasspath());
 
-        boolean loadAndroidAnnotations = InTextDirectivesUtils.isDirectiveDefined(
-                FilesKt.readText(file, Charsets.UTF_8), "ANDROID_ANNOTATIONS"
-        );
+        String fileText = FilesKt.readText(file, Charsets.UTF_8);
 
-        if (loadAndroidAnnotations) {
+        if (InTextDirectivesUtils.isDirectiveDefined(fileText, "ANDROID_ANNOTATIONS")) {
             result.add(ForTestCompileRuntime.androidAnnotationsForTests());
+        }
+        if (InTextDirectivesUtils.isDirectiveDefined(fileText, "STDLIB_JDK8")) {
+            result.add(ForTestCompileRuntime.runtimeJarForTestsWithJdk8());
         }
 
         return result;
@@ -129,9 +131,17 @@ public abstract class KotlinMultiFileTestWithJava<M, F> extends KtUsefulTestCase
         return false;
     }
 
+    @NotNull
+    protected File createTestFileFromPath(@NotNull String filePath) {
+        return new File(filePath);
+    }
+
     protected void doTest(String filePath) throws Exception {
-        File file = new File(filePath);
+        File file = createTestFileFromPath(filePath);
         String expectedText = KotlinTestUtils.doLoadFile(file);
+
+        if (InTextDirectivesUtils.isDirectiveDefined(expectedText, "// SKIP_JAVAC")) return;
+
         Map<String, ModuleAndDependencies> modules = new HashMap<>();
         List<F> testFiles = createTestFiles(file, expectedText, modules);
 
@@ -156,7 +166,7 @@ public abstract class KotlinMultiFileTestWithJava<M, F> extends KtUsefulTestCase
     protected abstract void doMultiFileTest(File file, Map<String, ModuleAndDependencies> modules, List<F> files) throws Exception;
 
     protected List<F> createTestFiles(File file, String expectedText, Map<String, ModuleAndDependencies> modules) {
-        return KotlinTestUtils.createTestFiles(file.getName(), expectedText, new KotlinTestUtils.TestFileFactory<M, F>() {
+        return TestFiles.createTestFiles(file.getName(), expectedText, new TestFiles.TestFileFactory<M, F>() {
             @Override
             public F createFile(
                     @Nullable M module,

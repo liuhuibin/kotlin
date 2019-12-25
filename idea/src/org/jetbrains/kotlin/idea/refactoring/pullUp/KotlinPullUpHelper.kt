@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.refactoring.pullUp
@@ -45,6 +34,7 @@ import org.jetbrains.kotlin.idea.refactoring.memberInfo.KtPsiClassWrapper
 import org.jetbrains.kotlin.idea.refactoring.memberInfo.toKtDeclarationWrapperAware
 import org.jetbrains.kotlin.idea.refactoring.safeDelete.removeOverrideModifier
 import org.jetbrains.kotlin.idea.util.anonymousObjectSuperTypeOrNull
+import org.jetbrains.kotlin.idea.util.hasComments
 import org.jetbrains.kotlin.idea.util.psi.patternMatching.KotlinPsiUnifier
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken
 import org.jetbrains.kotlin.lexer.KtTokens
@@ -64,6 +54,11 @@ class KotlinPullUpHelper(
     private val javaData: PullUpData,
     private val data: KotlinPullUpData
 ) : PullUpHelper<MemberInfoBase<PsiMember>> {
+    companion object {
+        private val MODIFIERS_TO_LIFT_IN_SUPERCLASS = listOf(KtTokens.PRIVATE_KEYWORD)
+        private val MODIFIERS_TO_LIFT_IN_INTERFACE = listOf(KtTokens.PRIVATE_KEYWORD, KtTokens.PROTECTED_KEYWORD, KtTokens.INTERNAL_KEYWORD)
+    }
+
     private fun KtExpression.isMovable(): Boolean {
         return accept(
             object : KtVisitor<Boolean, Nothing?>() {
@@ -108,7 +103,7 @@ class KotlinPullUpHelper(
         var initializerCandidate: KtExpression? = null
 
         for (statement in scope.statements) {
-            statement.asAssignment()?.let body@ {
+            statement.asAssignment()?.let body@{
                 val lhs = KtPsiUtil.safeDeparenthesize(it.left ?: return@body)
                 val receiver = (lhs as? KtQualifiedExpression)?.receiverExpression
                 if (receiver != null && receiver !is KtThisExpression) return@body
@@ -197,8 +192,7 @@ class KotlinPullUpHelper(
                     private fun processConstructorReference(expression: KtReferenceExpression, callingConstructorElement: KtElement) {
                         val descriptor = data.resolutionFacade.analyze(expression)[BindingContext.REFERENCE_TARGET, expression]
                         val constructorElement = (descriptor as? DeclarationDescriptorWithSource)?.source?.getPsi() ?: return
-                        if (constructorElement == data.targetClass
-                            || (constructorElement as? KtConstructor<*>)?.getContainingClassOrObject() == data.targetClass) {
+                        if (constructorElement == data.targetClass || (constructorElement as? KtConstructor<*>)?.getContainingClassOrObject() == data.targetClass) {
                             result.getOrPut(constructorElement as KtElement, { ArrayList() }).add(callingConstructorElement)
                         }
                     }
@@ -232,9 +226,8 @@ class KotlinPullUpHelper(
                     override fun getVertices() = propertyToInitializerInfo.keys
 
                     override fun getTargets(source: KtProperty) = propertyToInitializerInfo[source]?.usedProperties
-                },
-                { !propertyToInitializerInfo.containsKey(it) }
-            )
+                }
+            ) { !propertyToInitializerInfo.containsKey(it) }
 
             propertyToInitializerInfo.keys.removeAll(unmovableProperties)
             result[targetConstructor] = propertyToInitializerInfo
@@ -271,13 +264,18 @@ class KotlinPullUpHelper(
         }
     }
 
-    private fun liftToProtected(declaration: KtNamedDeclaration, ignoreUsages: Boolean = false) {
-        if (!declaration.hasModifier(KtTokens.PRIVATE_KEYWORD)) return
-        if (ignoreUsages || willBeUsedInSourceClass(
-                declaration,
-                data.sourceClass,
-                data.membersToMove
-            )) declaration.addModifier(KtTokens.PROTECTED_KEYWORD)
+    private fun liftVisibility(declaration: KtNamedDeclaration, ignoreUsages: Boolean = false) {
+        val newModifier = if (data.isInterfaceTarget) KtTokens.PUBLIC_KEYWORD else KtTokens.PROTECTED_KEYWORD
+        val modifiersToLift = if (data.isInterfaceTarget) MODIFIERS_TO_LIFT_IN_INTERFACE else MODIFIERS_TO_LIFT_IN_SUPERCLASS
+        val currentModifier = declaration.visibilityModifierTypeOrDefault()
+        if (currentModifier !in modifiersToLift) return
+        if (ignoreUsages || willBeUsedInSourceClass(declaration, data.sourceClass, data.membersToMove)) {
+            if (newModifier != KtTokens.DEFAULT_VISIBILITY_KEYWORD) {
+                declaration.addModifier(newModifier)
+            } else {
+                declaration.removeModifier(currentModifier)
+            }
+        }
     }
 
     override fun setCorrectVisibility(info: MemberInfoBase<PsiMember>) {
@@ -285,20 +283,20 @@ class KotlinPullUpHelper(
 
         if (data.isInterfaceTarget) {
             member.removeModifier(KtTokens.PUBLIC_KEYWORD)
-            return
         }
 
-        if (member.hasModifier(KtTokens.PRIVATE_KEYWORD)) {
+        val modifiersToLift = if (data.isInterfaceTarget) MODIFIERS_TO_LIFT_IN_INTERFACE else MODIFIERS_TO_LIFT_IN_SUPERCLASS
+        if (member.visibilityModifierTypeOrDefault() in modifiersToLift) {
             member.accept(
                 object : KtVisitorVoid() {
                     override fun visitNamedDeclaration(declaration: KtNamedDeclaration) {
                         when (declaration) {
                             is KtClass -> {
-                                liftToProtected(declaration)
+                                liftVisibility(declaration)
                                 declaration.declarations.forEach { it.accept(this) }
                             }
                             is KtNamedFunction, is KtProperty -> {
-                                liftToProtected(declaration, declaration == member && info.isToAbstract)
+                                liftVisibility(declaration, declaration == member && info.isToAbstract)
                             }
                         }
                     }
@@ -352,7 +350,7 @@ class KotlinPullUpHelper(
                 val superRef = sourcePsiClass.implementsList
                     ?.referenceElements
                     ?.firstOrNull { it.resolve()?.unwrapped == realMemberPsi }
-                        ?: return
+                    ?: return
                 val superTypeForTarget = substitutor.substitute(elementFactory.createType(superRef))
 
                 data.sourceClass.removeSuperTypeListEntry(currentSpecifier)
@@ -410,7 +408,7 @@ class KotlinPullUpHelper(
                 val newParameterTypes = lightMethod.parameterList.parameters.map { substitutor.substitute(it.type) }
                 val objectType = PsiType.getJavaLangObject(PsiManager.getInstance(project), GlobalSearchScope.allScope(project))
                 val newTypeParameterBounds = lightMethod.typeParameters.map {
-                    it.superTypes.map { substitutor.substitute(it) as? PsiClassType ?: objectType }
+                    it.superTypes.map { type -> substitutor.substitute(type) as? PsiClassType ?: objectType }
                 }
                 val newMethod = org.jetbrains.kotlin.idea.refactoring.createJavaMethod(member, data.targetClass)
                 RefactoringUtil.makeMethodAbstract(data.targetClass, newMethod)
@@ -492,6 +490,9 @@ class KotlinPullUpHelper(
                 movedMember = doAddCallableMember(memberCopy, clashingSuper, classToAddTo)
                 if (member.typeReference == null) {
                     movedMember.typeReference?.addToShorteningWaitSet()
+                }
+                if (movedMember.nextSibling.hasComments()) {
+                    movedMember.parent.addAfter(psiFactory.createNewLine(), movedMember)
                 }
 
                 removeOriginalMemberOrAddOverride(member)
@@ -585,7 +586,7 @@ class KotlinPullUpHelper(
         }
 
         fun addUsedParameters(constructorElement: KtElement, info: InitializerInfo) {
-            if (!info.usedParameters.isNotEmpty()) return
+            if (info.usedParameters.isEmpty()) return
             val constructor: KtConstructor<*> = when (constructorElement) {
                 is KtConstructor<*> -> constructorElement
                 is KtClass -> constructorElement.createPrimaryConstructorIfAbsent()
@@ -617,8 +618,8 @@ class KotlinPullUpHelper(
                     else -> null
                 }
                 superCall?.valueArgumentList?.let { args ->
-                    info.usedParameters.forEach {
-                        args.addArgument(psiFactory.createArgument(psiFactory.createExpression(it.name ?: "_")))
+                    info.usedParameters.forEach { parameter ->
+                        args.addArgument(psiFactory.createArgument(psiFactory.createExpression(parameter.name ?: "_")))
                     }
                 }
             }
@@ -638,7 +639,7 @@ class KotlinPullUpHelper(
             )
 
             for (oldProperty in properties) {
-                val info = propertyToInitializerInfo[oldProperty]!!
+                val info = propertyToInitializerInfo.getValue(oldProperty)
 
                 addUsedParameters(constructorElement, info)
 

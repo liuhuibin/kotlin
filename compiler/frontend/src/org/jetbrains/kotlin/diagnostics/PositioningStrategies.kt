@@ -188,6 +188,26 @@ object PositioningStrategies {
     }
 
     @JvmField
+    val DECLARATION_MODIFIERS_AND_NAME: PositioningStrategy<KtDeclaration> = object : DeclarationHeader<KtDeclaration>() {
+        override fun mark(element: KtDeclaration): List<TextRange> {
+            val startElement = element.firstChild
+            val nameIdentifier = (element as? KtNamedDeclaration)?.nameIdentifier
+            return if (nameIdentifier != null) {
+                markRange(startElement, nameIdentifier)
+            } else when (element) {
+                // companion object/constructors without name
+                is KtConstructor<*> -> {
+                    markRange(startElement, element.getConstructorKeyword() ?: element)
+                }
+                is KtObjectDeclaration -> {
+                    markRange(startElement, element.getObjectKeyword() ?: element)
+                }
+                else -> DEFAULT.mark(element)
+            }
+        }
+    }
+
+    @JvmField
     val DECLARATION_NAME: PositioningStrategy<KtNamedDeclaration> = object : DeclarationHeader<KtNamedDeclaration>() {
         override fun mark(element: KtNamedDeclaration): List<TextRange> {
             val nameIdentifier = element.nameIdentifier
@@ -195,7 +215,7 @@ object PositioningStrategies {
                 if (element is KtClassOrObject) {
                     val startElement =
                         element.getModifierList()?.getModifier(KtTokens.ENUM_KEYWORD)
-                                ?: element.node.findChildByType(TokenSet.create(KtTokens.CLASS_KEYWORD, KtTokens.OBJECT_KEYWORD))?.psi
+                            ?: element.node.findChildByType(TokenSet.create(KtTokens.CLASS_KEYWORD, KtTokens.OBJECT_KEYWORD))?.psi
                                 ?: element
 
                     return markRange(startElement, nameIdentifier)
@@ -238,7 +258,7 @@ object PositioningStrategies {
                 is KtPropertyAccessor -> {
                     val endOfSignatureElement =
                         element.returnTypeReference
-                                ?: element.rightParenthesis?.psi
+                                ?: element.rightParenthesis
                                 ?: element.namePlaceholder
 
                     return markRange(element, endOfSignatureElement)
@@ -437,7 +457,7 @@ object PositioningStrategies {
     @JvmField
     val DECLARATION_WITH_BODY: PositioningStrategy<KtDeclarationWithBody> = object : PositioningStrategy<KtDeclarationWithBody>() {
         override fun mark(element: KtDeclarationWithBody): List<TextRange> {
-            val lastBracketRange = (element.bodyExpression as? KtBlockExpression)?.lastBracketRange
+            val lastBracketRange = element.bodyBlockExpression?.lastBracketRange
             return if (lastBracketRange != null)
                 markRange(lastBracketRange)
             else
@@ -445,7 +465,7 @@ object PositioningStrategies {
         }
 
         override fun isValid(element: KtDeclarationWithBody): Boolean {
-            return super.isValid(element) && (element.bodyExpression as? KtBlockExpression)?.lastBracketRange != null
+            return super.isValid(element) && element.bodyBlockExpression?.lastBracketRange != null
         }
     }
 

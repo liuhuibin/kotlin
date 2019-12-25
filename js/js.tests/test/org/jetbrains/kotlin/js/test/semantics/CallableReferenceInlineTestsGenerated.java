@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.js.test.semantics;
@@ -26,7 +26,7 @@ public class CallableReferenceInlineTestsGenerated extends AbstractCallableRefer
     }
 
     public void testAllFilesPresentInCallableReference() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/codegen/boxInline/callableReference"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.JS, true);
+        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/codegen/boxInline/callableReference"), Pattern.compile("^(.+)\\.kt$"), null, TargetBackend.JS, true);
     }
 
     @TestMetadata("classLevel.kt")
@@ -44,6 +44,11 @@ public class CallableReferenceInlineTestsGenerated extends AbstractCallableRefer
         runTest("compiler/testData/codegen/boxInline/callableReference/constructor.kt");
     }
 
+    @TestMetadata("innerGenericConstuctor.kt")
+    public void testInnerGenericConstuctor() throws Exception {
+        runTest("compiler/testData/codegen/boxInline/callableReference/innerGenericConstuctor.kt");
+    }
+
     @TestMetadata("intrinsic.kt")
     public void testIntrinsic() throws Exception {
         runTest("compiler/testData/codegen/boxInline/callableReference/intrinsic.kt");
@@ -54,9 +59,19 @@ public class CallableReferenceInlineTestsGenerated extends AbstractCallableRefer
         runTest("compiler/testData/codegen/boxInline/callableReference/kt15449.kt");
     }
 
+    @TestMetadata("kt15751_2.kt")
+    public void testKt15751_2() throws Exception {
+        runTest("compiler/testData/codegen/boxInline/callableReference/kt15751_2.kt");
+    }
+
     @TestMetadata("kt16411.kt")
     public void testKt16411() throws Exception {
         runTest("compiler/testData/codegen/boxInline/callableReference/kt16411.kt");
+    }
+
+    @TestMetadata("kt35101.kt")
+    public void testKt35101() throws Exception {
+        runTest("compiler/testData/codegen/boxInline/callableReference/kt35101.kt");
     }
 
     @TestMetadata("propertyIntrinsic.kt")
@@ -93,7 +108,7 @@ public class CallableReferenceInlineTestsGenerated extends AbstractCallableRefer
         }
 
         public void testAllFilesPresentInBound() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/codegen/boxInline/callableReference/bound"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.JS, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/codegen/boxInline/callableReference/bound"), Pattern.compile("^(.+)\\.kt$"), null, TargetBackend.JS, true);
         }
 
         @TestMetadata("classProperty.kt")
@@ -104,6 +119,16 @@ public class CallableReferenceInlineTestsGenerated extends AbstractCallableRefer
         @TestMetadata("emptyLhsFunction.kt")
         public void testEmptyLhsFunction() throws Exception {
             runTest("compiler/testData/codegen/boxInline/callableReference/bound/emptyLhsFunction.kt");
+        }
+
+        @TestMetadata("emptyLhsOnInlineProperty.kt")
+        public void testEmptyLhsOnInlineProperty() throws Exception {
+            runTest("compiler/testData/codegen/boxInline/callableReference/bound/emptyLhsOnInlineProperty.kt");
+        }
+
+        @TestMetadata("emptyLhsProperty.kt")
+        public void testEmptyLhsProperty() throws Exception {
+            runTest("compiler/testData/codegen/boxInline/callableReference/bound/emptyLhsProperty.kt");
         }
 
         @TestMetadata("expression.kt")
@@ -119,6 +144,11 @@ public class CallableReferenceInlineTestsGenerated extends AbstractCallableRefer
         @TestMetadata("filter.kt")
         public void testFilter() throws Exception {
             runTest("compiler/testData/codegen/boxInline/callableReference/bound/filter.kt");
+        }
+
+        @TestMetadata("innerGenericConstuctor.kt")
+        public void testInnerGenericConstuctor() throws Exception {
+            runTest("compiler/testData/codegen/boxInline/callableReference/bound/innerGenericConstuctor.kt");
         }
 
         @TestMetadata("intrinsic.kt")
@@ -166,9 +196,24 @@ public class CallableReferenceInlineTestsGenerated extends AbstractCallableRefer
             runTest("compiler/testData/codegen/boxInline/callableReference/bound/propertyImportedFromObject.kt");
         }
 
+        @TestMetadata("sideEffect.kt")
+        public void testSideEffect() throws Exception {
+            runTest("compiler/testData/codegen/boxInline/callableReference/bound/sideEffect.kt");
+        }
+
         @TestMetadata("simple.kt")
         public void testSimple() throws Exception {
             runTest("compiler/testData/codegen/boxInline/callableReference/bound/simple.kt");
+        }
+
+        @TestMetadata("simpleVal.kt")
+        public void testSimpleVal() throws Exception {
+            runTest("compiler/testData/codegen/boxInline/callableReference/bound/simpleVal.kt");
+        }
+
+        @TestMetadata("simpleVal2.kt")
+        public void testSimpleVal2() throws Exception {
+            runTest("compiler/testData/codegen/boxInline/callableReference/bound/simpleVal2.kt");
         }
 
         @TestMetadata("topLevelExtensionProperty.kt")

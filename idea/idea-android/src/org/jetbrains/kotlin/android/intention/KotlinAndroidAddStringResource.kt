@@ -1,25 +1,19 @@
 /*
- * Copyright 2010-2016 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.android.intention
 
 import com.android.resources.ResourceType
 import com.intellij.CommonBundle
-import com.intellij.codeInsight.template.*
-import com.intellij.codeInsight.template.impl.*
+import com.intellij.codeInsight.template.Template
+import com.intellij.codeInsight.template.TemplateEditingAdapter
+import com.intellij.codeInsight.template.TemplateManager
+import com.intellij.codeInsight.template.impl.ConstantNode
+import com.intellij.codeInsight.template.impl.MacroCallNode
+import com.intellij.codeInsight.template.impl.TemplateImpl
+import com.intellij.codeInsight.template.impl.TemplateState
 import com.intellij.codeInsight.template.macro.VariableOfTypeMacro
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.undo.UndoUtil
@@ -48,8 +42,10 @@ import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 
 
-class KotlinAndroidAddStringResource : SelfTargetingIntention<KtLiteralStringTemplateEntry>(KtLiteralStringTemplateEntry::class.java,
-                                                                                            "Extract string resource") {
+class KotlinAndroidAddStringResource : SelfTargetingIntention<KtLiteralStringTemplateEntry>(
+    KtLiteralStringTemplateEntry::class.java,
+    "Extract string resource"
+) {
     private companion object {
         private val CLASS_CONTEXT = "android.content.Context"
         private val CLASS_FRAGMENT = "android.app.Fragment"
@@ -97,8 +93,16 @@ class KotlinAndroidAddStringResource : SelfTargetingIntention<KtLiteralStringTem
         val parameters = getCreateXmlResourceParameters(facet.module, element, file.virtualFile) ?: return
 
         runWriteAction {
-            if (!AndroidResourceUtil.createValueResource(project, parameters.resourceDirectory, parameters.name, ResourceType.STRING,
-                                                         parameters.fileName, parameters.directoryNames, parameters.value)) {
+            if (!AndroidResourceUtil.createValueResource(
+                    project,
+                    parameters.resourceDirectory,
+                    parameters.name,
+                    ResourceType.STRING,
+                    parameters.fileName,
+                    parameters.directoryNames,
+                    parameters.value
+                )
+            ) {
                 return@runWriteAction
             }
 
@@ -108,8 +112,10 @@ class KotlinAndroidAddStringResource : SelfTargetingIntention<KtLiteralStringTem
         }
     }
 
-    private fun getCreateXmlResourceParameters(module: Module, element: KtLiteralStringTemplateEntry,
-                                               contextFile: VirtualFile): CreateXmlResourceParameters? {
+    private fun getCreateXmlResourceParameters(
+        module: Module, element: KtLiteralStringTemplateEntry,
+        contextFile: VirtualFile
+    ): CreateXmlResourceParameters? {
         val stringValue = element.text
 
         val showDialog = !ApplicationManager.getApplication().isUnitTestMode
@@ -121,8 +127,7 @@ class KotlinAndroidAddStringResource : SelfTargetingIntention<KtLiteralStringTem
             if (!dialog.showAndGet()) {
                 return null
             }
-        }
-        else {
+        } else {
             dialog.close(0)
         }
 
@@ -132,23 +137,31 @@ class KotlinAndroidAddStringResource : SelfTargetingIntention<KtLiteralStringTem
             return null
         }
 
-        return CreateXmlResourceParameters(dialog.resourceName,
-                                           dialog.value,
-                                           dialog.fileName,
-                                           resourceDirectory,
-                                           dialog.dirNames)
+        return CreateXmlResourceParameters(
+            dialog.resourceName,
+            dialog.value,
+            dialog.fileName,
+            resourceDirectory,
+            dialog.dirNames
+        )
     }
 
-    private fun createResourceReference(module: Module, editor: Editor, file: KtFile, element: PsiElement, aPackage: String,
-                                        resName: String, resType: ResourceType) {
+    private fun createResourceReference(
+        module: Module,
+        editor: Editor,
+        file: KtFile,
+        element: PsiElement,
+        aPackage: String,
+        resName: String,
+        resType: ResourceType
+    ) {
         val rFieldName = AndroidResourceUtil.getRJavaFieldName(resName)
         val fieldName = "$aPackage.R.$resType.$rFieldName"
 
         val template: TemplateImpl
         if (!needContextReceiver(element)) {
             template = TemplateImpl("", "$GET_STRING_METHOD($fieldName)", "")
-        }
-        else {
+        } else {
             template = TemplateImpl("", "\$context\$.$GET_STRING_METHOD($fieldName)", "")
             val marker = MacroCallNode(VariableOfTypeMacro())
             marker.addParameter(ConstantNode(CLASS_CONTEXT))
@@ -167,7 +180,7 @@ class KotlinAndroidAddStringResource : SelfTargetingIntention<KtLiteralStringTem
                 ShortenReferences.DEFAULT.process(file, marker.startOffset, marker.endOffset)
             }
 
-            override fun beforeTemplateFinished(state: TemplateState?, template: Template?) {
+            override fun beforeTemplateFinished(state: TemplateState, template: Template?) {
                 ShortenReferences.DEFAULT.process(file, marker.startOffset, marker.endOffset)
             }
         })
@@ -184,8 +197,7 @@ class KotlinAndroidAddStringResource : SelfTargetingIntention<KtLiteralStringTem
                 return false
             }
 
-            if (parent.isSubclassOrSubclassExtension(viewClass) ||
-                (parent is KtClassOrObject && !parent.isInnerClass() && !parent.isObjectLiteral())) {
+            if (parent.isSubclassOrSubclassExtension(viewClass) || (parent is KtClassOrObject && !parent.isInnerClass() && !parent.isObjectLiteral())) {
                 return true
             }
 
@@ -198,13 +210,11 @@ class KotlinAndroidAddStringResource : SelfTargetingIntention<KtLiteralStringTem
     private fun getManifestPackage(facet: AndroidFacet) = facet.manifest?.`package`?.value
 
     private fun PsiElement.isSubclassOrSubclassExtension(baseClasses: Collection<String>) =
-            (this as? KtClassOrObject)?.isSubclassOfAny(baseClasses) ?:
-            this.isSubclassExtensionOfAny(baseClasses)
+        (this as? KtClassOrObject)?.isSubclassOfAny(baseClasses) ?: this.isSubclassExtensionOfAny(baseClasses)
 
     private fun PsiElement.isSubclassExtensionOfAny(baseClasses: Collection<String>) =
-            (this as? KtLambdaExpression)?.isSubclassExtensionOfAny(baseClasses) ?:
-            (this as? KtFunction)?.isSubclassExtensionOfAny(baseClasses) ?:
-            false
+        (this as? KtLambdaExpression)?.isSubclassExtensionOfAny(baseClasses) ?: (this as? KtFunction)?.isSubclassExtensionOfAny(baseClasses)
+        ?: false
 
     private fun KtClassOrObject.isObjectLiteral() = (this as? KtObjectDeclaration)?.isObjectLiteral() ?: false
 

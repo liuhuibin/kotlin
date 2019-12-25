@@ -1,12 +1,11 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.build
 
 import org.jetbrains.kotlin.metadata.jvm.deserialization.JvmMetadataVersion
-import org.jetbrains.kotlin.utils.JsMetadataVersion
 
 /**
  * If you want to add a new field, check its type is supported by [serializeToPlainText], [deserializeFromPlainText]
@@ -39,22 +38,26 @@ data class CommonBuildMetaInfo(
             multiplatformEnable: Boolean,
             ownVersion: Int,
             coroutinesVersion: Int,
-            multiplatformVersion: Int
-        ) = CommonBuildMetaInfo(
-            isEAP = isEAP,
-            compilerBuildVersion = compilerBuildVersion,
-            languageVersionString = languageVersionString,
-            apiVersionString = apiVersionString,
-            coroutinesEnable = coroutinesEnable,
-            coroutinesWarn = coroutinesWarn,
-            coroutinesError = coroutinesError,
-            multiplatformEnable = multiplatformEnable,
-            metadataVersionMajor = JvmMetadataVersion.INSTANCE.major,
-            metadataVersionMinor = JvmMetadataVersion.INSTANCE.minor,
-            metadataVersionPatch = JvmMetadataVersion.INSTANCE.patch,
-            ownVersion = ownVersion,
-            coroutinesVersion = coroutinesVersion,
-            multiplatformVersion = multiplatformVersion
-        )
+            multiplatformVersion: Int,
+            metadataVersionArray: IntArray?
+        ): CommonBuildMetaInfo {
+            val metadataVersion = metadataVersionArray?.let(::JvmMetadataVersion) ?: JvmMetadataVersion.INSTANCE
+            return CommonBuildMetaInfo(
+                isEAP = isEAP,
+                compilerBuildVersion = compilerBuildVersion,
+                languageVersionString = languageVersionString,
+                apiVersionString = apiVersionString,
+                coroutinesEnable = coroutinesEnable,
+                coroutinesWarn = coroutinesWarn,
+                coroutinesError = coroutinesError,
+                multiplatformEnable = multiplatformEnable,
+                metadataVersionMajor = metadataVersion.major,
+                metadataVersionMinor = metadataVersion.minor,
+                metadataVersionPatch = metadataVersion.patch,
+                ownVersion = ownVersion,
+                coroutinesVersion = coroutinesVersion,
+                multiplatformVersion = multiplatformVersion
+            )
+        }
     }
 }

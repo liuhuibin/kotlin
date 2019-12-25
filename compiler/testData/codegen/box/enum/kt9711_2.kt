@@ -1,7 +1,4 @@
-// IGNORE_BACKEND: JS_IR
-// TODO: muted automatically, investigate should it be ran for JS or not
-// IGNORE_BACKEND: JS
-
+// IGNORE_BACKEND_FIR: JVM_IR
 enum class IssueState {
 
     FIXED {
@@ -9,7 +6,7 @@ enum class IssueState {
 
         fun s()  = "OK"
 
-        class D {
+        inner class D {
             val k = s()
         }
     };

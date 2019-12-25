@@ -1,17 +1,17 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.configuration
 
-import com.intellij.ProjectTopics
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleUtilCore
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectBundle
-import com.intellij.openapi.roots.*
+import com.intellij.openapi.roots.ModuleRootManager
+import com.intellij.openapi.roots.ModuleRootModificationUtil
 import com.intellij.openapi.roots.ui.configuration.ProjectSettingsService
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.ui.popup.ListPopup
@@ -31,22 +31,11 @@ import org.jetbrains.kotlin.idea.util.application.runWriteAction
 import org.jetbrains.kotlin.idea.versions.SuppressNotificationState
 import org.jetbrains.kotlin.idea.versions.UnsupportedAbiVersionNotificationPanelProvider
 import org.jetbrains.kotlin.idea.versions.createComponentActionLabel
+import org.jetbrains.kotlin.platform.jvm.isJvm
 import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.resolve.jvm.platform.JvmPlatform
 
 // Code is partially copied from com.intellij.codeInsight.daemon.impl.SetupSDKNotificationProvider
-class KotlinSetupEnvironmentNotificationProvider(
-        private val myProject: Project,
-        notifications: EditorNotifications) : EditorNotifications.Provider<EditorNotificationPanel>() {
-
-    init {
-        myProject.messageBus.connect(myProject).subscribe(ProjectTopics.PROJECT_ROOTS, object : ModuleRootListener {
-            override fun rootsChanged(event: ModuleRootEvent?) {
-                notifications.updateAllNotifications()
-            }
-        })
-    }
-
+class KotlinSetupEnvironmentNotificationProvider(private val myProject: Project) : EditorNotifications.Provider<EditorNotificationPanel>() {
     override fun getKey(): Key<EditorNotificationPanel> = KEY
 
     override fun createNotificationPanel(file: VirtualFile, fileEditor: FileEditor): EditorNotificationPanel? {
@@ -65,12 +54,15 @@ class KotlinSetupEnvironmentNotificationProvider(
         }
 
         if (ModuleRootManager.getInstance(module).sdk == null &&
-            TargetPlatformDetector.getPlatform(psiFile) == JvmPlatform) {
+            TargetPlatformDetector.getPlatform(psiFile).isJvm()
+        ) {
             return createSetupSdkPanel(myProject, psiFile)
         }
 
-        if (!KotlinConfigurationCheckerComponent.getInstance(module.project).isSyncing &&
-            !SuppressNotificationState.isKotlinNotConfiguredSuppressed(module.toModuleGroup()) &&
+        val configurationCheckerComponent = KotlinConfigurationCheckerComponent.getInstanceIfNotDisposed(module.project) ?: return null
+
+        if (!configurationCheckerComponent.isSyncing &&
+            isNotConfiguredNotificationRequired(module.toModuleGroup()) &&
             !hasAnyKotlinRuntimeInScope(module) &&
             UnsupportedAbiVersionNotificationPanelProvider.collectBadRoots(module).isEmpty()
         ) {
@@ -103,13 +95,12 @@ class KotlinSetupEnvironmentNotificationProvider(
             return EditorNotificationPanel().apply {
                 setText("Kotlin not configured")
                 val configurators = getAbleToRunConfigurators(module).toList()
-                if (!configurators.isEmpty()) {
+                if (configurators.isNotEmpty()) {
                     createComponentActionLabel("Configure") { label ->
                         val singleConfigurator = configurators.singleOrNull()
                         if (singleConfigurator != null) {
                             singleConfigurator.apply(module.project)
-                        }
-                        else {
+                        } else {
                             val configuratorsPopup = createConfiguratorsPopup(module.project, configurators)
                             configuratorsPopup.showUnderneathOf(label)
                         }

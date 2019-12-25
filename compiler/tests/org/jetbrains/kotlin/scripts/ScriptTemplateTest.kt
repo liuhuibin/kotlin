@@ -17,31 +17,32 @@ package org.jetbrains.kotlin.scripts
 
 import com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
+import org.jetbrains.kotlin.cli.common.config.addKotlinSourceRoot
 import org.jetbrains.kotlin.cli.common.messages.*
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinToJVMBytecodeCompiler
 import org.jetbrains.kotlin.codegen.CompilationException
 import org.jetbrains.kotlin.config.JVMConfigurationKeys
-import org.jetbrains.kotlin.config.addKotlinSourceRoot
 import org.jetbrains.kotlin.daemon.TestMessageCollector
 import org.jetbrains.kotlin.daemon.assertHasMessage
 import org.jetbrains.kotlin.daemon.toFile
-import org.jetbrains.kotlin.script.InvalidScriptResolverAnnotation
-import org.jetbrains.kotlin.script.KotlinScriptDefinition
-import org.jetbrains.kotlin.script.KotlinScriptDefinitionFromAnnotatedTemplate
-import org.jetbrains.kotlin.script.tryConstructClassFromStringArgs
+import org.jetbrains.kotlin.script.loadScriptingPlugin
+import org.jetbrains.kotlin.scripting.configuration.ScriptingConfigurationKeys
+import org.jetbrains.kotlin.scripting.definitions.KotlinScriptDefinition
+import org.jetbrains.kotlin.scripting.definitions.ScriptDefinition
+import org.jetbrains.kotlin.scripting.resolve.InvalidScriptResolverAnnotation
+import org.jetbrains.kotlin.scripting.resolve.KotlinScriptDefinitionFromAnnotatedTemplate
 import org.jetbrains.kotlin.test.ConfigurationKind
 import org.jetbrains.kotlin.test.KotlinTestUtils
 import org.jetbrains.kotlin.test.TestJdkKind
 import org.jetbrains.kotlin.test.testFramework.KtUsefulTestCase
-import org.jetbrains.kotlin.util.KotlinFrontEndException
 import org.jetbrains.kotlin.utils.PathUtil
+import org.jetbrains.kotlin.utils.tryConstructClassFromStringArgs
 import org.junit.Assert
 import java.io.File
 import java.io.OutputStream
 import java.io.PrintStream
-import java.lang.Exception
 import java.lang.reflect.InvocationTargetException
 import java.net.URL
 import java.net.URLClassLoader
@@ -50,6 +51,7 @@ import kotlin.reflect.KClass
 import kotlin.script.dependencies.*
 import kotlin.script.experimental.dependencies.*
 import kotlin.script.experimental.dependencies.DependenciesResolver.ResolveResult
+import kotlin.script.experimental.jvm.defaultJvmScriptingHostConfiguration
 import kotlin.script.templates.AcceptedAnnotations
 import kotlin.script.templates.ScriptTemplateDefinition
 import kotlin.script.templates.standard.ScriptTemplateWithArgs
@@ -232,7 +234,7 @@ class ScriptTemplateTest : KtUsefulTestCase() {
         val aClass = compileScript("fib.kts", ScriptWithIntParam::class, messageCollector = messageCollector)
         Assert.assertNotNull("Compilation failed:\n$messageCollector", aClass)
         captureOut {
-            val anObj =  tryConstructClassFromStringArgs(aClass!!, listOf("4"))
+            val anObj = tryConstructClassFromStringArgs(aClass!!, listOf("4"))
             Assert.assertNotNull(anObj)
         }.let {
             assertEqualsTrimmed(NUM_4_LINE + FIB_SCRIPT_OUTPUT_TAIL, it)
@@ -312,16 +314,10 @@ class ScriptTemplateTest : KtUsefulTestCase() {
     }
 
     fun testScriptWithNoMatchingTemplate() {
-        try {
-            compileScript("fib.kts", ScriptWithDifferentFileNamePattern::class, null)
-            Assert.fail("should throw compilation error")
-        }
-        catch (e: KotlinFrontEndException) {
-            if (e.message?.contains("Should not parse a script without definition") != true) {
-                // unexpected error
-                throw e
-            }
-        }
+        val messageCollector = TestMessageCollector()
+        val aClass =
+            compileScript("without_params.kts", ScriptWithDifferentFileNamePattern::class, null, messageCollector = messageCollector)
+        Assert.assertNotNull("Compilation failed:\n$messageCollector", aClass)
     }
 
     private fun compileScript(
@@ -332,16 +328,17 @@ class ScriptTemplateTest : KtUsefulTestCase() {
             messageCollector: MessageCollector = PrintingMessageCollector(System.err, MessageRenderer.PLAIN_FULL_PATHS, false),
             includeKotlinRuntime: Boolean = true
     ): Class<*>? =
-            compileScriptImpl("compiler/testData/script/" + scriptPath, KotlinScriptDefinitionFromAnnotatedTemplate(
-                    scriptTemplate, environment
-            ), runIsolated, messageCollector, includeKotlinRuntime)
+            compileScriptImpl("compiler/testData/script/" + scriptPath,
+                              KotlinScriptDefinitionFromAnnotatedTemplate(
+                                  scriptTemplate, environment
+                              ), runIsolated, messageCollector, includeKotlinRuntime)
 
     private fun compileScriptImpl(
-            scriptPath: String,
-            scriptDefinition: KotlinScriptDefinition,
-            runIsolated: Boolean,
-            messageCollector: MessageCollector,
-            includeKotlinRuntime: Boolean
+        scriptPath: String,
+        scriptDefinition: KotlinScriptDefinition,
+        runIsolated: Boolean,
+        messageCollector: MessageCollector,
+        includeKotlinRuntime: Boolean
     ): Class<*>? {
         val rootDisposable = Disposer.newDisposable()
         try {
@@ -353,25 +350,36 @@ class ScriptTemplateTest : KtUsefulTestCase() {
                     *additionalClasspath)
             configuration.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)
             configuration.addKotlinSourceRoot(scriptPath)
-            configuration.add(JVMConfigurationKeys.SCRIPT_DEFINITIONS, scriptDefinition)
+            configuration.add(
+                ScriptingConfigurationKeys.SCRIPT_DEFINITIONS,
+                ScriptDefinition.FromLegacy(
+                    defaultJvmScriptingHostConfiguration,
+                    scriptDefinition
+                )
+            )
+            configuration.put(JVMConfigurationKeys.DISABLE_STANDARD_SCRIPT_DEFINITION, true)
             configuration.put(JVMConfigurationKeys.RETAIN_OUTPUT_IN_MEMORY, true)
+
+            loadScriptingPlugin(configuration)
 
             val environment = KotlinCoreEnvironment.createForTests(rootDisposable, configuration, EnvironmentConfigFiles.JVM_CONFIG_FILES)
 
-            try {
-                return KotlinToJVMBytecodeCompiler.compileScript(environment, this::class.java.classLoader.takeUnless { runIsolated })
-            }
-            catch (e: CompilationException) {
-                messageCollector.report(CompilerMessageSeverity.EXCEPTION, OutputMessageUtil.renderException(e),
-                                        MessageUtil.psiElementToMessageLocation(e.element))
-                return null
-            }
-            catch (t: Throwable) {
+            return try {
+                KotlinToJVMBytecodeCompiler.compileScript(environment, this::class.java.classLoader.takeUnless { runIsolated })
+            } catch (e: CompilationException) {
+                messageCollector.report(
+                    CompilerMessageSeverity.EXCEPTION, OutputMessageUtil.renderException(e),
+                    MessageUtil.psiElementToMessageLocation(e.element)
+                )
+                null
+            } catch (e: IllegalStateException) {
+                messageCollector.report(CompilerMessageSeverity.EXCEPTION, OutputMessageUtil.renderException(e))
+                null
+            } catch (t: Throwable) {
                 MessageCollectorUtil.reportException(messageCollector, t)
                 throw t
             }
-        }
-        finally {
+        } finally {
             Disposer.dispose(rootDisposable)
         }
     }
@@ -549,7 +557,7 @@ abstract class ScriptWithBaseClass(val num: Int, passthrough: Int) : TestDSLClas
 @ScriptTemplateDefinition(
         scriptFilePattern =".*\\.kts",
         resolver = TestKotlinScriptDependenciesResolver::class)
-abstract class ScriptWithoutParams(num: Int)
+abstract class ScriptWithoutParams(@Suppress("UNUSED_PARAMETER") num: Int)
 
 @ScriptTemplateDefinition(
         scriptFilePattern =".*\\.kts",

@@ -21,38 +21,55 @@ import org.jetbrains.kotlin.resolve.calls.model.*
 import org.jetbrains.kotlin.resolve.calls.tower.ResolutionCandidateApplicability
 import org.jetbrains.kotlin.resolve.calls.tower.ResolutionCandidateApplicability.INAPPLICABLE
 import org.jetbrains.kotlin.resolve.calls.tower.ResolutionCandidateApplicability.INAPPLICABLE_WRONG_RECEIVER
+import org.jetbrains.kotlin.resolve.scopes.receivers.DetailedReceiver
 import org.jetbrains.kotlin.types.KotlinType
-import org.jetbrains.kotlin.types.UnwrappedType
+import org.jetbrains.kotlin.types.model.KotlinTypeMarker
+import org.jetbrains.kotlin.types.model.TypeVariableMarker
 
 
 sealed class ConstraintPosition
 
-class ExplicitTypeParameterConstraintPosition(val typeArgument: SimpleTypeArgument) : ConstraintPosition() {
+class ExplicitTypeParameterConstraintPosition(val typeArgument: SimpleTypeArgument) : ConstraintPosition(), OnlyInputTypeConstraintPosition {
     override fun toString() = "TypeParameter $typeArgument"
 }
 
-class ExpectedTypeConstraintPosition(val topLevelCall: KotlinCall) : ConstraintPosition() {
+class ExpectedTypeConstraintPosition(val topLevelCall: KotlinCall) : ConstraintPosition(), OnlyInputTypeConstraintPosition {
     override fun toString() = "ExpectedType for call $topLevelCall"
 }
 
-class DeclaredUpperBoundConstraintPosition(val typeParameterDescriptor: TypeParameterDescriptor) : ConstraintPosition() {
+sealed class DeclaredUpperBoundConstraintPosition : ConstraintPosition()
+
+class DeclaredUpperBoundConstraintPositionImpl(val typeParameterDescriptor: TypeParameterDescriptor) : DeclaredUpperBoundConstraintPosition() {
     override fun toString() = "DeclaredUpperBound ${typeParameterDescriptor.name} from ${typeParameterDescriptor.containingDeclaration}"
 }
 
-class ArgumentConstraintPosition(val argument: KotlinCallArgument) : ConstraintPosition() {
+class FirDeclaredUpperBoundConstraintPosition : DeclaredUpperBoundConstraintPosition()
+
+interface OnlyInputTypeConstraintPosition
+
+class ArgumentConstraintPosition(val argument: KotlinCallArgument) : ConstraintPosition(), OnlyInputTypeConstraintPosition {
     override fun toString() = "Argument $argument"
 }
 
-class ReceiverConstraintPosition(val argument: KotlinCallArgument) : ConstraintPosition() {
+class ReceiverConstraintPosition(val argument: KotlinCallArgument) : ConstraintPosition(), OnlyInputTypeConstraintPosition {
     override fun toString() = "Receiver $argument"
 }
 
-class FixVariableConstraintPosition(val variable: NewTypeVariable) : ConstraintPosition() {
+class FixVariableConstraintPosition(val variable: TypeVariableMarker, val resolvedAtom: ResolvedAtom?) : ConstraintPosition() {
     override fun toString() = "Fix variable $variable"
 }
 
 class KnownTypeParameterConstraintPosition(val typeArgument: KotlinType) : ConstraintPosition() {
     override fun toString() = "TypeArgument $typeArgument"
+}
+
+class LHSArgumentConstraintPosition(
+    val argument: CallableReferenceKotlinCallArgument,
+    val receiver: DetailedReceiver
+) : ConstraintPosition() {
+    override fun toString(): String {
+        return "LHS receiver $receiver"
+    }
 }
 
 class LambdaArgumentConstraintPosition(val lambda: ResolvedLambdaAtom) : ConstraintPosition() {
@@ -65,8 +82,14 @@ class DelegatedPropertyConstraintPosition(val topLevelCall: KotlinCall) : Constr
     override fun toString() = "Constraint from call $topLevelCall for delegated property"
 }
 
-class IncorporationConstraintPosition(val from: ConstraintPosition, val initialConstraint: InitialConstraint) : ConstraintPosition() {
-    override fun toString() = "Incorporate $initialConstraint from position $from"
+class IncorporationConstraintPosition(
+    val from: ConstraintPosition,
+    val initialConstraint: InitialConstraint
+) : ConstraintPosition() {
+    lateinit var inputTypePositions: Set<ConstraintPosition>
+
+    override fun toString() =
+        "Incorporate $initialConstraint from position $from"
 }
 
 class CoroutinePosition() : ConstraintPosition() {
@@ -81,21 +104,24 @@ abstract class ConstraintSystemCallDiagnostic(applicability: ResolutionCandidate
 }
 
 class NewConstraintError(
-    val lowerType: UnwrappedType,
-    val upperType: UnwrappedType,
+    val lowerType: KotlinTypeMarker,
+    val upperType: KotlinTypeMarker,
     val position: IncorporationConstraintPosition
 ) : ConstraintSystemCallDiagnostic(if (position.from is ReceiverConstraintPosition) INAPPLICABLE_WRONG_RECEIVER else INAPPLICABLE)
 
 class CapturedTypeFromSubtyping(
-    val typeVariable: NewTypeVariable,
-    val constraintType: UnwrappedType,
+    val typeVariable: TypeVariableMarker,
+    val constraintType: KotlinTypeMarker,
     val position: ConstraintPosition
 ) : ConstraintSystemCallDiagnostic(INAPPLICABLE)
 
-class NotEnoughInformationForTypeParameter(val typeVariable: NewTypeVariable) : ConstraintSystemCallDiagnostic(INAPPLICABLE)
+class NotEnoughInformationForTypeParameter(
+    val typeVariable: TypeVariableMarker,
+    val resolvedAtom: ResolvedAtom
+) : ConstraintSystemCallDiagnostic(INAPPLICABLE)
 
 class ConstrainingTypeIsError(
-    val typeVariable: NewTypeVariable,
-    val constraintType: UnwrappedType,
+    val typeVariable: TypeVariableMarker,
+    val constraintType: KotlinTypeMarker,
     val position: IncorporationConstraintPosition
 ) : ConstraintSystemCallDiagnostic(INAPPLICABLE)

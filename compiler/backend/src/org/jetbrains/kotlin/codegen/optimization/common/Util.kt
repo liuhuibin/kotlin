@@ -34,6 +34,16 @@ val AbstractInsnNode.isMeaningful: Boolean
             else -> true
         }
 
+val AbstractInsnNode.isBranchOrCall: Boolean
+    get() =
+        when(this.type) {
+            AbstractInsnNode.JUMP_INSN,
+            AbstractInsnNode.TABLESWITCH_INSN,
+            AbstractInsnNode.LOOKUPSWITCH_INSN,
+            AbstractInsnNode.METHOD_INSN -> true
+            else -> false
+        }
+
 class InsnSequence(val from: AbstractInsnNode, val to: AbstractInsnNode?) : Sequence<AbstractInsnNode> {
     constructor(insnList: InsnList) : this(insnList.first, null)
 
@@ -78,8 +88,8 @@ fun MethodNode.prepareForEmitting() {
     maxStack = -1
     accept(
         MaxStackFrameSizeAndLocalsCalculator(
-            Opcodes.ASM5, access, desc,
-            object : MethodVisitor(Opcodes.ASM5) {
+            Opcodes.API_VERSION, access, desc,
+            object : MethodVisitor(Opcodes.API_VERSION) {
                 override fun visitMaxs(maxStack: Int, maxLocals: Int) {
                     this@prepareForEmitting.maxStack = maxStack
                 }

@@ -1,4 +1,6 @@
-// IGNORE_BACKEND: JS_IR
+// !LANGUAGE: -ProperIeee754Comparisons
+// IGNORE_BACKEND: NATIVE
+// DONT_TARGET_EXACT_BACKEND: JS_IR
 fun eqDI(x: Any?, y: Any?) = x is Double?   && y is Int?        && x == y
 fun eqDL(x: Any?, y: Any?) = x is Double?   && y is Long?       && x == y
 fun eqID(x: Any?, y: Any?) = x is Int?      && y is Double?     && x == y

@@ -17,6 +17,7 @@
 package samples.collections
 
 import samples.*
+import kotlin.test.*
 
 
 @RunWith(Enclosed::class)
@@ -32,9 +33,102 @@ class Arrays {
             val array: Array<Char>? = arrayOf('a', 'b', 'c')
             assertPrints(array.orEmpty().contentToString(), "[a, b, c]")
         }
+
+        @Sample
+        fun arrayIsNullOrEmpty() {
+            val nullArray: Array<Any>? = null
+            assertTrue(nullArray.isNullOrEmpty())
+
+            val emptyArray: Array<Any>? = emptyArray<Any>()
+            assertTrue(emptyArray.isNullOrEmpty())
+
+            val array: Array<Char>? = arrayOf('a', 'b', 'c')
+            assertFalse(array.isNullOrEmpty())
+        }
+
+        @Sample
+        fun arrayIfEmpty() {
+            val emptyArray: Array<Any> = emptyArray()
+
+            val emptyOrNull: Array<Any>? = emptyArray.ifEmpty { null }
+            assertPrints(emptyOrNull, "null")
+
+            val emptyOrDefault: Array<Any> = emptyArray.ifEmpty { arrayOf("default") }
+            assertPrints(emptyOrDefault.contentToString(), "[default]")
+
+            val nonEmptyArray = arrayOf(1)
+            val sameArray = nonEmptyArray.ifEmpty { arrayOf(2) }
+            assertTrue(nonEmptyArray === sameArray)
+        }
     }
 
     class Transformations {
+
+        @Sample
+        fun associateArrayOfPrimitives() {
+            val charCodes = intArrayOf(72, 69, 76, 76, 79)
+
+            val byCharCode = charCodes.associate { it to it.toChar() }
+
+            // 76=L only occurs once because only the last pair with the same key gets added
+            assertPrints(byCharCode, "{72=H, 69=E, 76=L, 79=O}")
+        }
+
+
+        @Sample
+        fun associateArrayOfPrimitivesBy() {
+            val charCodes = intArrayOf(72, 69, 76, 76, 79)
+
+            val byChar = charCodes.associateBy { it.toChar() }
+
+            // L=76 only occurs once because only the last pair with the same key gets added
+            assertPrints(byChar, "{H=72, E=69, L=76, O=79}")
+        }
+
+        @Sample
+        fun associateArrayOfPrimitivesByWithValueTransform() {
+            val charCodes = intArrayOf(65, 65, 66, 67, 68, 69)
+
+            val byUpperCase = charCodes.associateBy({ it.toChar() }, { (it + 32).toChar() })
+
+            // A=a only occurs once because only the last pair with the same key gets added
+            assertPrints(byUpperCase, "{A=a, B=b, C=c, D=d, E=e}")
+        }
+
+        @Sample
+        fun associateArrayOfPrimitivesByTo() {
+            val charCodes = intArrayOf(72, 69, 76, 76, 79)
+            val byChar = mutableMapOf<Char, Int>()
+
+            assertTrue(byChar.isEmpty())
+            charCodes.associateByTo(byChar) { it.toChar() }
+
+            assertTrue(byChar.isNotEmpty())
+            // L=76 only occurs once because only the last pair with the same key gets added
+            assertPrints(byChar, "{H=72, E=69, L=76, O=79}")
+        }
+
+        @Sample
+        fun associateArrayOfPrimitivesByToWithValueTransform() {
+            val charCodes = intArrayOf(65, 65, 66, 67, 68, 69)
+
+            val byUpperCase = mutableMapOf<Char, Char>()
+            charCodes.associateByTo(byUpperCase, { it.toChar() }, { (it + 32).toChar() } )
+
+            // A=a only occurs once because only the last pair with the same key gets added
+            assertPrints(byUpperCase, "{A=a, B=b, C=c, D=d, E=e}")
+        }
+
+        @Sample
+        fun associateArrayOfPrimitivesTo() {
+            val charCodes = intArrayOf(72, 69, 76, 76, 79)
+
+            val byChar = mutableMapOf<Int, Char>()
+            charCodes.associateTo(byChar) { it to it.toChar() }
+
+            // 76=L only occurs once because only the last pair with the same key gets added
+            assertPrints(byChar, "{72=H, 69=E, 76=L, 79=O}")
+        }
 
         @Sample
         fun flattenArray() {
@@ -101,6 +195,81 @@ class Arrays {
             val arrayCopyTruncated = array.copyOf(2)
             assertPrints(arrayCopyTruncated.contentToString(), "[1, 2]")
         }
+    }
+
+    class Sorting {
+
+        @Sample
+        fun sortArray() {
+            val intArray = intArrayOf(4, 3, 2, 1)
+
+            // before sorting
+            assertPrints(intArray.joinToString(), "4, 3, 2, 1")
+
+            intArray.sort()
+
+            // after sorting
+            assertPrints(intArray.joinToString(), "1, 2, 3, 4")
+        }
+
+        @Sample
+        fun sortArrayOfComparable() {
+            class Person(val firstName: String, val lastName: String) : Comparable<Person> {
+                override fun compareTo(other: Person): Int = this.lastName.compareTo(other.lastName)
+                override fun toString(): String = "$firstName $lastName"
+            }
+
+            val people = arrayOf(
+                Person("Ragnar", "Lodbrok"),
+                Person("Bjorn", "Ironside"),
+                Person("Sweyn", "Forkbeard")
+            )
+
+            // before sorting
+            assertPrints(people.joinToString(), "Ragnar Lodbrok, Bjorn Ironside, Sweyn Forkbeard")
+
+            people.sort()
+
+            // after sorting
+            assertPrints(people.joinToString(), "Sweyn Forkbeard, Bjorn Ironside, Ragnar Lodbrok")
+
+        }
+
+        @Sample
+        fun sortRangeOfArray() {
+            val intArray = intArrayOf(4, 3, 2, 1)
+
+            // before sorting
+            assertPrints(intArray.joinToString(), "4, 3, 2, 1")
+
+            intArray.sort(0, 3)
+
+            // after sorting
+            assertPrints(intArray.joinToString(), "2, 3, 4, 1")
+        }
+
+        @Sample
+        fun sortRangeOfArrayOfComparable() {
+            class Person(val firstName: String, val lastName: String) : Comparable<Person> {
+                override fun compareTo(other: Person): Int = this.lastName.compareTo(other.lastName)
+                override fun toString(): String = "$firstName $lastName"
+            }
+
+            val people = arrayOf(
+                Person("Ragnar", "Lodbrok"),
+                Person("Bjorn", "Ironside"),
+                Person("Sweyn", "Forkbeard")
+            )
+
+            // before sorting
+            assertPrints(people.joinToString(), "Ragnar Lodbrok, Bjorn Ironside, Sweyn Forkbeard")
+
+            people.sort(0, 2)
+
+            // after sorting
+            assertPrints(people.joinToString(), "Bjorn Ironside, Ragnar Lodbrok, Sweyn Forkbeard")
+        }
+
     }
 
 }

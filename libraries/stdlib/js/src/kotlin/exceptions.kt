@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package kotlin
@@ -107,6 +107,10 @@ public actual open class NoSuchElementException actual constructor(message: Stri
     actual constructor() : this(null)
 }
 
+@SinceKotlin("1.3")
+public actual open class ArithmeticException actual constructor(message: String?) : RuntimeException(message) {
+    actual constructor() : this(null)
+}
 
 public actual open class NoWhenBranchMatchedException actual constructor(message: String?, cause: Throwable?) : RuntimeException(message, cause) {
     actual constructor() : this(null, null)

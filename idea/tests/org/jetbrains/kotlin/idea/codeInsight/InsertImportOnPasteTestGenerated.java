@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.codeInsight;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.idea.codeInsight;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -24,11 +23,11 @@ public class InsertImportOnPasteTestGenerated extends AbstractInsertImportOnPast
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Copy extends AbstractInsertImportOnPasteTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTestCopy, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTestCopy, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInCopy() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/copyPaste/imports"), Pattern.compile("^([^.]+)\\.kt$"), TargetBackend.ANY, false);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/copyPaste/imports"), Pattern.compile("^([^.]+)\\.kt$"), null, false);
         }
 
         @TestMetadata("AlreadyImportedExtensions.kt")
@@ -74,6 +73,11 @@ public class InsertImportOnPasteTestGenerated extends AbstractInsertImportOnPast
         @TestMetadata("ClassType.kt")
         public void testClassType() throws Exception {
             runTest("idea/testData/copyPaste/imports/ClassType.kt");
+        }
+
+        @TestMetadata("ClassWithDoc.kt")
+        public void testClassWithDoc() throws Exception {
+            runTest("idea/testData/copyPaste/imports/ClassWithDoc.kt");
         }
 
         @TestMetadata("ConflictForTypeWithTypeParameter.kt")
@@ -362,11 +366,11 @@ public class InsertImportOnPasteTestGenerated extends AbstractInsertImportOnPast
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Cut extends AbstractInsertImportOnPasteTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTestCut, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTestCut, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInCut() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/copyPaste/imports"), Pattern.compile("^([^.]+)\\.kt$"), TargetBackend.ANY, false);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/copyPaste/imports"), Pattern.compile("^([^.]+)\\.kt$"), null, false);
         }
 
         @TestMetadata("AlreadyImportedExtensions.kt")
@@ -412,6 +416,11 @@ public class InsertImportOnPasteTestGenerated extends AbstractInsertImportOnPast
         @TestMetadata("ClassType.kt")
         public void testClassType() throws Exception {
             runTest("idea/testData/copyPaste/imports/ClassType.kt");
+        }
+
+        @TestMetadata("ClassWithDoc.kt")
+        public void testClassWithDoc() throws Exception {
+            runTest("idea/testData/copyPaste/imports/ClassWithDoc.kt");
         }
 
         @TestMetadata("ConflictForTypeWithTypeParameter.kt")

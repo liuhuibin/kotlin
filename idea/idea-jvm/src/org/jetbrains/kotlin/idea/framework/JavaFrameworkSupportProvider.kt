@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.framework
@@ -18,6 +18,10 @@ import com.intellij.openapi.roots.ui.configuration.FacetsProvider
 import com.intellij.openapi.roots.ui.configuration.libraries.CustomLibraryDescription
 import org.jetbrains.kotlin.idea.configuration.BuildSystemType
 import org.jetbrains.kotlin.idea.configuration.getBuildSystemType
+import org.jetbrains.kotlin.idea.formatter.KotlinStyleGuideCodeStyle
+import org.jetbrains.kotlin.idea.formatter.ProjectCodeStyleImporter
+import org.jetbrains.kotlin.idea.statistics.FUSEventGroups
+import org.jetbrains.kotlin.idea.statistics.KotlinFUSLogger
 import javax.swing.JComponent
 
 class JavaFrameworkSupportProvider : FrameworkSupportInModuleProvider() {
@@ -37,15 +41,23 @@ class JavaFrameworkSupportProvider : FrameworkSupportInModuleProvider() {
             override fun isOnlyLibraryAdded(): Boolean = true
 
             override fun addSupport(
-                    module: Module,
-                    rootModel: ModifiableRootModel,
-                    modifiableModelsProvider: ModifiableModelsProvider) {
+                module: Module,
+                rootModel: ModifiableRootModel,
+                modifiableModelsProvider: ModifiableModelsProvider
+            ) {
                 FrameworksCompatibilityUtils.suggestRemoveIncompatibleFramework(
-                        rootModel,
-                        JSLibraryStdDescription.SUITABLE_LIBRARY_KINDS,
-                        "Kotlin/\u200BJS")
+                    rootModel,
+                    JSLibraryStdDescription.SUITABLE_LIBRARY_KINDS,
+                    "Kotlin/\u200BJS"
+                )
 
-                description!!.finishLibConfiguration(module, rootModel)
+                description!!.finishLibConfiguration(module, rootModel, false)
+
+                val isNewProject = model.project == null
+                if (isNewProject) {
+                    ProjectCodeStyleImporter.apply(module.project, KotlinStyleGuideCodeStyle.INSTANCE)
+                }
+                KotlinFUSLogger.log(FUSEventGroups.NPWizards, "KotlinJavaFrameworkSupportProvider")
             }
 
             override fun onFrameworkSelectionChanged(selected: Boolean) {

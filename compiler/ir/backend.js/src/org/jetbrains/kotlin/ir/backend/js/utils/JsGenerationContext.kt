@@ -1,47 +1,51 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.ir.backend.js.utils
 
-import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
 import org.jetbrains.kotlin.ir.declarations.IrFunction
-import org.jetbrains.kotlin.ir.expressions.IrLoop
-import org.jetbrains.kotlin.ir.symbols.IrSymbol
-import org.jetbrains.kotlin.js.backend.ast.*
+import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
+import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
+import org.jetbrains.kotlin.js.backend.ast.JsName
+import org.jetbrains.kotlin.js.backend.ast.JsNameRef
+import org.jetbrains.kotlin.js.backend.ast.JsScope
+import org.jetbrains.kotlin.js.backend.ast.JsThisRef
 
-class JsGenerationContext {
-    fun newDeclaration(scope: JsScope, func: IrFunction? = null): JsGenerationContext {
-        return JsGenerationContext(this, if (func != null) JsBlock() else JsGlobalBlock(), scope, func)
+val emptyScope: JsScope
+    get() = object : JsScope("nil") {
+        override fun doCreateName(ident: String): JsName {
+            error("Trying to create name in empty scope")
+        }
     }
 
-    val currentBlock: JsBlock
-    val currentScope: JsScope
-    val currentFunction: IrFunction?
-    val parent: JsGenerationContext?
+class JsGenerationContext(
+    val currentFunction: IrFunction?,
     val staticContext: JsStaticContext
-    private val program: JsProgram
-
-    constructor(rootScope: JsRootScope, backendContext: JsIrBackendContext) {
-
-        this.parent = null
-        this.program = rootScope.program
-        this.staticContext = JsStaticContext(rootScope, program.globalBlock, SimpleNameGenerator(), backendContext)
-        this.currentScope = rootScope
-        this.currentBlock = program.globalBlock
-        this.currentFunction = null
+): IrNamer by staticContext {
+    fun newDeclaration(func: IrFunction? = null): JsGenerationContext {
+        return JsGenerationContext(
+            currentFunction = func,
+            staticContext = staticContext
+        )
     }
 
-    constructor(parent: JsGenerationContext, block: JsBlock, scope: JsScope, func: IrFunction?) {
-        this.parent = parent
-        this.program = parent.program
-        this.staticContext = parent.staticContext
-        this.currentBlock = block
-        this.currentScope = scope
-        this.currentFunction = func
+    val continuation
+        get() = if (isCoroutineDoResume()) {
+            JsThisRef()
+        } else {
+            if (currentFunction!!.descriptor.isSuspend) {
+                JsNameRef(Namer.CONTINUATION)
+            } else {
+                getNameForValueDeclaration(currentFunction.valueParameters.last()).makeRef()
+            }
+        }
+
+    private fun isCoroutineDoResume(): Boolean {
+        val overriddenSymbols = (currentFunction as? IrSimpleFunction)?.overriddenSymbols ?: return false
+        return staticContext.doResumeFunctionSymbol in overriddenSymbols
     }
 
-    fun getNameForSymbol(symbol: IrSymbol): JsName = staticContext.getNameForSymbol(symbol, this)
-    fun getNameForLoop(loop: IrLoop): JsName? = staticContext.getNameForLoop(loop, this)
+    fun checkIfJsCode(symbol: IrFunctionSymbol): Boolean = symbol == staticContext.backendContext.intrinsics.jsCode
 }

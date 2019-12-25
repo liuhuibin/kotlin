@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 // a package is omitted to get declarations directly under the module
@@ -51,6 +51,7 @@ fun charArray(size: Int, init: dynamic): Array<Char> {
 inline fun charArrayWithFun(size: Int, init: (Int) -> Char): Array<Char> {
     val array = charArray(size, null)
     for (i in 0..array.size - 1) {
+        @Suppress("UNUSED_VARIABLE") // used in js block
         val value = init(i)
         js("array[i] = value;")
     }
@@ -61,6 +62,7 @@ inline fun charArrayWithFun(size: Int, init: (Int) -> Char): Array<Char> {
 inline fun untypedCharArrayWithFun(size: Int, init: (Int) -> Char): Array<Char> {
     val array = Array<Char>(size)
     for (i in 0..array.size - 1) {
+        @Suppress("UNUSED_VARIABLE") // used in js block
         val value = init(i)
         js("array[i] = value;")
     }

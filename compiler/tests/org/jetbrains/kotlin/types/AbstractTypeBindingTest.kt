@@ -40,7 +40,7 @@ abstract class AbstractTypeBindingTest : KotlinTestWithEnvironment() {
 
         val analyzeResult = JvmResolveUtil.analyze(testKtFile, environment)
 
-        val testDeclaration = testKtFile.declarations.last()!! as KtCallableDeclaration
+        val testDeclaration = testKtFile.declarations.last() as KtCallableDeclaration
 
         val typeBinding = testDeclaration.createTypeBindingForReturnType(analyzeResult.bindingContext)
 
@@ -118,7 +118,5 @@ abstract class AbstractTypeBindingTest : KotlinTestWithEnvironment() {
             }
             popIndent()
         }
-
-        override fun toString(): String = out.toString()
     }
 }

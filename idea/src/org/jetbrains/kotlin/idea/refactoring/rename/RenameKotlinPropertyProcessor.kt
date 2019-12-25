@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2016 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.refactoring.rename
@@ -25,7 +14,6 @@ import com.intellij.psi.*
 import com.intellij.psi.search.SearchScope
 import com.intellij.psi.search.searches.DirectClassInheritorsSearch
 import com.intellij.psi.search.searches.OverridingMethodsSearch
-import com.intellij.refactoring.JavaRefactoringSettings
 import com.intellij.refactoring.listeners.RefactoringElementListener
 import com.intellij.refactoring.rename.RenameProcessor
 import com.intellij.refactoring.util.MoveRenameUsageInfo
@@ -44,10 +32,12 @@ import org.jetbrains.kotlin.descriptors.PropertyDescriptor
 import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
 import org.jetbrains.kotlin.descriptors.VariableDescriptor
 import org.jetbrains.kotlin.idea.caches.resolve.analyze
+import org.jetbrains.kotlin.idea.caches.resolve.getResolutionFacade
 import org.jetbrains.kotlin.idea.caches.resolve.unsafeResolveToDescriptor
 import org.jetbrains.kotlin.idea.core.getDeepestSuperDeclarations
 import org.jetbrains.kotlin.idea.core.isEnumCompanionPropertyWithEntryConflict
 import org.jetbrains.kotlin.idea.core.unquote
+import org.jetbrains.kotlin.idea.refactoring.KotlinRefactoringSettings
 import org.jetbrains.kotlin.idea.refactoring.checkSuperMethodsWithPopup
 import org.jetbrains.kotlin.idea.refactoring.dropOverrideKeywordIfNecessary
 import org.jetbrains.kotlin.idea.references.KtDestructuringDeclarationReference
@@ -77,16 +67,16 @@ class RenameKotlinPropertyProcessor : RenameKotlinPsiProcessor() {
         return namedUnwrappedElement is KtProperty || (namedUnwrappedElement is KtParameter && namedUnwrappedElement.hasValOrVar())
     }
 
-    override fun isToSearchInComments(psiElement: PsiElement) = JavaRefactoringSettings.getInstance().RENAME_SEARCH_IN_COMMENTS_FOR_FIELD
+    override fun isToSearchInComments(psiElement: PsiElement) = KotlinRefactoringSettings.instance.RENAME_SEARCH_IN_COMMENTS_FOR_FIELD
 
     override fun setToSearchInComments(element: PsiElement, enabled: Boolean) {
-        JavaRefactoringSettings.getInstance().RENAME_SEARCH_IN_COMMENTS_FOR_FIELD = enabled
+        KotlinRefactoringSettings.instance.RENAME_SEARCH_IN_COMMENTS_FOR_FIELD = enabled
     }
 
-    override fun isToSearchForTextOccurrences(element: PsiElement) = JavaRefactoringSettings.getInstance().RENAME_SEARCH_FOR_TEXT_FOR_FIELD
+    override fun isToSearchForTextOccurrences(element: PsiElement) = KotlinRefactoringSettings.instance.RENAME_SEARCH_FOR_TEXT_FOR_FIELD
 
     override fun setToSearchForTextOccurrences(element: PsiElement, enabled: Boolean) {
-        JavaRefactoringSettings.getInstance().RENAME_SEARCH_FOR_TEXT_FOR_FIELD = enabled
+        KotlinRefactoringSettings.instance.RENAME_SEARCH_FOR_TEXT_FOR_FIELD = enabled
     }
 
     private fun getJvmNames(element: PsiElement): Pair<String?, String?> {
@@ -102,9 +92,7 @@ class RenameKotlinPropertyProcessor : RenameKotlinPsiProcessor() {
         return when {
             getterJvmName == null && setterJvmName == null -> allReferences
             element is KtElement -> allReferences.filter {
-                it is KtReference
-                || (getterJvmName == null && (it.resolve() as? PsiNamedElement)?.name != setterJvmName)
-                || (setterJvmName == null && (it.resolve() as? PsiNamedElement)?.name != getterJvmName)
+                it is KtReference || (getterJvmName == null && (it.resolve() as? PsiNamedElement)?.name != setterJvmName) || (setterJvmName == null && (it.resolve() as? PsiNamedElement)?.name != getterJvmName)
             }
             element is KtLightDeclaration<*, *> -> {
                 val name = element.name
@@ -115,10 +103,10 @@ class RenameKotlinPropertyProcessor : RenameKotlinPsiProcessor() {
     }
 
     private fun checkAccidentalOverrides(
-            declaration: KtNamedDeclaration,
-            newName: String,
-            descriptor: VariableDescriptor,
-            result: MutableList<UsageInfo>
+        declaration: KtNamedDeclaration,
+        newName: String,
+        descriptor: VariableDescriptor,
+        result: MutableList<UsageInfo>
     ) {
         fun reportAccidentalOverride(candidate: PsiNamedElement) {
             val what = UsageViewUtil.getType(declaration).capitalize()
@@ -137,23 +125,23 @@ class RenameKotlinPropertyProcessor : RenameKotlinPsiProcessor() {
         }
 
         DFS.dfs(
-                listOf(initialClassDescriptor),
-                DFS.Neighbors<ClassDescriptor> { DescriptorUtils.getSuperclassDescriptors(it) },
-                object : DFS.AbstractNodeHandler<ClassDescriptor, Unit>() {
-                    override fun beforeChildren(current: ClassDescriptor): Boolean {
-                        if (current == initialClassDescriptor) return true
-                        (current.findCallableMemberBySignature(prototype))?.let { candidateDescriptor ->
-                            val candidate = candidateDescriptor.source.getPsi() as? PsiNamedElement ?: return false
-                            reportAccidentalOverride(candidate)
-                            return false
-                        }
-                        return true
+            listOf(initialClassDescriptor),
+            DFS.Neighbors<ClassDescriptor> { DescriptorUtils.getSuperclassDescriptors(it) },
+            object : DFS.AbstractNodeHandler<ClassDescriptor, Unit>() {
+                override fun beforeChildren(current: ClassDescriptor): Boolean {
+                    if (current == initialClassDescriptor) return true
+                    (current.findCallableMemberBySignature(prototype))?.let { candidateDescriptor ->
+                        val candidate = candidateDescriptor.source.getPsi() as? PsiNamedElement ?: return false
+                        reportAccidentalOverride(candidate)
+                        return false
                     }
-
-                    override fun result() {
-
-                    }
+                    return true
                 }
+
+                override fun result() {
+
+                }
+            }
         )
 
         if (!declaration.hasModifier(KtTokens.PRIVATE_KEYWORD)) {
@@ -166,48 +154,49 @@ class RenameKotlinPropertyProcessor : RenameKotlinPsiProcessor() {
                 }
             }
             DFS.dfs(
-                    listOf(initialPsiClass),
-                    DFS.Neighbors<PsiClass> { DirectClassInheritorsSearch.search(it) },
-                    object : DFS.AbstractNodeHandler<PsiClass, Unit>() {
-                        override fun beforeChildren(current: PsiClass): Boolean {
-                            if (current == initialPsiClass) return true
+                listOf(initialPsiClass),
+                DFS.Neighbors<PsiClass> { DirectClassInheritorsSearch.search(it) },
+                object : DFS.AbstractNodeHandler<PsiClass, Unit>() {
+                    override fun beforeChildren(current: PsiClass): Boolean {
+                        if (current == initialPsiClass) return true
 
-                            if (current is KtLightClass) {
-                                val property = current.kotlinOrigin?.findPropertyByName(newName) ?: return true
-                                reportAccidentalOverride(property)
+                        if (current is KtLightClass) {
+                            val property = current.kotlinOrigin?.findPropertyByName(newName) ?: return true
+                            reportAccidentalOverride(property)
+                            return false
+                        }
+
+                        for (psiMethod in prototypes) {
+                            current.findMethodBySignature(psiMethod, false)?.let {
+                                val candidate = it.unwrapped as? PsiNamedElement ?: return true
+                                reportAccidentalOverride(candidate)
                                 return false
                             }
-
-                            for (psiMethod in prototypes) {
-                                current.findMethodBySignature(psiMethod, false)?.let {
-                                    val candidate = it.unwrapped as? PsiNamedElement ?: return true
-                                    reportAccidentalOverride(candidate)
-                                    return false
-                                }
-                            }
-
-                            return true
                         }
 
-                        override fun result() {
-
-                        }
+                        return true
                     }
+
+                    override fun result() {
+
+                    }
+                }
             )
         }
     }
 
     override fun findCollisions(
-            element: PsiElement,
-            newName: String,
-            allRenames: MutableMap<out PsiElement, String>,
-            result: MutableList<UsageInfo>
+        element: PsiElement,
+        newName: String,
+        allRenames: MutableMap<out PsiElement, String>,
+        result: MutableList<UsageInfo>
     ) {
         val declaration = element.namedUnwrappedElement as? KtNamedDeclaration ?: return
-        val descriptor = declaration.unsafeResolveToDescriptor() as VariableDescriptor
+        val resolutionFacade = declaration.getResolutionFacade()
+        val descriptor = declaration.unsafeResolveToDescriptor(resolutionFacade) as VariableDescriptor
 
         val collisions = SmartList<UsageInfo>()
-        checkRedeclarations(descriptor, newName, collisions)
+        checkRedeclarations(declaration, newName, collisions, resolutionFacade, descriptor)
         checkAccidentalOverrides(declaration, newName, descriptor, collisions)
         checkOriginalUsagesRetargeting(declaration, newName, result, collisions)
         checkNewNameUsagesRetargeting(declaration, newName, collisions)
@@ -223,14 +212,14 @@ class RenameKotlinPropertyProcessor : RenameKotlinPsiProcessor() {
         if (ApplicationManager.getApplication()!!.isUnitTestMode) return deepestSuperDeclaration
 
         val containsText: String? =
-                deepestSuperDeclaration.fqName?.parent()?.asString() ?:
-                (deepestSuperDeclaration.parent as? KtClassOrObject)?.name
+            deepestSuperDeclaration.fqName?.parent()?.asString() ?: (deepestSuperDeclaration.parent as? KtClassOrObject)?.name
 
         val result = Messages.showYesNoCancelDialog(
-                deepestSuperDeclaration.project,
-                if (containsText != null) "Do you want to rename base property from \n$containsText" else "Do you want to rename base property",
-                "Rename warning",
-                Messages.getQuestionIcon())
+            deepestSuperDeclaration.project,
+            if (containsText != null) "Do you want to rename base property from \n$containsText" else "Do you want to rename base property",
+            "Rename warning",
+            Messages.getQuestionIcon()
+        )
 
         return when (result) {
             Messages.YES -> deepestSuperDeclaration
@@ -243,7 +232,7 @@ class RenameKotlinPropertyProcessor : RenameKotlinPsiProcessor() {
         val namedUnwrappedElement = element.namedUnwrappedElement ?: return null
 
         val callableDeclaration = namedUnwrappedElement as? KtCallableDeclaration
-                                  ?: throw IllegalStateException("Can't be for element $element there because of canProcessElement()")
+            ?: throw IllegalStateException("Can't be for element $element there because of canProcessElement()")
 
         val declarationToRename = chooseCallableToRename(callableDeclaration) ?: return null
 
@@ -261,7 +250,7 @@ class RenameKotlinPropertyProcessor : RenameKotlinPsiProcessor() {
         val namedUnwrappedElement = element.namedUnwrappedElement ?: return
 
         val callableDeclaration = namedUnwrappedElement as? KtCallableDeclaration
-                                  ?: throw IllegalStateException("Can't be for element $element there because of canProcessElement()")
+            ?: throw IllegalStateException("Can't be for element $element there because of canProcessElement()")
 
         fun preprocessAndPass(substitutedJavaElement: PsiElement) {
             val (getterJvmName, setterJvmName) = getJvmNames(namedUnwrappedElement)
@@ -269,12 +258,10 @@ class RenameKotlinPropertyProcessor : RenameKotlinPsiProcessor() {
                 val name = element.name
                 if (element.name != getterJvmName && element.name != setterJvmName) {
                     substitutedJavaElement
-                }
-                else {
+                } else {
                     substitutedJavaElement.toLightMethods().firstOrNull { it.name == name }
                 }
-            }
-            else substitutedJavaElement
+            } else substitutedJavaElement
             renameCallback.pass(elementToProcess)
         }
 
@@ -289,7 +276,8 @@ class RenameKotlinPropertyProcessor : RenameKotlinPsiProcessor() {
         }
     }
 
-    class PropertyMethodWrapper(private val propertyMethod: PsiMethod) : PsiNamedElement by propertyMethod, NavigationItem by propertyMethod {
+    class PropertyMethodWrapper(private val propertyMethod: PsiMethod) : PsiNamedElement by propertyMethod,
+        NavigationItem by propertyMethod {
         override fun getName() = propertyMethod.name
         override fun setName(name: String) = this
         override fun copy() = this
@@ -299,7 +287,7 @@ class RenameKotlinPropertyProcessor : RenameKotlinPsiProcessor() {
         super.prepareRenaming(element, newName, allRenames, scope)
 
         val namedUnwrappedElement = element.namedUnwrappedElement
-        val propertyMethods = when(namedUnwrappedElement) {
+        val propertyMethods = when (namedUnwrappedElement) {
             is KtProperty -> runReadAction { LightClassUtil.getLightClassPropertyMethods(namedUnwrappedElement) }
             is KtParameter -> runReadAction { LightClassUtil.getLightClassPropertyMethods(namedUnwrappedElement) }
             else -> throw IllegalStateException("Can't be for element $element there because of canProcessElement()")
@@ -314,13 +302,16 @@ class RenameKotlinPropertyProcessor : RenameKotlinPsiProcessor() {
         if (newPropertyName != null
             && getter != null && setter != null
             && (element == getter || element == setter)
-            && propertyNameByAccessor(getter.name, getter) == propertyNameByAccessor(setter.name, setter)) {
+            && propertyNameByAccessor(getter.name, getter) == propertyNameByAccessor(setter.name, setter)
+        ) {
             val accessorToRename = if (element == getter) setter else getter
             val newAccessorName = if (element == getter) JvmAbi.setterName(newPropertyName) else JvmAbi.getterName(newPropertyName)
-            if (ApplicationManager.getApplication().isUnitTestMode
-                || Messages.showYesNoDialog("Do you want to rename ${accessorToRename.name}() as well?",
-                                            "Rename",
-                                            Messages.getQuestionIcon()) == Messages.YES) {
+            if (ApplicationManager.getApplication().isUnitTestMode || Messages.showYesNoDialog(
+                    "Do you want to rename ${accessorToRename.name}() as well?",
+                    "Rename",
+                    Messages.getQuestionIcon()
+                ) == Messages.YES
+            ) {
                 allRenames[accessorToRename] = newAccessorName
             }
         }
@@ -350,7 +341,13 @@ class RenameKotlinPropertyProcessor : RenameKotlinPsiProcessor() {
         SETTER_USAGE
     }
 
-    override tailrec fun renameElement(element: PsiElement, newName: String, usages: Array<UsageInfo>, listener: RefactoringElementListener?) {
+    //TODO: a very long and complicated method, even recursive. mb refactor it somehow? at least split by PsiElement types?
+    override tailrec fun renameElement(
+        element: PsiElement,
+        newName: String,
+        usages: Array<UsageInfo>,
+        listener: RefactoringElementListener?
+    ) {
         val newNameUnquoted = newName.unquote()
         if (element is KtLightMethod) {
             if (element.modifierList.findAnnotation(DescriptorUtils.JVM_NAME.asString()) != null) {
@@ -405,23 +402,28 @@ class RenameKotlinPropertyProcessor : RenameKotlinPsiProcessor() {
                     oldSetterName -> UsageKind.SETTER_USAGE
                     else -> UsageKind.SIMPLE_PROPERTY_USAGE
                 }
-            }
-            else {
+            } else {
                 UsageKind.SIMPLE_PROPERTY_USAGE
             }
         }
 
-        super.renameElement(element, JvmAbi.setterName(newNameUnquoted).quoteIfNeeded(),
-                            refKindUsages[UsageKind.SETTER_USAGE]?.toTypedArray() ?: arrayOf<UsageInfo>(),
-                            null)
+        super.renameElement(
+            element.copy(), JvmAbi.setterName(newNameUnquoted).quoteIfNeeded(),
+            refKindUsages[UsageKind.SETTER_USAGE]?.toTypedArray() ?: arrayOf<UsageInfo>(),
+            null
+        )
 
-        super.renameElement(element, JvmAbi.getterName(newNameUnquoted).quoteIfNeeded(),
-                            refKindUsages[UsageKind.GETTER_USAGE]?.toTypedArray() ?: arrayOf<UsageInfo>(),
-                            null)
+        super.renameElement(
+            element.copy(), JvmAbi.getterName(newNameUnquoted).quoteIfNeeded(),
+            refKindUsages[UsageKind.GETTER_USAGE]?.toTypedArray() ?: arrayOf<UsageInfo>(),
+            null
+        )
 
-        super.renameElement(element, newName,
-                            refKindUsages[UsageKind.SIMPLE_PROPERTY_USAGE]?.toTypedArray() ?: arrayOf<UsageInfo>(),
-                            null)
+        super.renameElement(
+            element, newName,
+            refKindUsages[UsageKind.SIMPLE_PROPERTY_USAGE]?.toTypedArray() ?: arrayOf<UsageInfo>(),
+            null
+        )
 
         usages.forEach { (it as? KtResolvableCollisionUsageInfo)?.apply() }
 
@@ -430,11 +432,13 @@ class RenameKotlinPropertyProcessor : RenameKotlinPsiProcessor() {
         listener?.elementRenamed(element)
     }
 
-    private fun addRenameElements(psiMethod: PsiMethod?,
-                                  oldName: String?,
-                                  newName: String?,
-                                  allRenames: MutableMap<PsiElement, String>,
-                                  scope: SearchScope) {
+    private fun addRenameElements(
+        psiMethod: PsiMethod?,
+        oldName: String?,
+        newName: String?,
+        allRenames: MutableMap<PsiElement, String>,
+        scope: SearchScope
+    ) {
         if (psiMethod == null) return
 
         OverridingMethodsSearch.search(psiMethod, scope, true).forEach { overrider ->
@@ -450,9 +454,9 @@ class RenameKotlinPropertyProcessor : RenameKotlinPsiProcessor() {
                         val isGetter = overriderElement.parameterList.parametersCount == 0
                         allRenames[overriderElement] = if (isGetter) JvmAbi.getterName(newName) else JvmAbi.setterName(newName)
                     }
-                }
-                else {
-                    val demangledName = if (newName != null && overrider is KtLightMethod && overrider.isMangled) demangleInternalName(newName) else null
+                } else {
+                    val demangledName =
+                        if (newName != null && overrider is KtLightMethod && overrider.isMangled) demangleInternalName(newName) else null
                     val adjustedName = demangledName ?: newName
                     val newOverriderName = RefactoringUtil.suggestNewOverriderName(overriderName, oldName, adjustedName)
                     if (newOverriderName != null) {

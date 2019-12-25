@@ -1,4 +1,5 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
+// KJS_WITH_FULL_RUNTIME
 class C(val i: Int) {
   operator fun component1() = i + 1
   operator fun component2() = i + 2

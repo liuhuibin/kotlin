@@ -19,7 +19,12 @@ package org.jetbrains.kotlin.codegen.inline
 import gnu.trove.TIntIntHashMap
 import org.jetbrains.kotlin.codegen.ClassBuilder
 import org.jetbrains.kotlin.codegen.SourceInfo
+import org.jetbrains.kotlin.codegen.inline.SMAP.Companion.END
+import org.jetbrains.kotlin.codegen.inline.SMAP.Companion.FILE_SECTION
+import org.jetbrains.kotlin.codegen.inline.SMAP.Companion.LINE_SECTION
+import org.jetbrains.kotlin.codegen.inline.SMAP.Companion.STRATA_SECTION
 import java.util.*
+import kotlin.math.max
 
 const val KOTLIN_STRATA_NAME = "Kotlin"
 const val KOTLIN_DEBUG_STRATA_NAME = "KotlinDebug"
@@ -49,9 +54,9 @@ class SMAPBuilder(
     }
 
     private fun generateDefaultStrata(realMappings: List<FileMapping>): String {
-        val fileIds = "*F" + realMappings.mapIndexed { id, file -> "\n${file.toSMAPFile(id + 1)}" }.joinToString("")
-        val lineMappings = "*L" + realMappings.joinToString("") { it.toSMAPMapping() }
-        return "*S $KOTLIN_STRATA_NAME\n$fileIds\n$lineMappings\n*E\n"
+        val fileIds = FILE_SECTION + realMappings.mapIndexed { id, file -> "\n${file.toSMAPFile(id + 1)}" }.joinToString("")
+        val lineMappings = LINE_SECTION + realMappings.joinToString("") { it.toSMAPMapping() }
+        return "$STRATA_SECTION $KOTLIN_STRATA_NAME\n$fileIds\n$lineMappings\n$END\n"
     }
 
     private fun generateDebugStrata(realMappings: List<FileMapping>): String {
@@ -69,9 +74,9 @@ class SMAPBuilder(
         if (combinedMapping.lineMappings.isEmpty()) return ""
 
         val newMappings = listOf(combinedMapping)
-        val fileIds = "*F" + newMappings.mapIndexed { id, file -> "\n${file.toSMAPFile(id + 1)}" }.joinToString("")
-        val lineMappings = "*L" + newMappings.joinToString("") { it.toSMAPMapping() }
-        return "*S $KOTLIN_DEBUG_STRATA_NAME\n$fileIds\n$lineMappings\n*E\n"
+        val fileIds = FILE_SECTION + newMappings.mapIndexed { id, file -> "\n${file.toSMAPFile(id + 1)}" }.joinToString("")
+        val lineMappings = LINE_SECTION + newMappings.joinToString("") { it.toSMAPMapping() }
+        return "$STRATA_SECTION $KOTLIN_DEBUG_STRATA_NAME\n$fileIds\n$lineMappings\n$END\n"
     }
 
     private fun RangeMapping.toSMAP(fileId: Int): String {
@@ -105,7 +110,7 @@ open class NestedSourceMapper(
         } else {
             val rangeForMapping =
                 (if (lastVisitedRange?.contains(lineNumber) == true) lastVisitedRange!! else findMappingIfExists(lineNumber))
-                        ?: error("Can't find range to map line $lineNumber in ${sourceInfo.source}: ${sourceInfo.pathOrCleanFQN}")
+                    ?: error("Can't find range to map line $lineNumber in ${sourceInfo.source}: ${sourceInfo.pathOrCleanFQN}")
             val sourceLineNumber = rangeForMapping.mapDestToSource(lineNumber)
             val newLineNumber = parent.mapLineNumber(sourceLineNumber, rangeForMapping.parent!!.name, rangeForMapping.parent!!.path)
             if (newLineNumber > 0) {
@@ -127,12 +132,6 @@ open class NestedSourceMapper(
 open class InlineLambdaSourceMapper(
     parent: SourceMapper, smap: SMAPAndMethodNode
 ) : NestedSourceMapper(parent, smap.sortedRanges, smap.classSMAP.sourceInfo) {
-
-    init {
-        assert(ranges.isNotEmpty()) {
-            "Mapping ranges should be presented in inline lambda: ${smap.node}"
-        }
-    }
 
     override fun mapLineNumber(lineNumber: Int): Int {
         if (ranges.firstOrNull()?.contains(lineNumber) == true) {
@@ -213,7 +212,7 @@ open class DefaultSourceMapper(val sourceInfo: SourceInfo) : SourceMapper {
                 val newFileMapping = getOrRegisterNewSource(fileMapping.name, fileMapping.path)
                 fileMapping.lineMappings.forEach {
                     newFileMapping.mapNewInterval(it.source, it.dest, it.range)
-                    maxUsedValue = Math.max(it.maxDest, maxUsedValue)
+                    maxUsedValue = max(it.maxDest, maxUsedValue)
                 }
             }
     }
@@ -271,6 +270,7 @@ class SMAP(val fileMappings: List<FileMapping>) {
     companion object {
         const val FILE_SECTION = "*F"
         const val LINE_SECTION = "*L"
+        const val STRATA_SECTION = "*S"
         const val END = "*E"
     }
 }

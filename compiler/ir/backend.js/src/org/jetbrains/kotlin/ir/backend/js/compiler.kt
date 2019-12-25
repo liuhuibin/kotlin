@@ -1,111 +1,105 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.ir.backend.js
 
 import com.intellij.openapi.project.Project
-import org.jetbrains.kotlin.backend.common.lower.*
-import org.jetbrains.kotlin.backend.common.runOnFilePostfix
+import org.jetbrains.kotlin.backend.common.phaser.PhaseConfig
+import org.jetbrains.kotlin.backend.common.phaser.invokeToplevel
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.ir.backend.js.lower.*
-import org.jetbrains.kotlin.ir.backend.js.lower.inline.*
+import org.jetbrains.kotlin.ir.backend.js.export.isExported
+import org.jetbrains.kotlin.ir.backend.js.lower.moveBodilessDeclarationsToSeparatePlace
 import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.IrModuleToJsTransformer
-import org.jetbrains.kotlin.ir.declarations.IrFile
+import org.jetbrains.kotlin.ir.backend.js.utils.JsMainFunctionDetector
+import org.jetbrains.kotlin.ir.backend.js.utils.NameTables
+import org.jetbrains.kotlin.ir.backend.js.utils.isJsExport
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationWithName
+import org.jetbrains.kotlin.ir.declarations.IrField
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
+import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.util.ExternalDependenciesGenerator
+import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
+import org.jetbrains.kotlin.ir.util.generateTypicalIrProviderList
+import org.jetbrains.kotlin.ir.util.isEffectivelyExternal
 import org.jetbrains.kotlin.ir.util.patchDeclarationParents
-import org.jetbrains.kotlin.js.analyze.TopDownAnalyzerFacadeForJS
+import org.jetbrains.kotlin.library.KotlinLibrary
+import org.jetbrains.kotlin.library.resolver.KotlinLibraryResolveResult
 import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.progress.ProgressIndicatorAndCompilationCanceledStatus
 import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.psi2ir.Psi2IrTranslator
+import org.jetbrains.kotlin.utils.DFS
+
+fun sortDependencies(dependencies: Collection<IrModuleFragment>): Collection<IrModuleFragment> {
+    val mapping = dependencies.map { it.descriptor to it }.toMap()
+
+    return DFS.topologicalOrder(dependencies) { m ->
+        val descriptor = m.descriptor
+        descriptor.allDependencyModules.filter { it != descriptor }.map { mapping[it] }
+    }.reversed()
+}
+
+class CompilerResult(
+    val jsCode: String?,
+    val dceJsCode: String?,
+    val tsDefinitions: String? = null
+)
 
 fun compile(
     project: Project,
     files: List<KtFile>,
     configuration: CompilerConfiguration,
-    export: FqName
-): String {
-    val analysisResult = TopDownAnalyzerFacadeForJS.analyzeFiles(files, project, configuration, emptyList(), emptyList())
-    ProgressIndicatorAndCompilationCanceledStatus.checkCanceled()
+    phaseConfig: PhaseConfig,
+    allDependencies: KotlinLibraryResolveResult,
+    friendDependencies: List<KotlinLibrary>,
+    mainArguments: List<String>?,
+    exportedDeclarations: Set<FqName> = emptySet(),
+    generateFullJs: Boolean = true,
+    generateDceJs: Boolean = false
+): CompilerResult {
+    val (moduleFragment, dependencyModules, irBuiltIns, symbolTable, deserializer) =
+        loadIr(project, files, configuration, allDependencies, friendDependencies)
 
-    TopDownAnalyzerFacadeForJS.checkForErrors(files, analysisResult.bindingContext)
+    val moduleDescriptor = moduleFragment.descriptor
 
-    val psi2IrTranslator = Psi2IrTranslator()
-    val psi2IrContext = psi2IrTranslator.createGeneratorContext(analysisResult.moduleDescriptor, analysisResult.bindingContext)
+    val mainFunction = JsMainFunctionDetector.getMainFunctionOrNull(moduleFragment)
 
-    val moduleFragment = psi2IrTranslator.generateModuleFragment(psi2IrContext, files).removeDuplicates()
+    val context = JsIrBackendContext(moduleDescriptor, irBuiltIns, symbolTable, moduleFragment, exportedDeclarations, configuration)
 
-    val context = JsIrBackendContext(
-        analysisResult.moduleDescriptor,
-        psi2IrContext.irBuiltIns,
-        psi2IrContext.symbolTable,
-        moduleFragment
-    )
+    // Load declarations referenced during `context` initialization
+    dependencyModules.forEach {
+        val irProviders = generateTypicalIrProviderList(it.descriptor, irBuiltIns, symbolTable, deserializer)
+        ExternalDependenciesGenerator(symbolTable, irProviders).generateUnboundSymbolsAsDependencies()
+    }
 
-    ExternalDependenciesGenerator(psi2IrContext.symbolTable, psi2IrContext.irBuiltIns).generateUnboundSymbolsAsDependencies(moduleFragment)
+    val irFiles = dependencyModules.flatMap { it.files } + moduleFragment.files
 
-    context.performInlining(moduleFragment)
+    moduleFragment.files.clear()
+    moduleFragment.files += irFiles
 
-    moduleFragment.files.forEach { context.lower(it) }
-    val transformer = SecondaryCtorLowering.CallsiteRedirectionTransformer(context)
-    moduleFragment.files.forEach { it.accept(transformer, null) }
-
-    val program = moduleFragment.accept(IrModuleToJsTransformer(context), null)
-
-    return program.toString()
-}
-
-fun JsIrBackendContext.performInlining(moduleFragment: IrModuleFragment) {
-    FunctionInlining(this).inline(moduleFragment)
-
-    moduleFragment.referenceAllTypeExternalClassifiers(symbolTable)
-
-    do {
-        @Suppress("DEPRECATION")
-        moduleFragment.replaceUnboundSymbols(this)
-        moduleFragment.referenceAllTypeExternalClassifiers(symbolTable)
-    } while (symbolTable.unboundClasses.isNotEmpty())
-
+    val irProvidersWithoutDeserializer = generateTypicalIrProviderList(moduleDescriptor, irBuiltIns, symbolTable)
+    // Create stubs
+    ExternalDependenciesGenerator(symbolTable, irProvidersWithoutDeserializer).generateUnboundSymbolsAsDependencies()
     moduleFragment.patchDeclarationParents()
 
-    moduleFragment.files.forEach { file ->
-        RemoveInlineFunctionsWithReifiedTypeParametersLowering.runOnFilePostfix(file)
-    }
+    deserializer.finalizeExpectActualLinker()
+
+    moveBodilessDeclarationsToSeparatePlace(context, moduleFragment)
+
+    jsPhases.invokeToplevel(phaseConfig, context, moduleFragment)
+
+    val transformer = IrModuleToJsTransformer(context, mainFunction, mainArguments)
+    return transformer.generateModule(moduleFragment, generateFullJs, generateDceJs)
 }
 
-fun JsIrBackendContext.lower(file: IrFile) {
-    LateinitLowering(this, true).lower(file)
-    DefaultArgumentStubGenerator(this).runOnFilePostfix(file)
-    DefaultParameterInjector(this).runOnFilePostfix(file)
-    SharedVariablesLowering(this).runOnFilePostfix(file)
-    ReturnableBlockLowering(this).lower(file)
-    LocalDeclarationsLowering(this).runOnFilePostfix(file)
-    InnerClassesLowering(this).runOnFilePostfix(file)
-    InnerClassConstructorCallsLowering(this).runOnFilePostfix(file)
-    PropertiesLowering().lower(file)
-    InitializersLowering(this, JsLoweredDeclarationOrigin.CLASS_STATIC_INITIALIZER, false).runOnFilePostfix(file)
-    MultipleCatchesLowering(this).lower(file)
-    TypeOperatorLowering(this).lower(file)
-    BlockDecomposerLowering(this).runOnFilePostfix(file)
-    SecondaryCtorLowering(this).runOnFilePostfix(file)
-    CallableReferenceLowering(this).lower(file)
-    IntrinsicifyCallsLowering(this).lower(file)
-}
+fun generateJsCode(
+    context: JsIrBackendContext,
+    moduleFragment: IrModuleFragment,
+    nameTables: NameTables
+): String {
+    moveBodilessDeclarationsToSeparatePlace(context, moduleFragment)
+    jsPhases.invokeToplevel(PhaseConfig(jsPhases), context, moduleFragment)
 
-// TODO find out why duplicates occur
-private fun IrModuleFragment.removeDuplicates(): IrModuleFragment {
-
-    fun <T> MutableList<T>.removeDuplicates() {
-        val tmp = toSet()
-        clear()
-        addAll(tmp)
-    }
-
-    dependencyModules.removeDuplicates()
-    dependencyModules.forEach { it.externalPackageFragments.removeDuplicates() }
-
-    return this
+    val transformer = IrModuleToJsTransformer(context, null, null, true, nameTables)
+    return transformer.generateModule(moduleFragment).jsCode!!
 }

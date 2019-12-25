@@ -1,34 +1,30 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.codeInsight
 
 import com.intellij.codeInspection.ex.EntryPointsManagerBase
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.CommandProcessor
+import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.psi.PsiFile
 import com.intellij.testFramework.TestLoggerFactory
 import org.jdom.Document
 import org.jdom.input.SAXBuilder
+import org.jetbrains.kotlin.idea.core.script.isScriptChangesNotifierDisabled
 import org.jetbrains.kotlin.idea.inspections.runInspection
-import org.jetbrains.kotlin.idea.test.*
+import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCase
+import org.jetbrains.kotlin.idea.test.TestFixtureExtension
+import org.jetbrains.kotlin.idea.test.configureCompilerOptions
+import org.jetbrains.kotlin.idea.test.rollbackCompilerOptions
 import org.jetbrains.kotlin.idea.util.application.runWriteAction
 import org.jetbrains.kotlin.idea.versions.bundledRuntimeVersion
 import org.jetbrains.kotlin.test.InTextDirectivesUtils
 import org.jetbrains.kotlin.test.KotlinTestUtils
+import org.jetbrains.plugins.groovy.GroovyFileType
 import java.io.File
 
 abstract class AbstractInspectionTest : KotlinLightCodeInsightFixtureTestCase() {
@@ -40,6 +36,8 @@ abstract class AbstractInspectionTest : KotlinLightCodeInsightFixtureTestCase() 
         try {
             super.setUp()
             EntryPointsManagerBase.getInstance(project).ADDITIONAL_ANNOTATIONS.add(ENTRY_POINT_ANNOTATION)
+            runWriteAction { FileTypeManager.getInstance().associateExtension(GroovyFileType.GROOVY_FILE_TYPE, "gradle") }
+            ApplicationManager.getApplication().isScriptChangesNotifierDisabled = true
         } catch (e: Throwable) {
             TestLoggerFactory.onTestFinished(false)
             throw e
@@ -47,6 +45,7 @@ abstract class AbstractInspectionTest : KotlinLightCodeInsightFixtureTestCase() 
     }
 
     override fun tearDown() {
+        ApplicationManager.getApplication().isScriptChangesNotifierDisabled = false
         EntryPointsManagerBase.getInstance(project).ADDITIONAL_ANNOTATIONS.remove(ENTRY_POINT_ANNOTATION)
         super.tearDown()
     }
@@ -65,6 +64,8 @@ abstract class AbstractInspectionTest : KotlinLightCodeInsightFixtureTestCase() 
 
         val fixtureClasses = InTextDirectivesUtils.findListWithPrefixes(options, "// FIXTURE_CLASS: ")
 
+        val configured = configureCompilerOptions(options, project, module)
+
         val inspectionsTestDir = optionsFile.parentFile!!
         val srcDir = inspectionsTestDir.parentFile!!
 
@@ -79,14 +80,14 @@ abstract class AbstractInspectionTest : KotlinLightCodeInsightFixtureTestCase() 
             testDataPath = "${KotlinTestUtils.getHomeDirectory()}/$srcDir"
 
             val afterFiles = srcDir.listFiles { it -> it.name == "inspectionData" }?.single()?.listFiles { it -> it.extension == "after" }
-                    ?: emptyArray()
+                ?: emptyArray()
             val psiFiles = srcDir.walkTopDown().onEnter { it.name != "inspectionData" }.mapNotNull { file ->
                 when {
                     file.isDirectory -> null
                     file.extension == "kt" -> {
                         val text = FileUtil.loadFile(file, true)
                         val fileText =
-                            if (text.startsWith("package"))
+                            if (text.lines().any { it.startsWith("package") })
                                 text
                             else
                                 "package ${file.nameWithoutExtension};$text"
@@ -140,6 +141,9 @@ abstract class AbstractInspectionTest : KotlinLightCodeInsightFixtureTestCase() 
                 }
 
             } finally {
+                if (configured) {
+                    rollbackCompilerOptions(project, module)
+                }
                 fixtureClasses.forEach { TestFixtureExtension.unloadFixture(it) }
             }
         }

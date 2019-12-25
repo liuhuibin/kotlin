@@ -1,4 +1,4 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
 var result = 0
 
 fun <T> Iterator<T>.foreach(action: (T) -> Unit) {

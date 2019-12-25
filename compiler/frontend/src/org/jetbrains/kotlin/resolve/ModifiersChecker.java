@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.resolve;
@@ -19,6 +19,7 @@ import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.resolve.checkers.*;
+import org.jetbrains.kotlin.resolve.deprecation.DeprecationResolver;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -87,7 +88,7 @@ public class ModifiersChecker {
             DeclarationDescriptor descriptor = bindingContext.get(BindingContext.DECLARATION_TO_DESCRIPTOR, modifierListOwner);
             for (DeclarationAttributeAltererExtension extension : extensions) {
                 Modality newModality = extension.refineDeclarationModality(
-                        modifierListOwner, descriptor, containingDescriptor, modality, bindingContext, false);
+                        modifierListOwner, descriptor, containingDescriptor, modality, false);
 
                 if (newModality != null) {
                     modality = newModality;
@@ -265,7 +266,8 @@ public class ModifiersChecker {
 
         public void runDeclarationCheckers(@NotNull KtDeclaration declaration, @NotNull DeclarationDescriptor descriptor) {
             DeclarationCheckerContext context = new DeclarationCheckerContext(
-                    trace, languageVersionSettings, deprecationResolver, moduleDescriptor, expectActualTracker
+                    trace, languageVersionSettings, deprecationResolver, moduleDescriptor, expectActualTracker,
+                    missingSupertypesResolver
             );
             for (DeclarationChecker checker : declarationCheckers) {
                 checker.check(declaration, descriptor, context);
@@ -290,6 +292,7 @@ public class ModifiersChecker {
     private final ExpectActualTracker expectActualTracker;
     private final DeprecationResolver deprecationResolver;
     private final ModuleDescriptor moduleDescriptor;
+    private final MissingSupertypesResolver missingSupertypesResolver;
 
     public ModifiersChecker(
             @NotNull AnnotationChecker annotationChecker,
@@ -297,7 +300,8 @@ public class ModifiersChecker {
             @NotNull LanguageVersionSettings languageVersionSettings,
             @NotNull ExpectActualTracker expectActualTracker,
             @NotNull DeprecationResolver deprecationResolver,
-            @NotNull ModuleDescriptor moduleDescriptor
+            @NotNull ModuleDescriptor moduleDescriptor,
+            @NotNull MissingSupertypesResolver missingSupertypesResolver
     ) {
         this.annotationChecker = annotationChecker;
         this.declarationCheckers = declarationCheckers;
@@ -305,6 +309,7 @@ public class ModifiersChecker {
         this.expectActualTracker = expectActualTracker;
         this.deprecationResolver = deprecationResolver;
         this.moduleDescriptor = moduleDescriptor;
+        this.missingSupertypesResolver = missingSupertypesResolver;
     }
 
     @NotNull

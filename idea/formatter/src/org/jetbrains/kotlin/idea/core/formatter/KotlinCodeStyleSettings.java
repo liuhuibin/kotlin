@@ -1,36 +1,28 @@
 /*
- * Copyright 2010-2016 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.core.formatter;
 
+import com.intellij.application.options.CodeStyle;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.InvalidDataException;
 import com.intellij.openapi.util.WriteExternalException;
 import com.intellij.psi.codeStyle.*;
 import org.jdom.Element;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.kotlin.idea.formatter.KotlinObsoleteCodeStyle;
 import org.jetbrains.kotlin.idea.formatter.KotlinStyleGuideCodeStyle;
+import org.jetbrains.kotlin.idea.util.FormatterUtilKt;
 import org.jetbrains.kotlin.idea.util.ReflectionUtil;
 
 import static com.intellij.util.ReflectionUtil.copyFields;
 
 public class KotlinCodeStyleSettings extends CustomCodeStyleSettings {
-    public static final KotlinCodeStyleSettings DEFAULT = new KotlinCodeStyleSettings(new CodeStyleSettings());
-
     public final PackageEntryTable PACKAGES_TO_USE_STAR_IMPORTS = new PackageEntryTable();
     public boolean SPACE_AROUND_RANGE = false;
     public boolean SPACE_BEFORE_TYPE_COLON = false;
@@ -62,6 +54,12 @@ public class KotlinCodeStyleSettings extends CustomCodeStyleSettings {
     @ReflectionUtil.SkipInEquals
     public String CODE_STYLE_DEFAULTS = null;
 
+    /**
+     * Load settings with previous IDEA defaults to have an ability to restore them.
+     */
+    @Nullable
+    private KotlinCodeStyleSettings settingsAgainstPreviousDefaults = null;
+
     private final boolean isTempForDeserialize;
 
     public KotlinCodeStyleSettings(CodeStyleSettings container) {
@@ -81,13 +79,20 @@ public class KotlinCodeStyleSettings extends CustomCodeStyleSettings {
     }
 
     public static KotlinCodeStyleSettings getInstance(Project project) {
-        return CodeStyleSettingsManager.getSettings(project).getCustomSettings(KotlinCodeStyleSettings.class);
+        return CodeStyle.getSettings(project).getCustomSettings(KotlinCodeStyleSettings.class);
     }
 
+    @SuppressWarnings("MethodDoesntCallSuperMethod")
     @Override
     public Object clone() {
+        return cloneSettings();
+    }
+
+    @NotNull
+    public KotlinCodeStyleSettings cloneSettings() {
         KotlinCodeStyleSettings clone = new KotlinCodeStyleSettings(getContainer());
         clone.copyFrom(this);
+        clone.settingsAgainstPreviousDefaults = this.settingsAgainstPreviousDefaults;
         return clone;
     }
 
@@ -105,9 +110,16 @@ public class KotlinCodeStyleSettings extends CustomCodeStyleSettings {
 
     @Override
     public void writeExternal(Element parentElement, @NotNull CustomCodeStyleSettings parentSettings) throws WriteExternalException {
-        if (KotlinStyleGuideCodeStyle.CODE_STYLE_ID.equals(CODE_STYLE_DEFAULTS)) {
+        if (CODE_STYLE_DEFAULTS != null) {
             KotlinCodeStyleSettings defaultKotlinCodeStyle = (KotlinCodeStyleSettings) parentSettings.clone();
-            KotlinStyleGuideCodeStyle.Companion.applyToKotlinCustomSettings(defaultKotlinCodeStyle, false);
+
+            if (KotlinStyleGuideCodeStyle.CODE_STYLE_ID.equals(CODE_STYLE_DEFAULTS)) {
+                KotlinStyleGuideCodeStyle.Companion.applyToKotlinCustomSettings(defaultKotlinCodeStyle, false);
+            }
+            else if (KotlinObsoleteCodeStyle.CODE_STYLE_ID.equals(CODE_STYLE_DEFAULTS)) {
+                KotlinObsoleteCodeStyle.Companion.applyToKotlinCustomSettings(defaultKotlinCodeStyle, false);
+            }
+
             parentSettings = defaultKotlinCodeStyle;
         }
 
@@ -122,8 +134,19 @@ public class KotlinCodeStyleSettings extends CustomCodeStyleSettings {
         }
 
         KotlinCodeStyleSettings tempSettings = readExternalToTemp(parentElement);
-        if (KotlinStyleGuideCodeStyle.CODE_STYLE_ID.equals(tempSettings.CODE_STYLE_DEFAULTS)) {
+        String customDefaults = tempSettings.CODE_STYLE_DEFAULTS;
+
+        if (KotlinStyleGuideCodeStyle.CODE_STYLE_ID.equals(customDefaults)) {
             KotlinStyleGuideCodeStyle.Companion.applyToKotlinCustomSettings(this, true);
+        }
+        else if (KotlinObsoleteCodeStyle.CODE_STYLE_ID.equals(customDefaults)) {
+            KotlinObsoleteCodeStyle.Companion.applyToKotlinCustomSettings(this, true);
+        }
+        else if (customDefaults == null && FormatterUtilKt.isDefaultOfficialCodeStyle()) {
+            // Temporary load settings against previous defaults
+            settingsAgainstPreviousDefaults = new KotlinCodeStyleSettings(null, true);
+            KotlinObsoleteCodeStyle.Companion.applyToKotlinCustomSettings(settingsAgainstPreviousDefaults, true);
+            settingsAgainstPreviousDefaults.readExternal(parentElement);
         }
 
         // Actual read
@@ -136,5 +159,23 @@ public class KotlinCodeStyleSettings extends CustomCodeStyleSettings {
         tempSettings.readExternal(parentElement);
 
         return tempSettings;
+    }
+
+    public boolean canRestore() {
+        return settingsAgainstPreviousDefaults != null;
+    }
+
+    public void restore() {
+        if (settingsAgainstPreviousDefaults != null) {
+            copyFrom(settingsAgainstPreviousDefaults);
+        }
+    }
+
+    public static KotlinCodeStyleSettings defaultSettings() {
+        return ServiceManager.getService(KotlinCodeStyleSettingsHolder.class).defaultSettings;
+    }
+
+    public static final class KotlinCodeStyleSettingsHolder {
+        private final KotlinCodeStyleSettings defaultSettings = new KotlinCodeStyleSettings(new CodeStyleSettings());
     }
 }

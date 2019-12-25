@@ -86,12 +86,15 @@ interface IrStatementOrigin {
     object FOR_LOOP_NEXT : IrStatementOriginImpl("FOR_LOOP_NEXT")
 
     object LAMBDA : IrStatementOriginImpl("LAMBDA")
+    object DEFAULT_VALUE : IrStatementOriginImpl("DEFAULT_VALUE")
     object ANONYMOUS_FUNCTION : IrStatementOriginImpl("ANONYMOUS_FUNCTION")
     object OBJECT_LITERAL : IrStatementOriginImpl("OBJECT_LITERAL")
 
     object INITIALIZE_PROPERTY_FROM_PARAMETER : IrStatementOriginImpl("INITIALIZE_PROPERTY_FROM_PARAMETER")
 
     object PROPERTY_REFERENCE_FOR_DELEGATE : IrStatementOriginImpl("PROPERTY_REFERENCE_FOR_DELEGATE")
+
+    object BRIDGE_DELEGATION : IrStatementOriginImpl("BRIDGE_DELEGATION")
 
     data class COMPONENT_N private constructor(val index: Int) : IrStatementOriginImpl("COMPONENT_$index") {
         companion object {

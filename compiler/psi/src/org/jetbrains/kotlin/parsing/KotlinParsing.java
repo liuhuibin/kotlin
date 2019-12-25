@@ -162,6 +162,10 @@ public class KotlinParsing extends AbstractKotlinParsing {
         myExpressionParsing.parseFunctionLiteral(/* preferBlock = */ false, /* collapse = */false);
     }
 
+    void parseBlockExpression() {
+        parseBlock(/* collapse = */ false);
+    }
+
     void parseScript() {
         PsiBuilder.Marker fileMarker = mark();
 
@@ -416,38 +420,55 @@ public class KotlinParsing extends AbstractKotlinParsing {
         ModifierDetector detector = new ModifierDetector();
         parseModifierList(detector, DEFAULT, TokenSet.EMPTY);
 
-        IElementType keywordToken = tt();
-        IElementType declType = null;
+        IElementType declType = parseCommonDeclaration(detector, NameParsingMode.REQUIRED, DeclarationParsingMode.MEMBER_OR_TOPLEVEL);
 
-        if (keywordToken == CLASS_KEYWORD || keywordToken == INTERFACE_KEYWORD) {
-            declType = parseClass(detector.isEnumDetected());
-        }
-        else if (keywordToken == FUN_KEYWORD) {
-            declType = parseFunction();
-        }
-        else if (keywordToken == VAL_KEYWORD || keywordToken == VAR_KEYWORD) {
-            declType = parseProperty();
-        }
-        else if (keywordToken == TYPE_ALIAS_KEYWORD) {
-            declType = parseTypeAlias();
-        }
-        else if (keywordToken == OBJECT_KEYWORD) {
-            parseObject(NameParsingMode.REQUIRED, true);
-            declType = OBJECT_DECLARATION;
-        }
-        else if (at(LBRACE)) {
+        if (declType == null && at(LBRACE)) {
             error("Expecting a top level declaration");
             parseBlock();
             declType = FUN;
         }
 
-        if (declType == null) {
+        if (declType == null && at(IMPORT_KEYWORD)) {
+            error("imports are only allowed in the beginning of file");
+            parseImportDirectives();
+            decl.drop();
+        }
+        else if (declType == null) {
             errorAndAdvance("Expecting a top level declaration");
             decl.drop();
         }
         else {
             closeDeclarationWithCommentBinders(decl, declType, true);
         }
+    }
+
+    public IElementType parseCommonDeclaration(
+            @NotNull ModifierDetector detector,
+            @NotNull NameParsingMode nameParsingModeForObject,
+            @NotNull DeclarationParsingMode declarationParsingMode
+    ) {
+        IElementType keywordToken = tt();
+
+        if (keywordToken == CLASS_KEYWORD || keywordToken == INTERFACE_KEYWORD) {
+            return parseClass(detector.isEnumDetected(), true);
+        }
+        else if (keywordToken == FUN_KEYWORD) {
+            return parseFunction();
+        }
+        else if (keywordToken == VAL_KEYWORD || keywordToken == VAR_KEYWORD) {
+            return parseProperty(declarationParsingMode);
+        }
+        else if (keywordToken == TYPE_ALIAS_KEYWORD) {
+            return parseTypeAlias();
+        }
+        else if (keywordToken == OBJECT_KEYWORD) {
+            parseObject(nameParsingModeForObject, true);
+            return OBJECT_DECLARATION;
+        } else if (keywordToken == IDENTIFIER && detector.isEnumDetected() && declarationParsingMode.canBeEnumUsedAsSoftKeyword) {
+            return parseClass(true, false);
+        }
+
+        return null;
     }
 
     /*
@@ -488,24 +509,36 @@ public class KotlinParsing extends AbstractKotlinParsing {
     }
 
     private boolean parseTypeModifierList() {
-        return doParseModifierList(null, TYPE_MODIFIER_KEYWORDS, DEFAULT, TokenSet.EMPTY);
+        return doParseModifierList(null, TYPE_MODIFIER_KEYWORDS, TYPE_CONTEXT, TokenSet.EMPTY);
     }
 
     private boolean parseTypeArgumentModifierList() {
         return doParseModifierList(null, TYPE_ARGUMENT_MODIFIER_KEYWORDS, NO_ANNOTATIONS, TokenSet.create(COMMA, COLON, GT));
     }
 
-    private boolean doParseModifierList(
+    private boolean doParseModifierListBody(
             @Nullable Consumer<IElementType> tokenConsumer,
             @NotNull TokenSet modifierKeywords,
             @NotNull AnnotationParsingMode annotationParsingMode,
             @NotNull TokenSet noModifiersBefore
     ) {
-        PsiBuilder.Marker list = mark();
         boolean empty = true;
+        PsiBuilder.Marker beforeAnnotationMarker;
         while (!eof()) {
             if (at(AT) && annotationParsingMode.allowAnnotations) {
-                parseAnnotationOrList(annotationParsingMode);
+                beforeAnnotationMarker = mark();
+
+                boolean isAnnotationParsed = parseAnnotationOrList(annotationParsingMode);
+
+                if (!isAnnotationParsed && !annotationParsingMode.withSignificantWhitespaceBeforeArguments) {
+                    beforeAnnotationMarker.rollbackTo();
+                    // try parse again, but with significant whitespace
+                    doParseModifierListBody(tokenConsumer, modifierKeywords, WITH_SIGNIFICANT_WHITESPACE_BEFORE_ARGUMENTS, noModifiersBefore);
+                    empty = false;
+                    break;
+                } else {
+                    beforeAnnotationMarker.drop();
+                }
             }
             else if (tryParseModifier(tokenConsumer, noModifiersBefore, modifierKeywords)) {
                 // modifier advanced
@@ -515,6 +548,25 @@ public class KotlinParsing extends AbstractKotlinParsing {
             }
             empty = false;
         }
+
+        return empty;
+    }
+
+    private boolean doParseModifierList(
+            @Nullable Consumer<IElementType> tokenConsumer,
+            @NotNull TokenSet modifierKeywords,
+            @NotNull AnnotationParsingMode annotationParsingMode,
+            @NotNull TokenSet noModifiersBefore
+    ) {
+        PsiBuilder.Marker list = mark();
+
+        boolean empty = doParseModifierListBody(
+                tokenConsumer,
+                modifierKeywords,
+                annotationParsingMode,
+                noModifiersBefore
+        );
+
         if (empty) {
             list.drop();
         }
@@ -750,7 +802,10 @@ public class KotlinParsing extends AbstractKotlinParsing {
      */
     private boolean parseAnnotation(AnnotationParsingMode mode) {
         assert _at(IDENTIFIER) ||
-               (_at(AT) && !WHITE_SPACE_OR_COMMENT_BIT_SET.contains(myBuilder.rawLookup(1)));
+               // We have "@ann" or "@:ann" or "@ :ann", but not "@ ann"
+               // (it's guaranteed that call sites do not allow the latter case)
+               (_at(AT) && (!isNextRawTokenCommentOrWhitespace() || lookahead(1) == COLON))
+                : "Invalid annotation prefix";
 
         PsiBuilder.Marker annotation = mark();
 
@@ -772,24 +827,41 @@ public class KotlinParsing extends AbstractKotlinParsing {
 
         parseTypeArgumentList();
 
-        if (at(LPAR)) {
+        boolean whitespaceAfterAnnotation = WHITE_SPACE_OR_COMMENT_BIT_SET.contains(myBuilder.rawLookup(-1));
+        boolean shouldBeParsedNextAsFunctionalType = at(LPAR) && whitespaceAfterAnnotation && mode.withSignificantWhitespaceBeforeArguments;
+
+        if (at(LPAR) && !shouldBeParsedNextAsFunctionalType) {
             myExpressionParsing.parseValueArgumentList();
+
+            /*
+             * There are two problem cases relating to parsing of annotations on a functional type:
+             *  - Annotation on a functional type was parsed correctly with the capture parentheses of the functional type,
+             *      e.g. @Anno () -> Unit
+             *                    ^ Parse error only here: Type expected
+             *  - It wasn't parsed, e.g. @Anno (x: kotlin.Any) -> Unit
+             *                                           ^ Parse error: Expecting ')'
+             *
+             * In both cases, parser should rollback to start parsing of annotation and tries parse it with significant whitespace.
+             * A marker is set here which means that we must to rollback.
+             */
+            if (mode.typeContext && (getLastToken() != RPAR || at(ARROW))) {
+                annotation.done(ANNOTATION_ENTRY);
+                return false;
+            }
         }
         annotation.done(ANNOTATION_ENTRY);
 
         return true;
     }
 
+    private boolean isNextRawTokenCommentOrWhitespace() {
+        return WHITE_SPACE_OR_COMMENT_BIT_SET.contains(myBuilder.rawLookup(1));
+    }
+
     public enum NameParsingMode {
         REQUIRED,
         ALLOWED,
         PROHIBITED
-    }
-
-    public enum DeclarationParsingMode {
-        TOP_LEVEL,
-        CLASS_MEMBER,
-        LOCAL
     }
 
     /*
@@ -814,15 +886,22 @@ public class KotlinParsing extends AbstractKotlinParsing {
             boolean object,
             NameParsingMode nameParsingMode,
             boolean optionalBody,
-            boolean enumClass
+            boolean enumClass,
+            boolean expectKindKeyword
     ) {
-        if (object) {
-            assert _at(OBJECT_KEYWORD);
+        if (expectKindKeyword) {
+            if (object) {
+                assert _at(OBJECT_KEYWORD);
+            }
+            else {
+                assert _atSet(CLASS_KEYWORD, INTERFACE_KEYWORD);
+            }
+            advance(); // CLASS_KEYWORD, INTERFACE_KEYWORD or OBJECT_KEYWORD
         }
         else {
-            assert _atSet(CLASS_KEYWORD, INTERFACE_KEYWORD);
+            assert enumClass : "Currently classifiers without class/interface/object are only allowed for enums";
+            error("'class' keyword is expected after 'enum'");
         }
-        advance(); // CLASS_KEYWORD, INTERFACE_KEYWORD or OBJECT_KEYWORD
 
         if (nameParsingMode == NameParsingMode.REQUIRED) {
             expect(IDENTIFIER, "Name expected", CLASS_NAME_RECOVERY_SET);
@@ -907,12 +986,12 @@ public class KotlinParsing extends AbstractKotlinParsing {
         return object ? OBJECT_DECLARATION : CLASS;
     }
 
-    IElementType parseClass(boolean enumClass) {
-        return parseClassOrObject(false, NameParsingMode.REQUIRED, true, enumClass);
+    private IElementType parseClass(boolean enumClass, boolean expectKindKeyword) {
+        return parseClassOrObject(false, NameParsingMode.REQUIRED, true, enumClass, expectKindKeyword);
     }
 
     void parseObject(NameParsingMode nameParsingMode, boolean optionalBody) {
-        parseClassOrObject(true, nameParsingMode, optionalBody, false);
+        parseClassOrObject(true, nameParsingMode, optionalBody, false, true);
     }
 
     /*
@@ -1090,7 +1169,7 @@ public class KotlinParsing extends AbstractKotlinParsing {
         ModifierDetector detector = new ModifierDetector();
         parseModifierList(detector, DEFAULT, TokenSet.EMPTY);
 
-        IElementType declType = parseMemberDeclarationRest(detector.isEnumDetected(), detector.isDefaultDetected());
+        IElementType declType = parseMemberDeclarationRest(detector);
 
         if (declType == null) {
             errorWithRecovery("Expecting member declaration", TokenSet.EMPTY);
@@ -1101,26 +1180,16 @@ public class KotlinParsing extends AbstractKotlinParsing {
         }
     }
 
-    private IElementType parseMemberDeclarationRest(boolean isEnum, boolean isDefault) {
-        IElementType keywordToken = tt();
-        IElementType declType = null;
-        if (keywordToken == CLASS_KEYWORD || keywordToken == INTERFACE_KEYWORD) {
-            declType = parseClass(isEnum);
-        }
-        else if (keywordToken == FUN_KEYWORD) {
-                declType = parseFunction();
-        }
-        else if (keywordToken == VAL_KEYWORD || keywordToken == VAR_KEYWORD) {
-            declType = parseProperty();
-        }
-        else if (keywordToken == TYPE_ALIAS_KEYWORD) {
-            declType = parseTypeAlias();
-        }
-        else if (keywordToken == OBJECT_KEYWORD) {
-            parseObject(isDefault ? NameParsingMode.ALLOWED : NameParsingMode.REQUIRED, true);
-            declType = OBJECT_DECLARATION;
-        }
-        else if (at(INIT_KEYWORD)) {
+    private IElementType parseMemberDeclarationRest(@NotNull ModifierDetector modifierDetector) {
+        IElementType declType = parseCommonDeclaration(
+                modifierDetector,
+                modifierDetector.isCompanionDetected() ? NameParsingMode.ALLOWED : NameParsingMode.REQUIRED,
+                DeclarationParsingMode.MEMBER_OR_TOPLEVEL
+        );
+
+        if (declType != null) return declType;
+
+        if (at(INIT_KEYWORD)) {
             advance(); // init
             if (at(LBRACE)) {
                 parseBlock();
@@ -1218,7 +1287,7 @@ public class KotlinParsing extends AbstractKotlinParsing {
      *   : modifiers "typealias" SimpleName typeParameters? "=" type
      *   ;
      */
-    IElementType parseTypeAlias() {
+    private IElementType parseTypeAlias() {
         assert _at(TYPE_ALIAS_KEYWORD);
 
         advance(); // TYPE_ALIAS_KEYWORD
@@ -1242,6 +1311,22 @@ public class KotlinParsing extends AbstractKotlinParsing {
         return TYPEALIAS;
     }
 
+    enum DeclarationParsingMode {
+        MEMBER_OR_TOPLEVEL(false, true, true),
+        LOCAL(true, false, false),
+        SCRIPT_TOPLEVEL(true, true, false);
+
+        public final boolean destructuringAllowed;
+        public final boolean accessorsAllowed;
+        public final boolean canBeEnumUsedAsSoftKeyword;
+
+        DeclarationParsingMode(boolean destructuringAllowed, boolean accessorsAllowed, boolean canBeEnumUsedAsSoftKeyword) {
+            this.destructuringAllowed = destructuringAllowed;
+            this.accessorsAllowed = accessorsAllowed;
+            this.canBeEnumUsedAsSoftKeyword = canBeEnumUsedAsSoftKeyword;
+        }
+    }
+
     /*
      * variableDeclarationEntry
      *   : SimpleName (":" type)?
@@ -1257,29 +1342,7 @@ public class KotlinParsing extends AbstractKotlinParsing {
      *       (getter? setter? | setter? getter?) SEMI?
      *   ;
      */
-    private IElementType parseProperty() {
-        return parseProperty(PropertyParsingMode.MEMBER_OR_TOPLEVEL);
-    }
-
-    public IElementType parseLocalProperty(boolean isScriptTopLevel) {
-        return parseProperty(isScriptTopLevel ? PropertyParsingMode.SCRIPT_TOPLEVEL : PropertyParsingMode.LOCAL);
-    }
-
-    enum PropertyParsingMode {
-        MEMBER_OR_TOPLEVEL(false, true),
-        LOCAL(true, false),
-        SCRIPT_TOPLEVEL(true, true);
-
-        public final boolean destructuringAllowed;
-        public final boolean accessorsAllowed;
-
-        PropertyParsingMode(boolean destructuringAllowed, boolean accessorsAllowed) {
-            this.destructuringAllowed = destructuringAllowed;
-            this.accessorsAllowed = accessorsAllowed;
-        }
-    }
-
-    public IElementType parseProperty(PropertyParsingMode mode) {
+    public IElementType parseProperty(DeclarationParsingMode mode) {
         assert (at(VAL_KEYWORD) || at(VAR_KEYWORD));
         advance();
 
@@ -1403,7 +1466,7 @@ public class KotlinParsing extends AbstractKotlinParsing {
                 if (at(COMMA)) {
                     errorAndAdvance("Expecting a name");
                 }
-                else if (at(RPAR)) {
+                else if (at(RPAR)) { // For declaration similar to `val () = somethingCall()`
                     error("Expecting a name");
                     break;
                 }
@@ -1421,6 +1484,7 @@ public class KotlinParsing extends AbstractKotlinParsing {
 
                 if (!at(COMMA)) break;
                 advance(); // COMMA
+                if (at(RPAR)) break;
             }
         }
 
@@ -1472,7 +1536,7 @@ public class KotlinParsing extends AbstractKotlinParsing {
                 errorUntil("Accessor body expected", TokenSet.orSet(ACCESSOR_FIRST_OR_PROPERTY_END, TokenSet.create(LBRACE, LPAR, EQ)));
             }
             else {
-                closeDeclarationWithCommentBinders(getterOrSetter, PROPERTY_ACCESSOR, false);
+                closeDeclarationWithCommentBinders(getterOrSetter, PROPERTY_ACCESSOR, true);
                 return accessorKind;
             }
         }
@@ -1486,10 +1550,13 @@ public class KotlinParsing extends AbstractKotlinParsing {
             expect(IDENTIFIER, "Expecting parameter name", TokenSet.create(RPAR, COLON, LBRACE, EQ));
 
             if (at(COLON)) {
-                advance();  // COLON
+                advance(); // COLON
                 parseTypeRef();
             }
             setterParameter.done(VALUE_PARAMETER);
+            if (at(COMMA)) {
+                advance(); // COMMA
+            }
             parameterList.done(VALUE_PARAMETER_LIST);
         }
         if (!at(RPAR)) {
@@ -1508,7 +1575,7 @@ public class KotlinParsing extends AbstractKotlinParsing {
 
         parseFunctionBody();
 
-        closeDeclarationWithCommentBinders(getterOrSetter, PROPERTY_ACCESSOR, false);
+        closeDeclarationWithCommentBinders(getterOrSetter, PROPERTY_ACCESSOR, true);
 
         return accessorKind;
     }
@@ -1567,10 +1634,10 @@ public class KotlinParsing extends AbstractKotlinParsing {
             PsiBuilder.Marker error = mark();
             parseTypeParameterList(TokenSet.orSet(TokenSet.create(LPAR), valueParametersFollow));
             if (typeParameterListOccurred) {
-                int offset = myBuilder.getCurrentOffset();
+                int finishIndex = myBuilder.rawTokenIndex();
                 error.rollbackTo();
                 error = mark();
-                advance(offset - myBuilder.getCurrentOffset());
+                advance(finishIndex - myBuilder.rawTokenIndex());
                 error.error("Only one type parameter list is allowed for a function");
             }
             else {
@@ -1716,17 +1783,50 @@ public class KotlinParsing extends AbstractKotlinParsing {
      *   ;
      */
     void parseBlock() {
-        PsiBuilder.Marker block = mark();
+        parseBlock(/*collapse*/ true);
+    }
+
+    private void parseBlock(boolean collapse) {
+
+        PsiBuilder.Marker lazyBlock = mark();
 
         myBuilder.enableNewlines();
+
         expect(LBRACE, "Expecting '{' to open a block");
 
-        myExpressionParsing.parseStatements();
+        if(collapse){
+            advanceBalancedBlock();
+        }else{
+            myExpressionParsing.parseStatements();
+            expect(RBRACE, "Expecting '}'");
+        }
 
-        expect(RBRACE, "Expecting '}'");
         myBuilder.restoreNewlinesState();
 
-        block.done(BLOCK);
+        if(collapse){
+            lazyBlock.collapse(BLOCK);
+        }else{
+            lazyBlock.done(BLOCK);
+        }
+    }
+
+    public void advanceBalancedBlock() {
+
+        int braceCount = 1;
+        while (!eof()) {
+            if (_at(LBRACE)) {
+                braceCount++;
+            }
+            else if (_at(RBRACE)) {
+                braceCount--;
+            }
+
+            advance();
+
+            if (braceCount == 0) {
+                break;
+            }
+        }
     }
 
     /*
@@ -1800,6 +1900,9 @@ public class KotlinParsing extends AbstractKotlinParsing {
 
                 if (!at(COMMA)) break;
                 advance(); // COMMA
+                if (at(GT)) {
+                    break;
+                }
             }
 
             expect(GT, "Missing '>'", recoverySet);
@@ -1949,7 +2052,7 @@ public class KotlinParsing extends AbstractKotlinParsing {
         else if (at(LPAR)) {
             PsiBuilder.Marker functionOrParenthesizedType = mark();
 
-            // This may be a function parameter list or just a prenthesized type
+            // This may be a function parameter list or just a parenthesized type
             advance(); // LPAR
             parseTypeRefContents(TokenSet.EMPTY).drop(); // parenthesized types, no reference element around it is needed
 
@@ -2167,6 +2270,9 @@ public class KotlinParsing extends AbstractKotlinParsing {
             projection.done(TYPE_PROJECTION);
             if (!at(COMMA)) break;
             advance(); // COMMA
+            if (at(GT)) {
+                break;
+            }
         }
 
         boolean atGT = at(GT);
@@ -2229,7 +2335,6 @@ public class KotlinParsing extends AbstractKotlinParsing {
                     errorAndAdvance("Expecting a parameter declaration");
                 }
                 else if (at(RPAR)) {
-                    error("Expecting a parameter declaration");
                     break;
                 }
 
@@ -2247,6 +2352,12 @@ public class KotlinParsing extends AbstractKotlinParsing {
 
                 if (at(COMMA)) {
                     advance(); // COMMA
+                }
+                else if (at(COLON)) {
+                    // recovery for the case "fun bar(x: Array<Int> : Int)" when we've just parsed "x: Array<Int>"
+                    // error should be reported in the `parseValueParameter` call
+                    //noinspection UnnecessaryContinue
+                    continue;
                 }
                 else {
                     if (!at(RPAR)) error("Expecting comma or ')'");
@@ -2318,6 +2429,14 @@ public class KotlinParsing extends AbstractKotlinParsing {
 
             if (at(COLON)) {
                 advance(); // COLON
+
+                if (at(IDENTIFIER) && lookahead(1) == COLON) {
+                    // recovery for the case "fun foo(x: y: Int)" when we're at "y: " it's likely that this is a name of the next parameter,
+                    // not a type reference of the current one
+                    error("Type reference expected");
+                    return false;
+                }
+
                 parseTypeRef();
             }
             else if (typeRequired) {
@@ -2341,7 +2460,7 @@ public class KotlinParsing extends AbstractKotlinParsing {
 
     /*package*/ static class ModifierDetector implements Consumer<IElementType> {
         private boolean enumDetected = false;
-        private boolean defaultDetected = false;
+        private boolean companionDetected = false;
 
         @Override
         public void consume(IElementType item) {
@@ -2349,7 +2468,7 @@ public class KotlinParsing extends AbstractKotlinParsing {
                 enumDetected = true;
             }
             else if (item == KtTokens.COMPANION_KEYWORD) {
-                defaultDetected = true;
+                companionDetected = true;
             }
         }
 
@@ -2357,26 +2476,34 @@ public class KotlinParsing extends AbstractKotlinParsing {
             return enumDetected;
         }
 
-        public boolean isDefaultDetected() {
-            return defaultDetected;
+        public boolean isCompanionDetected() {
+            return companionDetected;
         }
     }
 
     enum AnnotationParsingMode {
-        DEFAULT(false, true),
-        FILE_ANNOTATIONS_BEFORE_PACKAGE(true, true),
-        FILE_ANNOTATIONS_WHEN_PACKAGE_OMITTED(true, true),
-        NO_ANNOTATIONS(false, false);
+        DEFAULT(false, true, false, false),
+        FILE_ANNOTATIONS_BEFORE_PACKAGE(true, true, false, false),
+        FILE_ANNOTATIONS_WHEN_PACKAGE_OMITTED(true, true, false, false),
+        TYPE_CONTEXT(false, true, true, false),
+        WITH_SIGNIFICANT_WHITESPACE_BEFORE_ARGUMENTS(false, true, true, true),
+        NO_ANNOTATIONS(false, false, false, false);
 
         boolean isFileAnnotationParsingMode;
         boolean allowAnnotations;
+        boolean withSignificantWhitespaceBeforeArguments;
+        boolean typeContext;
 
         AnnotationParsingMode(
                 boolean isFileAnnotationParsingMode,
-                boolean allowAnnotations
+                boolean allowAnnotations,
+                boolean typeContext,
+                boolean withSignificantWhitespaceBeforeArguments
         ) {
             this.isFileAnnotationParsingMode = isFileAnnotationParsingMode;
             this.allowAnnotations = allowAnnotations;
+            this.typeContext = typeContext;
+            this.withSignificantWhitespaceBeforeArguments = withSignificantWhitespaceBeforeArguments;
         }
     }
 }

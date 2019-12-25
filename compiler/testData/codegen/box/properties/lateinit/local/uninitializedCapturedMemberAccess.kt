@@ -1,7 +1,5 @@
-// IGNORE_BACKEND: JS_IR
-// LANGUAGE_VERSION: 1.2
+// IGNORE_BACKEND_FIR: JVM_IR
 // WITH_RUNTIME
-// IGNORE_BACKEND: NATIVE
 
 import kotlin.UninitializedPropertyAccessException
 

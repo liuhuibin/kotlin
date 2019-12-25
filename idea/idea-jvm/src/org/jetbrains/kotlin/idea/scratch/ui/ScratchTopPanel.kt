@@ -17,123 +17,115 @@
 package org.jetbrains.kotlin.idea.scratch.ui
 
 
-import com.intellij.application.options.ModulesComboBox
-import com.intellij.openapi.Disposable
-import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.actionSystem.ActionPlaces
-import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.fileEditor.TextEditor
-import com.intellij.openapi.module.Module
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.psi.PsiFile
-import com.intellij.psi.PsiManager
-import com.intellij.ui.components.panels.HorizontalLayout
-import org.jetbrains.annotations.TestOnly
+import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.application.ApplicationManager
+import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.scratch.ScratchFile
-import org.jetbrains.kotlin.idea.scratch.ScratchFileLanguageProvider
+import org.jetbrains.kotlin.idea.scratch.ScratchFileAutoRunner
 import org.jetbrains.kotlin.idea.scratch.actions.ClearScratchAction
 import org.jetbrains.kotlin.idea.scratch.actions.RunScratchAction
-import org.jetbrains.kotlin.idea.scratch.addScratchPanel
-import org.jetbrains.kotlin.idea.scratch.removeScratchPanel
-import javax.swing.*
+import org.jetbrains.kotlin.idea.scratch.actions.StopScratchAction
+import org.jetbrains.kotlin.idea.scratch.output.ScratchOutputHandlerAdapter
 
-class ScratchTopPanel private constructor(val scratchFile: ScratchFile) : JPanel(HorizontalLayout(5)), Disposable {
-    override fun dispose() {
-        scratchFile.editor.removeScratchPanel(this)
-    }
-
-    companion object {
-        fun createPanel(project: Project, virtualFile: VirtualFile, editor: TextEditor) {
-            val psiFile = PsiManager.getInstance(project).findFile(virtualFile) ?: return
-            val scratchFile = ScratchFileLanguageProvider.get(psiFile.language)?.createFile(project, editor) ?: return
-            editor.addScratchPanel(ScratchTopPanel(scratchFile))
-        }
-    }
-
-    private val moduleChooser: ModulesComboBox
-    private val isReplCheckbox: JCheckBox
-    private val isMakeBeforeRunCheckbox: JCheckBox
+class ScratchTopPanel(val scratchFile: ScratchFile) {
+    private val moduleChooserAction: ModulesComboBoxAction = ModulesComboBoxAction(scratchFile)
+    val actionsToolbar: ActionToolbar
 
     init {
-        add(createActionsToolbar())
+        setupTopPanelUpdateHandlers()
 
-        moduleChooser = createModuleChooser(scratchFile.project)
-        add(JLabel("Use classpath of module"))
-        add(moduleChooser)
-
-        add(JSeparator(SwingConstants.VERTICAL))
-
-        isReplCheckbox = JCheckBox("Use REPL", false)
-        add(isReplCheckbox)
-        isReplCheckbox.addItemListener {
-            scratchFile.getPsiFile()?.virtualFile?.apply {
-                scratchPanelConfig = (scratchPanelConfig ?: ScratchPanelConfig()).copy(isRepl = isReplCheckbox.isSelected)
-            }
-        }
-
-        add(JSeparator(SwingConstants.VERTICAL))
-
-        isMakeBeforeRunCheckbox = JCheckBox("Make before Run", false)
-        add(isMakeBeforeRunCheckbox)
-        isMakeBeforeRunCheckbox.addItemListener {
-            scratchFile.getPsiFile()?.virtualFile?.apply {
-                scratchPanelConfig = (scratchPanelConfig ?: ScratchPanelConfig()).copy(isMakeBeforeRun = isMakeBeforeRunCheckbox.isSelected)
-            }
-        }
-
-        add(JSeparator(SwingConstants.VERTICAL))
-
-        (scratchFile.getPsiFile()?.virtualFile?.scratchPanelConfig ?: ScratchPanelConfig()).let {
-            isReplCheckbox.isSelected = it.isRepl
-            isMakeBeforeRunCheckbox.isSelected = it.isMakeBeforeRun
-        }
-    }
-
-    fun getModule(): Module? = moduleChooser.selectedModule
-
-    fun setModule(module: Module) {
-        moduleChooser.selectedModule = module
-    }
-
-    fun addModuleListener(f: (PsiFile, Module) -> Unit) {
-        moduleChooser.addActionListener {
-            val selectedModule = moduleChooser.selectedModule
-            val psiFile = scratchFile.getPsiFile()
-            if (selectedModule != null && psiFile != null) {
-                f(psiFile, selectedModule)
-            }
-        }
-    }
-
-    fun isRepl() = isReplCheckbox.isSelected
-    fun isMakeBeforeRun() = isMakeBeforeRunCheckbox.isSelected
-
-    @TestOnly
-    fun setReplMode(isSelected: Boolean) {
-        isReplCheckbox.isSelected = isSelected
-    }
-
-    @TestOnly
-    fun setMakeBeforeRun(isSelected: Boolean) {
-        isMakeBeforeRunCheckbox.isSelected = isSelected
-    }
-
-    private fun createActionsToolbar(): JComponent {
         val toolbarGroup = DefaultActionGroup().apply {
-            add(RunScratchAction(this@ScratchTopPanel))
+            add(RunScratchAction())
+            add(StopScratchAction())
             addSeparator()
-            add(ClearScratchAction(this@ScratchTopPanel))
+            add(ClearScratchAction())
+            addSeparator()
+            add(moduleChooserAction)
+            add(IsMakeBeforeRunAction())
+            addSeparator()
+            add(IsInteractiveCheckboxAction())
+            addSeparator()
+            add(IsReplCheckboxAction())
         }
 
-        return ActionManager.getInstance().createActionToolbar(ActionPlaces.EDITOR_TOOLBAR, toolbarGroup, true).component
+        actionsToolbar = ActionManager.getInstance().createActionToolbar(ActionPlaces.EDITOR_TOOLBAR, toolbarGroup, true)
     }
 
-    private fun createModuleChooser(project: Project): ModulesComboBox {
-        return ModulesComboBox().apply {
-            fillModules(project)
+    private fun setupTopPanelUpdateHandlers() {
+        scratchFile.addModuleListener { _, _ -> updateToolbar() }
+
+        val toolbarHandler = createUpdateToolbarHandler()
+        scratchFile.replScratchExecutor?.addOutputHandler(toolbarHandler)
+        scratchFile.compilingScratchExecutor?.addOutputHandler(toolbarHandler)
+    }
+
+    private fun createUpdateToolbarHandler(): ScratchOutputHandlerAdapter {
+        return object : ScratchOutputHandlerAdapter() {
+            override fun onStart(file: ScratchFile) {
+                updateToolbar()
+            }
+
+            override fun onFinish(file: ScratchFile) {
+                updateToolbar()
+            }
+        }
+    }
+
+    private fun updateToolbar() {
+        ApplicationManager.getApplication().invokeLater {
+            actionsToolbar.updateActionsImmediately()
+        }
+    }
+
+    private inner class IsMakeBeforeRunAction : SmallBorderCheckboxAction(KotlinBundle.message("scratch.make.before.run.checkbox")) {
+        override fun update(e: AnActionEvent) {
+            super.update(e)
+            e.presentation.isVisible = scratchFile.module != null
+            e.presentation.description = scratchFile.module?.let { selectedModule ->
+                KotlinBundle.message("scratch.make.before.run.checkbox.description", selectedModule.name)
+            }
+        }
+
+        override fun isSelected(e: AnActionEvent): Boolean {
+            return scratchFile.options.isMakeBeforeRun
+        }
+
+        override fun setSelected(e: AnActionEvent, isMakeBeforeRun: Boolean) {
+            scratchFile.saveOptions { copy(isMakeBeforeRun = isMakeBeforeRun) }
+        }
+    }
+
+    private inner class IsInteractiveCheckboxAction : SmallBorderCheckboxAction(
+        text = KotlinBundle.message("scratch.is.interactive.checkbox"),
+        description = KotlinBundle.message("scratch.is.interactive.checkbox.description", ScratchFileAutoRunner.AUTO_RUN_DELAY_IN_SECONDS)
+    ) {
+        override fun isSelected(e: AnActionEvent): Boolean {
+            return scratchFile.options.isInteractiveMode
+        }
+
+        override fun setSelected(e: AnActionEvent, isInteractiveMode: Boolean) {
+            scratchFile.saveOptions { copy(isInteractiveMode = isInteractiveMode) }
+        }
+    }
+
+    private inner class IsReplCheckboxAction : SmallBorderCheckboxAction(
+        text = KotlinBundle.message("scratch.is.repl.checkbox"),
+        description = KotlinBundle.message("scratch.is.repl.checkbox.description")
+    ) {
+        override fun isSelected(e: AnActionEvent): Boolean {
+            return scratchFile.options.isRepl
+        }
+
+        override fun setSelected(e: AnActionEvent, isRepl: Boolean) {
+            scratchFile.saveOptions { copy(isRepl = isRepl) }
+
+            if (isRepl) {
+                // TODO start REPL process when checkbox is selected to speed up execution
+                // Now it is switched off due to KT-18355: REPL process is keep alive if no command is executed
+                //scratchFile.replScratchExecutor?.start()
+            } else {
+                scratchFile.replScratchExecutor?.stop()
+            }
         }
     }
 }
-
-data class ScratchPanelConfig(val isRepl: Boolean = false, val isMakeBeforeRun: Boolean = false)

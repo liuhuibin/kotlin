@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2017 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.resolve.descriptorUtil
@@ -28,6 +17,7 @@ import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.FqNameUnsafe
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.DescriptorUtils.getContainingClass
 import org.jetbrains.kotlin.resolve.constants.ConstantValue
@@ -39,6 +29,9 @@ import org.jetbrains.kotlin.types.TypeProjection
 import org.jetbrains.kotlin.types.TypeSubstitutor
 import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.types.checker.KotlinTypeChecker
+import org.jetbrains.kotlin.types.checker.KotlinTypeRefiner
+import org.jetbrains.kotlin.types.checker.REFINER_CAPABILITY
+import org.jetbrains.kotlin.types.refinement.TypeRefinement
 import org.jetbrains.kotlin.types.typeUtil.isAnyOrNullableAny
 import org.jetbrains.kotlin.types.typeUtil.makeNullable
 import org.jetbrains.kotlin.utils.DFS
@@ -68,6 +61,9 @@ val DeclarationDescriptor.isExtension: Boolean
 val DeclarationDescriptor.module: ModuleDescriptor
     get() = DescriptorUtils.getContainingModule(this)
 
+val DeclarationDescriptor.platform: TargetPlatform?
+    get() = module.platform
+
 fun ModuleDescriptor.resolveTopLevelClass(topLevelClassFqName: FqName, location: LookupLocation): ClassDescriptor? {
     assert(!topLevelClassFqName.isRoot)
     return getPackage(topLevelClassFqName.parent()).memberScope.getContributedClassifier(
@@ -83,8 +79,13 @@ val ClassifierDescriptorWithTypeParameters.denotedClassDescriptor: ClassDescript
         else -> throw UnsupportedOperationException("Unexpected descriptor kind: $this")
     }
 
+// Used in https://plugins.jetbrains.com/plugin/10346-extsee
+@Deprecated("The one below with receiver type ClassifierDescriptor? should be used", level = DeprecationLevel.HIDDEN)
 val ClassifierDescriptorWithTypeParameters.classId: ClassId?
-    get() = containingDeclaration.let { owner ->
+    get() = (this as ClassifierDescriptor?).classId
+
+val ClassifierDescriptor?.classId: ClassId?
+    get() = this?.containingDeclaration?.let { owner ->
         when (owner) {
             is PackageFragmentDescriptor -> ClassId(owner.fqName, name)
             is ClassifierDescriptorWithTypeParameters -> owner.classId?.createNestedClassId(name)
@@ -208,7 +209,9 @@ fun Annotated.getAnnotationRetention(): KotlinRetention? {
     val retentionArgumentValue =
         annotations.findAnnotation(KotlinBuiltIns.FQ_NAMES.retention)?.allValueArguments?.get(RETENTION_PARAMETER_NAME)
                 as? EnumValue ?: return null
-    return KotlinRetention.valueOf(retentionArgumentValue.enumEntryName.asString())
+
+    val retentionArgumentValueName = retentionArgumentValue.enumEntryName.asString()
+    return KotlinRetention.values().firstOrNull { it.name == retentionArgumentValueName }
 }
 
 val Annotated.nonSourceAnnotations: List<AnnotationDescriptor>
@@ -232,7 +235,7 @@ val DeclarationDescriptor.parents: Sequence<DeclarationDescriptor>
 val CallableMemberDescriptor.propertyIfAccessor: CallableMemberDescriptor
     get() = if (this is PropertyAccessorDescriptor) correspondingProperty else this
 
-fun CallableDescriptor.fqNameOrNull(): FqName? = fqNameUnsafe.takeIf { it.isSafe }?.toSafe()
+fun DeclarationDescriptor.fqNameOrNull(): FqName? = fqNameUnsafe.takeIf { it.isSafe }?.toSafe()
 
 fun CallableMemberDescriptor.firstOverridden(
     useOriginal: Boolean = false,
@@ -433,6 +436,8 @@ fun MemberDescriptor.isEffectivelyExternal(): Boolean {
     return containingClass != null && containingClass.isEffectivelyExternal()
 }
 
+fun DeclarationDescriptor.isEffectivelyExternal() = this is MemberDescriptor && this.isEffectivelyExternal()
+
 fun isParameterOfAnnotation(parameterDescriptor: ParameterDescriptor): Boolean =
     parameterDescriptor.containingDeclaration.isAnnotationConstructor()
 
@@ -441,3 +446,9 @@ fun DeclarationDescriptor.isAnnotationConstructor(): Boolean =
 
 fun DeclarationDescriptor.isPrimaryConstructorOfInlineClass(): Boolean =
     this is ConstructorDescriptor && this.isPrimary && this.constructedClass.isInline
+
+@TypeRefinement
+fun ModuleDescriptor.getKotlinTypeRefiner(): KotlinTypeRefiner = getCapability(REFINER_CAPABILITY)?.value ?: KotlinTypeRefiner.Default
+
+@UseExperimental(TypeRefinement::class)
+fun ModuleDescriptor.isTypeRefinementEnabled(): Boolean = getCapability(REFINER_CAPABILITY)?.value != null

@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.jvm.compiler;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.jvm.compiler;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -24,11 +23,11 @@ public class LoadJava8TestGenerated extends AbstractLoadJava8Test {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class CompiledJava extends AbstractLoadJava8Test {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTestCompiledJava, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTestCompiledJava, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInCompiledJava() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava8/compiledJava"), Pattern.compile("^(.+)\\.java$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava8/compiledJava"), Pattern.compile("^(.+)\\.java$"), null, true);
         }
 
         @TestMetadata("InnerClassTypeAnnotation.java")
@@ -39,6 +38,11 @@ public class LoadJava8TestGenerated extends AbstractLoadJava8Test {
         @TestMetadata("MapRemove.java")
         public void testMapRemove() throws Exception {
             runTest("compiler/testData/loadJava8/compiledJava/MapRemove.java");
+        }
+
+        @TestMetadata("ParameterNames.java")
+        public void testParameterNames() throws Exception {
+            runTest("compiler/testData/loadJava8/compiledJava/ParameterNames.java");
         }
 
         @TestMetadata("TypeAnnotations.java")
@@ -57,11 +61,11 @@ public class LoadJava8TestGenerated extends AbstractLoadJava8Test {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class SourceJava extends AbstractLoadJava8Test {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTestSourceJava, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTestSourceJava, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInSourceJava() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava8/sourceJava"), Pattern.compile("^(.+)\\.java$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava8/sourceJava"), Pattern.compile("^(.+)\\.java$"), null, true);
         }
 
         @TestMetadata("MapRemove.java")

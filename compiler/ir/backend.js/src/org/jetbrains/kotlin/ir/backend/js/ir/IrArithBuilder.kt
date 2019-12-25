@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.ir.backend.js.ir
@@ -8,6 +8,7 @@ package org.jetbrains.kotlin.ir.backend.js.ir
 import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
 import org.jetbrains.kotlin.ir.backend.js.utils.OperatorNames
 import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.types.IrSimpleType
 import org.jetbrains.kotlin.name.Name
 
 class JsIrArithBuilder(val context: JsIrBackendContext) {
@@ -15,15 +16,15 @@ class JsIrArithBuilder(val context: JsIrBackendContext) {
     val symbols = context.ir.symbols
 
     private fun buildBinaryOperator(name: Name, l: IrExpression, r: IrExpression): IrExpression {
-        val symbol = context.getOperatorByName(name, l.type)!!
-        return JsIrBuilder.buildCall(symbol).apply {
+        val symbol = context.getOperatorByName(name, l.type as IrSimpleType)
+        return JsIrBuilder.buildCall(symbol!!).apply {
             dispatchReceiver = l
             putValueArgument(0, r)
         }
     }
 
     private fun buildUnaryOperator(name: Name, v: IrExpression): IrExpression {
-        val symbol = context.getOperatorByName(name, v.type)!!
+        val symbol = context.getOperatorByName(name, v.type as IrSimpleType)!!
         return JsIrBuilder.buildCall(symbol).apply { dispatchReceiver = v }
     }
 
@@ -41,7 +42,7 @@ class JsIrArithBuilder(val context: JsIrBackendContext) {
     fun inv(v: IrExpression): IrExpression = buildUnaryOperator(OperatorNames.INV, v)
 
     fun andand(l: IrExpression, r: IrExpression) = // if (l) r else false
-        JsIrBuilder.buildIfElse(context.builtIns.booleanType, l, r, JsIrBuilder.buildBoolean(context.builtIns.booleanType, false))
+        JsIrBuilder.buildIfElse(context.irBuiltIns.booleanType, l, r, JsIrBuilder.buildBoolean(context.irBuiltIns.booleanType, false))
     fun oror(l: IrExpression, r: IrExpression) = // if (l) true else r
-        JsIrBuilder.buildIfElse(context.builtIns.booleanType, l, JsIrBuilder.buildBoolean(context.builtIns.booleanType, true), r)
+        JsIrBuilder.buildIfElse(context.irBuiltIns.booleanType, l, JsIrBuilder.buildBoolean(context.irBuiltIns.booleanType, true), r)
 }

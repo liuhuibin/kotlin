@@ -20,10 +20,10 @@ import com.intellij.CommonBundle;
 import com.intellij.facet.impl.ui.libraries.LibraryCompositionSettings;
 import com.intellij.facet.impl.ui.libraries.LibraryOptionsPanel;
 import com.intellij.framework.library.FrameworkLibraryVersionFilter;
-import com.intellij.ide.util.projectWizard.JavaSettingsStep;
 import com.intellij.ide.util.projectWizard.ModuleBuilder;
 import com.intellij.ide.util.projectWizard.ModuleWizardStep;
 import com.intellij.ide.util.projectWizard.SettingsStep;
+import com.intellij.ide.util.projectWizard.WizardContext;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.module.JavaModuleType;
 import com.intellij.openapi.module.Module;
@@ -44,9 +44,12 @@ import kotlin.collections.ArraysKt;
 import kotlin.jvm.functions.Function1;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.kotlin.js.resolve.JsPlatform;
-import org.jetbrains.kotlin.resolve.TargetPlatform;
-import org.jetbrains.kotlin.resolve.jvm.platform.JvmPlatform;
+import org.jetbrains.kotlin.idea.formatter.KotlinStyleGuideCodeStyle;
+import org.jetbrains.kotlin.idea.formatter.ProjectCodeStyleImporter;
+import org.jetbrains.kotlin.platform.TargetPlatform;
+import org.jetbrains.kotlin.platform.TargetPlatformKt;
+import org.jetbrains.kotlin.platform.js.JsPlatformKt;
+import org.jetbrains.kotlin.platform.jvm.JvmPlatformKt;
 
 import javax.swing.*;
 import java.lang.reflect.Field;
@@ -64,6 +67,8 @@ public class KotlinModuleSettingStep extends ModuleWizardStep {
     private final CustomLibraryDescription customLibraryDescription;
     private final LibrariesContainer librariesContainer;
 
+    private boolean isNewProject;
+
     private LibraryOptionsPanel libraryOptionsPanel;
     private JPanel panel;
 
@@ -71,8 +76,15 @@ public class KotlinModuleSettingStep extends ModuleWizardStep {
 
     private final String basePath;
 
-    public KotlinModuleSettingStep(TargetPlatform targetPlatform, ModuleBuilder moduleBuilder, @NotNull SettingsStep settingsStep) {
-        if (!(targetPlatform instanceof JvmPlatform)) {
+    public KotlinModuleSettingStep(
+            TargetPlatform targetPlatform,
+            ModuleBuilder moduleBuilder,
+            @NotNull SettingsStep settingsStep,
+            @Nullable WizardContext wizardContext
+    ) {
+        isNewProject = wizardContext != null && wizardContext.isCreatingNewProject();
+
+        if (!(JvmPlatformKt.isJvm(targetPlatform))) {
             KotlinSdkType.Companion.setUpIfNeeded();
         }
 
@@ -98,8 +110,12 @@ public class KotlinModuleSettingStep extends ModuleWizardStep {
                     libraryCompositionSettings.addLibraries(rootModel, new ArrayList<Library>(), librariesContainer);
 
                     if (customLibraryDescription instanceof CustomLibraryDescriptorWithDeferredConfig) {
-                        ((CustomLibraryDescriptorWithDeferredConfig) customLibraryDescription).finishLibConfiguration(module, rootModel);
+                        ((CustomLibraryDescriptorWithDeferredConfig) customLibraryDescription).finishLibConfiguration(module, rootModel, isNewProject);
                     }
+                }
+
+                if (isNewProject) {
+                    ProjectCodeStyleImporter.INSTANCE.apply(module.getProject(), KotlinStyleGuideCodeStyle.Companion.getINSTANCE());
                 }
             }
         };
@@ -124,15 +140,15 @@ public class KotlinModuleSettingStep extends ModuleWizardStep {
 
     @NotNull
     protected String getLibraryLabelText() {
-        if (targetPlatform == JvmPlatform.INSTANCE) return "Kotlin runtime";
-        if (targetPlatform == JsPlatform.INSTANCE) return "Kotlin JS library";
+        if (JvmPlatformKt.isJvm(targetPlatform)) return "Kotlin runtime";
+        if (JsPlatformKt.isJs(targetPlatform)) return "Kotlin JS library";
         throw new IllegalStateException("Only JS and JVM target are supported");
     }
 
     @NotNull
     protected CustomLibraryDescription getCustomLibraryDescription(@Nullable Project project) {
-        if (targetPlatform == JvmPlatform.INSTANCE) return new JavaRuntimeLibraryDescription(project);
-        if (targetPlatform == JsPlatform.INSTANCE) return new JSLibraryStdDescription(project);
+        if (JvmPlatformKt.isJvm(targetPlatform)) return new JavaRuntimeLibraryDescription(project);
+        if (JsPlatformKt.isJs(targetPlatform)) return new JSLibraryStdDescription(project);
         throw new IllegalStateException("Only JS and JVM target are supported");
     }
 

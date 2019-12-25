@@ -6,12 +6,11 @@ plugins {
     id("jps-compatible")
 }
 
-jvmTarget = "1.6"
-
 dependencies {
-    compile(projectDist(":kotlin-stdlib"))
-    compile(project(":compiler:cli-common"))
-    compile(intellijPluginDep("gradle"))
+    compile(kotlinStdlib())
+
+    compileOnly(intellijPluginDep("gradle"))
+    compileOnly(intellijDep()) { includeJars("slf4j-api-1.7.25") }
 }
 
 sourceSets {
@@ -21,4 +20,8 @@ sourceSets {
 
 runtimeJar()
 
-ideaPlugin()
+sourcesJar()
+
+javadocJar()
+
+apply(from = "$rootDir/gradle/kotlinPluginPublication.gradle.kts")

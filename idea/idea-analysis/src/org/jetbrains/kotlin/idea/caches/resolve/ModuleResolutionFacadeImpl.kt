@@ -38,7 +38,7 @@ import org.jetbrains.kotlin.resolve.lazy.ResolveSession
 internal class ModuleResolutionFacadeImpl(
     private val projectFacade: ProjectResolutionFacade,
     private val moduleInfo: IdeaModuleInfo
-) : ResolutionFacade {
+) : ResolutionFacade, ResolutionFacadeModuleDescriptorProvider {
     override val project: Project
         get() = projectFacade.project
 
@@ -47,27 +47,34 @@ internal class ModuleResolutionFacadeImpl(
     override val moduleDescriptor: ModuleDescriptor
         get() = findModuleDescriptor(moduleInfo)
 
-    fun findModuleDescriptor(ideaModuleInfo: IdeaModuleInfo) = projectFacade.findModuleDescriptor(ideaModuleInfo)
+    override fun findModuleDescriptor(ideaModuleInfo: IdeaModuleInfo) = projectFacade.findModuleDescriptor(ideaModuleInfo)
 
     override fun analyze(element: KtElement, bodyResolveMode: BodyResolveMode): BindingContext {
         return analyze(listOf(element), bodyResolveMode)
     }
 
     override fun analyze(elements: Collection<KtElement>, bodyResolveMode: BodyResolveMode): BindingContext {
+        ResolveInDispatchThreadManager.assertNoResolveInDispatchThread()
+
         if (elements.isEmpty()) return BindingContext.EMPTY
         val resolveElementCache = getFrontendService(elements.first(), ResolveElementCache::class.java)
         return resolveElementCache.resolveToElements(elements, bodyResolveMode)
     }
 
-    override fun analyzeWithAllCompilerChecks(elements: Collection<KtElement>): AnalysisResult =
-        projectFacade.getAnalysisResultsForElements(elements)
+    override fun analyzeWithAllCompilerChecks(elements: Collection<KtElement>): AnalysisResult {
+        ResolveInDispatchThreadManager.assertNoResolveInDispatchThread()
+
+        return projectFacade.getAnalysisResultsForElements(elements)
+    }
 
     override fun resolveToDescriptor(declaration: KtDeclaration, bodyResolveMode: BodyResolveMode): DeclarationDescriptor {
         return if (KtPsiUtil.isLocal(declaration)) {
             val bindingContext = analyze(declaration, bodyResolveMode)
             bindingContext[BindingContext.DECLARATION_TO_DESCRIPTOR, declaration]
-                    ?: getFrontendService(moduleInfo, AbsentDescriptorHandler::class.java).diagnoseDescriptorNotFound(declaration)
+                ?: getFrontendService(moduleInfo, AbsentDescriptorHandler::class.java).diagnoseDescriptorNotFound(declaration)
         } else {
+            ResolveInDispatchThreadManager.assertNoResolveInDispatchThread()
+
             val resolveSession = projectFacade.resolverForElement(declaration).componentProvider.get<ResolveSession>()
             resolveSession.resolveToDescriptor(declaration)
         }
@@ -96,6 +103,11 @@ internal class ModuleResolutionFacadeImpl(
     }
 }
 
-fun ResolutionFacade.findModuleDescriptor(ideaModuleInfo: IdeaModuleInfo): ModuleDescriptor? {
-    return (this as? ModuleResolutionFacadeImpl)?.findModuleDescriptor(ideaModuleInfo)
+fun ResolutionFacade.findModuleDescriptor(ideaModuleInfo: IdeaModuleInfo): ModuleDescriptor {
+    return (this as ResolutionFacadeModuleDescriptorProvider).findModuleDescriptor(ideaModuleInfo)
+}
+
+
+interface ResolutionFacadeModuleDescriptorProvider {
+    fun findModuleDescriptor(ideaModuleInfo: IdeaModuleInfo): ModuleDescriptor
 }

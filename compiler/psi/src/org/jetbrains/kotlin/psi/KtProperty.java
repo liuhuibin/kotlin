@@ -25,6 +25,7 @@ import com.intellij.psi.PsiModifiableCodeBlock;
 import com.intellij.psi.tree.IElementType;
 import com.intellij.psi.tree.TokenSet;
 import com.intellij.psi.util.PsiTreeUtil;
+import com.intellij.util.AstLoadingFilter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.KtNodeTypes;
@@ -37,7 +38,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.jetbrains.kotlin.KtNodeTypes.PROPERTY_DELEGATE;
-import static org.jetbrains.kotlin.lexer.KtTokens.*;
+import static org.jetbrains.kotlin.lexer.KtTokens.EQ;
 
 public class KtProperty extends KtTypeParameterListOwnerStub<KotlinPropertyStub>
         implements KtVariableDeclaration, PsiModifiableCodeBlock {
@@ -195,11 +196,17 @@ public class KtProperty extends KtTypeParameterListOwnerStub<KotlinPropertyStub>
         if (stub != null) {
             return stub.hasDelegate();
         }
+
         return getDelegate() != null;
     }
 
     @Nullable
     public KtPropertyDelegate getDelegate() {
+        KotlinPropertyStub stub = getStub();
+        if (stub != null && !stub.hasDelegate()) {
+            return null;
+        }
+
         return (KtPropertyDelegate) findChildByType(PROPERTY_DELEGATE);
     }
 
@@ -208,15 +215,22 @@ public class KtProperty extends KtTypeParameterListOwnerStub<KotlinPropertyStub>
         if (stub != null) {
             return stub.hasDelegateExpression();
         }
+
         return getDelegateExpression() != null;
     }
 
     @Nullable
     public KtExpression getDelegateExpression() {
+        KotlinPropertyStub stub = getStub();
+        if (stub != null && !stub.hasDelegateExpression()) {
+            return null;
+        }
+
         KtPropertyDelegate delegate = getDelegate();
         if (delegate != null) {
             return delegate.getExpression();
         }
+
         return null;
     }
 
@@ -226,13 +240,21 @@ public class KtProperty extends KtTypeParameterListOwnerStub<KotlinPropertyStub>
         if (stub != null) {
             return stub.hasInitializer();
         }
+
         return getInitializer() != null;
     }
 
     @Override
     @Nullable
     public KtExpression getInitializer() {
-        return PsiTreeUtil.getNextSiblingOfType(findChildByType(EQ), KtExpression.class);
+        KotlinPropertyStub stub = getStub();
+        if (stub != null && !stub.hasInitializer()) {
+            return null;
+        }
+
+        return AstLoadingFilter.forceAllowTreeLoading(this.getContainingFile(), () ->
+                PsiTreeUtil.getNextSiblingOfType(findChildByType(EQ), KtExpression.class)
+        );
     }
 
     public boolean hasDelegateExpressionOrInitializer() {

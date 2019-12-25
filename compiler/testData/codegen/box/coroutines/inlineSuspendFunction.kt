@@ -1,5 +1,4 @@
-// IGNORE_BACKEND: JS_IR
-// IGNORE_BACKEND: NATIVE
+// IGNORE_BACKEND_FIR: JVM_IR
 // WITH_RUNTIME
 // WITH_COROUTINES
 // COMMON_COROUTINES_TEST
@@ -16,7 +15,7 @@ class Controller {
         x.resume(v)
     }
 
-    suspend inline fun suspendInline(v: String): String = suspendCoroutineOrReturn { x ->
+    suspend inline fun suspendInline(v: String): String = suspendCoroutineUninterceptedOrReturn { x ->
         withValue(v, x)
         COROUTINE_SUSPENDED
     }

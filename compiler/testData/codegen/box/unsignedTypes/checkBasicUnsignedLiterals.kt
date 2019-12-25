@@ -1,9 +1,9 @@
-// !LANGUAGE: +InlineClasses
-// !SKIP_METADATA_VERSION_CHECK
-// WITH_UNSIGNED
-// TARGET_BACKEND: JVM
+// IGNORE_BACKEND_FIR: JVM_IR
+// KJS_WITH_FULL_RUNTIME
+// WITH_RUNTIME
 
 fun box(): String {
+    val good = 42.toUInt()
     val u1 = 1u
     val u2 = 2u
     val u3 = u1 + u2

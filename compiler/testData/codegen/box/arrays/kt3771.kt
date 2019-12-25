@@ -1,4 +1,4 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
 fun fill(dest : Array<in String>, v : String) {
     dest[0] = v
 }

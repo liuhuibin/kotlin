@@ -1,4 +1,7 @@
-// IGNORE_BACKEND: JS_IR
+// !LANGUAGE: -NestedClassesInEnumEntryShouldBeInner
+// IGNORE_BACKEND_FIR: JVM_IR
+// IGNORE_BACKEND: NATIVE
+
 enum class E {
     ENTRY,
     SUBCLASS {

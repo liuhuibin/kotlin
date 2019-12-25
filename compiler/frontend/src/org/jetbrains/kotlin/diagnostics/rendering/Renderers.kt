@@ -20,7 +20,8 @@ import com.google.common.collect.Lists
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi.PsiElement
-import org.jetbrains.kotlin.analyzer.ModuleInfo
+import org.jetbrains.kotlin.analyzer.moduleInfo
+import org.jetbrains.kotlin.analyzer.unwrapPlatform
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.cfg.WhenMissingCase
 import org.jetbrains.kotlin.cfg.hasUnknown
@@ -28,14 +29,14 @@ import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.impl.TypeAliasConstructorDescriptor
 import org.jetbrains.kotlin.diagnostics.rendering.TabledDescriptorRenderer.newTable
 import org.jetbrains.kotlin.diagnostics.rendering.TabledDescriptorRenderer.newText
+import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.psi.KtClass
-import org.jetbrains.kotlin.psi.KtClassOrObject
-import org.jetbrains.kotlin.psi.KtNamedDeclaration
+import org.jetbrains.kotlin.platform.isCommon
+import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.renderer.DescriptorRenderer
-import org.jetbrains.kotlin.resolve.DescriptorUtils
-import org.jetbrains.kotlin.resolve.MemberComparator
-import org.jetbrains.kotlin.resolve.MultiTargetPlatform
+import org.jetbrains.kotlin.renderer.DescriptorRenderer.Companion.DEBUG_TEXT
+import org.jetbrains.kotlin.renderer.PropertyAccessorRenderingPolicy
+import org.jetbrains.kotlin.resolve.*
 import org.jetbrains.kotlin.resolve.calls.inference.*
 import org.jetbrains.kotlin.resolve.calls.inference.TypeBounds.Bound
 import org.jetbrains.kotlin.resolve.calls.inference.TypeBounds.BoundKind.LOWER_BOUND
@@ -44,13 +45,11 @@ import org.jetbrains.kotlin.resolve.calls.inference.constraintPosition.Constrain
 import org.jetbrains.kotlin.resolve.calls.inference.constraintPosition.ConstraintPositionKind.*
 import org.jetbrains.kotlin.resolve.calls.inference.constraintPosition.getValidityConstraintForConstituentType
 import org.jetbrains.kotlin.resolve.calls.model.ResolvedCall
-import org.jetbrains.kotlin.resolve.getMultiTargetPlatform
 import org.jetbrains.kotlin.types.*
 import org.jetbrains.kotlin.types.checker.KotlinTypeChecker
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 import java.io.PrintWriter
 import java.io.StringWriter
-import java.lang.AssertionError
 
 object Renderers {
 
@@ -82,20 +81,22 @@ object Renderers {
     val NAME = Renderer<Named> { it.name.asString() }
 
     @JvmField
-    val PLATFORM = Renderer<ModuleDescriptor> {
-        val platform = it.getMultiTargetPlatform()
-        " ${it.getCapability(ModuleInfo.Capability)?.displayedName ?: ""}" + when (platform) {
-            MultiTargetPlatform.Common -> ""
-            is MultiTargetPlatform.Specific -> " for " + platform.platform
-            null -> ""
-        }
+    val MODULE_WITH_PLATFORM = Renderer<ModuleDescriptor> { module ->
+        val platform = module.platform
+        val moduleName = MODULE.render(module)
+        val platformNameIfAny = if (platform == null || platform.isCommon()) "" else " for " + platform.single().platformName
+
+        moduleName + platformNameIfAny
     }
 
     @JvmField
+    val MODULE = Renderer<ModuleDescriptor> { module ->
+        module.moduleInfo?.unwrapPlatform()?.displayedName ?: module.name.asString()
+    }
+    
+    @JvmField
     val VISIBILITY = Renderer<Visibility> {
-        if (it == Visibilities.INVISIBLE_FAKE)
-            "invisible (private in a supertype)"
-        else it.displayName
+        it.externalDisplayName
     }
 
     @JvmField
@@ -116,8 +117,8 @@ object Renderers {
     }
 
     @JvmField
-    val CAPITALIZED_DECLARATION_NAME_WITH_KIND_AND_PLATFORM = ContextDependentRenderer<DeclarationDescriptor> { descriptor, context ->
-        val declarationWithNameAndKind = DECLARATION_NAME_WITH_KIND.render(descriptor, context)
+    val CAPITALIZED_DECLARATION_NAME_WITH_KIND_AND_PLATFORM = Renderer<DeclarationDescriptor> { descriptor ->
+        val declarationWithNameAndKind = DECLARATION_NAME_WITH_KIND.render(descriptor)
         val withPlatform = if (descriptor is MemberDescriptor && descriptor.isActual)
             "actual $declarationWithNameAndKind"
         else
@@ -157,7 +158,25 @@ object Renderers {
     val RENDER_CLASS_OR_OBJECT_NAME = Renderer<ClassifierDescriptorWithTypeParameters> { it.renderKindWithName() }
 
     @JvmField
-    val RENDER_TYPE = SmartTypeRenderer(DescriptorRenderer.FQ_NAMES_IN_TYPES.withOptions { parameterNamesInFunctionalTypes = false })
+    val RENDER_TYPE = SmartTypeRenderer(DescriptorRenderer.FQ_NAMES_IN_TYPES.withOptions {
+        parameterNamesInFunctionalTypes = false
+    })
+
+    @JvmField
+    val RENDER_TYPE_WITH_ANNOTATIONS = SmartTypeRenderer(DescriptorRenderer.FQ_NAMES_IN_TYPES_WITH_ANNOTATIONS.withOptions {
+        parameterNamesInFunctionalTypes = false
+    })
+
+    @JvmField
+    val TYPE_PROJECTION = Renderer<TypeProjection> { projection ->
+        when {
+            projection.isStarProjection -> "*"
+            projection.projectionKind == Variance.INVARIANT ->
+                RENDER_TYPE.render(projection.type, RenderingContext.of(projection.type))
+            else ->
+                "${projection.projectionKind} ${RENDER_TYPE.render(projection.type, RenderingContext.of(projection.type))}"
+        }
+    }
 
     @JvmField
     val RENDER_POSITION_VARIANCE = Renderer { variance: Variance ->
@@ -171,10 +190,21 @@ object Renderers {
     @JvmField
     val AMBIGUOUS_CALLS = Renderer { calls: Collection<ResolvedCall<*>> ->
         val descriptors = calls.map { it.resultingDescriptor }
+        renderAmbiguousDescriptors(descriptors)
+    }
+
+    @JvmField
+    val AMBIGUOUS_CALLABLE_REFERENCES = Renderer { references: Collection<CallableDescriptor> ->
+        renderAmbiguousDescriptors(references)
+    }
+
+    private fun renderAmbiguousDescriptors(descriptors: Collection<CallableDescriptor>): String {
         val context = RenderingContext.Impl(descriptors)
-        descriptors
+        return descriptors
             .sortedWith(MemberComparator.INSTANCE)
-            .joinToString(separator = "\n", prefix = "\n") { FQ_NAMES_IN_TYPES.render(it, context) }
+            .joinToString(separator = "\n", prefix = "\n") {
+                FQ_NAMES_IN_TYPES.render(it, context)
+            }
     }
 
     @JvmStatic
@@ -489,7 +519,7 @@ object Renderers {
         val typeParameter = typeVariableWithCapturedConstraint.originalTypeParameter
         val upperBound = TypeIntersector.getUpperBoundsAsType(typeParameter)
 
-        assert(!KotlinBuiltIns.isNullableAny(upperBound) && capturedTypeConstructor.typeProjection.projectionKind == Variance.IN_VARIANCE) {
+        assert(!KotlinBuiltIns.isNullableAny(upperBound) && capturedTypeConstructor.projection.projectionKind == Variance.IN_VARIANCE) {
             "There is the only reason to report TYPE_INFERENCE_CANNOT_CAPTURE_TYPES"
         }
 
@@ -504,7 +534,10 @@ object Renderers {
             newText().normal(
                 typeParameter.name.wrapIntoQuotes() +
                         " cannot capture " +
-                        "${capturedTypeConstructor.typeProjection.toString().wrapIntoQuotes()}. " +
+                        "${result.typeProjectionRenderer.render(
+                            capturedTypeConstructor.projection,
+                            RenderingContext.of(capturedTypeConstructor.projection)
+                        ).wrapIntoQuotes()}. " +
                         explanation
             )
         )
@@ -527,11 +560,18 @@ object Renderers {
         }
     }
 
-    private fun renderTypes(types: Collection<KotlinType>, context: RenderingContext) =
-        StringUtil.join(types, { RENDER_TYPE.render(it, context) }, ", ")
+    private fun renderTypes(
+        types: Collection<KotlinType>,
+        typeRenderer: DiagnosticParameterRenderer<KotlinType>,
+        context: RenderingContext
+    ): String {
+        return StringUtil.join(types, { typeRenderer.render(it, context) }, ", ")
+    }
 
     @JvmField
-    val RENDER_COLLECTION_OF_TYPES = ContextDependentRenderer<Collection<KotlinType>> { types, context -> renderTypes(types, context) }
+    val RENDER_COLLECTION_OF_TYPES = ContextDependentRenderer<Collection<KotlinType>> { types, context ->
+        renderTypes(types, RENDER_TYPE, context)
+    }
 
     enum class ConstraintSystemRenderingVerbosity {
         COMPACT,
@@ -634,13 +674,13 @@ object Renderers {
         if (TypeUtils.noExpectedType(inferenceErrorData.expectedType)) {
             append(inferenceErrorData.expectedType)
         } else {
-            append(RENDER_TYPE.render(inferenceErrorData.expectedType, context))
+            append(RENDER_TYPE_WITH_ANNOTATIONS.render(inferenceErrorData.expectedType, context))
         }
         append("\nArgument types:\n")
         if (inferenceErrorData.receiverArgumentType != null) {
-            append(RENDER_TYPE.render(inferenceErrorData.receiverArgumentType, context)).append(".")
+            append(RENDER_TYPE_WITH_ANNOTATIONS.render(inferenceErrorData.receiverArgumentType, context)).append(".")
         }
-        append("(").append(renderTypes(inferenceErrorData.valueArgumentsTypes, context)).append(")")
+        append("(").append(renderTypes(inferenceErrorData.valueArgumentsTypes, RENDER_TYPE_WITH_ANNOTATIONS, context)).append(")")
     }
 
     private fun String.wrapIntoQuotes(): String = "'$this'"
@@ -662,6 +702,10 @@ object Renderers {
     @JvmField
     val FQ_NAMES_IN_TYPES = DescriptorRenderer.FQ_NAMES_IN_TYPES.asRenderer()
     @JvmField
+    val FQ_NAMES_IN_TYPES_ANNOTATIONS_WHITELIST = DescriptorRenderer.FQ_NAMES_IN_TYPES_WITH_ANNOTATIONS.withAnnotationsWhitelist()
+    @JvmField
+    val FQ_NAMES_IN_TYPES_WITH_ANNOTATIONS = DescriptorRenderer.FQ_NAMES_IN_TYPES_WITH_ANNOTATIONS.asRenderer()
+    @JvmField
     val COMPACT = DescriptorRenderer.COMPACT.asRenderer()
     @JvmField
     val COMPACT_WITHOUT_SUPERTYPES = DescriptorRenderer.COMPACT_WITHOUT_SUPERTYPES.asRenderer()
@@ -677,8 +721,20 @@ object Renderers {
     val DEPRECATION_RENDERER = DescriptorRenderer.ONLY_NAMES_WITH_SHORT_TYPES.withOptions {
         withoutTypeParameters = false
         receiverAfterName = false
-        renderAccessors = true
+        propertyAccessorRenderingPolicy = PropertyAccessorRenderingPolicy.PRETTY
     }.asRenderer()
+
+    fun renderExpressionType(type: KotlinType?, dataFlowTypes: Set<KotlinType>?): String {
+        if (type == null)
+            return "Type is unknown"
+
+        if (dataFlowTypes == null)
+            return DEBUG_TEXT.renderType(type)
+
+        val typesAsString = dataFlowTypes.map { DEBUG_TEXT.renderType(it) }.toMutableSet().apply { add(DEBUG_TEXT.renderType(type)) }
+
+        return typesAsString.sorted().joinToString(separator = " & ")
+    }
 }
 
 fun DescriptorRenderer.asRenderer() = SmartDescriptorRenderer(this)

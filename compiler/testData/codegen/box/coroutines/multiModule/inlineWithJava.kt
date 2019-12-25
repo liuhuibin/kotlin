@@ -1,6 +1,7 @@
-// IGNORE_BACKEND: NATIVE, JS, JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
+// TARGET_BACKEND: JVM
 // WITH_COROUTINES
-// COMMON_COROUTINES_TEST
+// WITH_RUNTIME
 // MODULE: lib
 // FILE: lib.kt
 interface I {}
@@ -9,7 +10,7 @@ suspend inline fun foo() = object : I {}
 
 // MODULE: useLib(lib)
 // FILE: UseLib.java
-import COROUTINES_PACKAGE.*;
+import kotlin.coroutines.*;
 import kotlin.Unit;
 
 public class UseLib {
@@ -23,10 +24,7 @@ class MyContinuation implements Continuation<I> {
     public CoroutineContext getContext() {
         return EmptyCoroutineContext.INSTANCE;
     }
-    public void resume(I value) {}
-    public void resumeWithException(Throwable e) {
-        throw new RuntimeException(e);
-    }
+    public void resumeWith(Object value) {}
 }
 
 // MODULE: main(useLib)

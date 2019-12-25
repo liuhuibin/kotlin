@@ -16,9 +16,12 @@
 
 package org.jetbrains.kotlin.idea.conversion.copy
 
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.psi.*
 import com.intellij.psi.search.PsiShortNamesCache
 import com.intellij.psi.util.PsiTreeUtil
+import org.jetbrains.kotlin.builtins.jvm.JavaToKotlinClassMap
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptorWithVisibility
 import org.jetbrains.kotlin.idea.caches.project.getNullableModuleInfo
@@ -29,21 +32,20 @@ import org.jetbrains.kotlin.idea.core.isVisible
 import org.jetbrains.kotlin.idea.imports.canBeReferencedViaImport
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.idea.util.ProjectRootsUtil
+import org.jetbrains.kotlin.idea.util.application.runReadAction
 import org.jetbrains.kotlin.idea.util.application.runWriteAction
-import org.jetbrains.kotlin.platform.JavaToKotlinClassMap
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtImportDirective
 import org.jetbrains.kotlin.psi.psiUtil.referenceExpression
-import java.util.*
 
-
-class PlainTextPasteImportResolver(val dataForConversion: DataForConversion, val targetFile: KtFile) {
-
+class PlainTextPasteImportResolver(private val dataForConversion: DataForConversion, val targetFile: KtFile) {
     private val file = dataForConversion.file
     private val project = targetFile.project
 
     private val importList = file.importList!!
+
+    // keep access to deprecated PsiElementFactory.SERVICE for bwc with <= 191
     private val psiElementFactory = PsiElementFactory.SERVICE.getInstance(project)
 
     private val bindingContext by lazy { targetFile.analyzeWithContent() }
@@ -56,12 +58,12 @@ class PlainTextPasteImportResolver(val dataForConversion: DataForConversion, val
     private var ambiguityInResolution = false
     private var couldNotResolve = false
 
-    val addedImports = ArrayList<PsiImportStatementBase>()
+    val addedImports = mutableListOf<PsiImportStatementBase>()
 
     private fun canBeImported(descriptor: DeclarationDescriptorWithVisibility?): Boolean {
         return descriptor != null
-               && descriptor.canBeReferencedViaImport()
-               && descriptor.isVisible(targetFile, null, bindingContext, resolutionFacade)
+                && descriptor.canBeReferencedViaImport()
+                && descriptor.isVisible(targetFile, null, bindingContext, resolutionFacade)
     }
 
     private fun addImport(importStatement: PsiImportStatementBase, shouldAddToTarget: Boolean = false) {
@@ -71,114 +73,164 @@ class PlainTextPasteImportResolver(val dataForConversion: DataForConversion, val
     }
 
     fun addImportsFromTargetFile() {
+        if (importList in dataForConversion.elementsAndTexts.toList()) return
 
-        fun tryConvertKotlinImport(importDirective: KtImportDirective) {
-            val importPath = importDirective.importPath
-            val importedReference = importDirective.importedReference
-            if (importPath != null && !importPath.hasAlias() && importedReference is KtDotQualifiedExpression) {
-                val receiver = importedReference
+        val task = {
+            val addImportList = mutableListOf<PsiImportStatementBase>()
+
+            fun tryConvertKotlinImport(importDirective: KtImportDirective) {
+                val importPath = importDirective.importPath
+                val importedReference = importDirective.importedReference
+                if (importPath != null && !importPath.hasAlias() && importedReference is KtDotQualifiedExpression) {
+                    val receiver = importedReference
                         .receiverExpression
                         .referenceExpression()
                         ?.mainReference
                         ?.resolve()
-                val selector = importedReference
+                    val selector = importedReference
                         .selectorExpression
                         ?.referenceExpression()
                         ?.mainReference
                         ?.resolve()
 
-                val isPackageReceiver = receiver is PsiPackage
-                val isClassReceiver = receiver is PsiClass
-                val isClassSelector = selector is PsiClass
+                    val isPackageReceiver = receiver is PsiPackage
+                    val isClassReceiver = receiver is PsiClass
+                    val isClassSelector = selector is PsiClass
 
-                if (importPath.isAllUnder) {
-                    if (isClassReceiver)
-                        addImport(psiElementFactory.createImportStaticStatement(receiver as PsiClass, "*"))
-                    else if (isPackageReceiver)
-                        addImport(psiElementFactory.createImportStatementOnDemand((receiver as PsiPackage).qualifiedName))
+                    if (importPath.isAllUnder) {
+                        when {
+                            isClassReceiver ->
+                                addImportList.add(psiElementFactory.createImportStaticStatement(receiver as PsiClass, "*"))
+                            isPackageReceiver ->
+                                addImportList.add(psiElementFactory.createImportStatementOnDemand((receiver as PsiPackage).qualifiedName))
+                        }
+                    } else {
+                        when {
+                            isClassSelector ->
+                                addImportList.add(psiElementFactory.createImportStatement(selector as PsiClass))
+                            isClassReceiver ->
+                                addImportList.add(
+                                    psiElementFactory.createImportStaticStatement(
+                                        receiver as PsiClass,
+                                        importPath.importedName!!.asString()
+                                    )
+                                )
+                        }
+                    }
                 }
-                else {
-                    if (isClassSelector)
-                        addImport(psiElementFactory.createImportStatement(selector as PsiClass))
-                    else if (isClassReceiver)
-                        addImport(psiElementFactory.createImportStaticStatement(receiver as PsiClass, importPath.importedName!!.asString()))
+            }
+
+            runReadAction {
+                val importDirectives = targetFile.importDirectives
+                importDirectives.forEachIndexed { index, value ->
+                    ProgressManager.getInstance().progressIndicator?.fraction = 1.0 * index / importDirectives.size
+                    tryConvertKotlinImport(value)
                 }
+            }
+
+            ApplicationManager.getApplication().invokeAndWait {
+                runWriteAction { addImportList.forEach { addImport(it) } }
             }
         }
-        if (importList !in dataForConversion.elementsAndTexts.toList())
-            runWriteAction {
-                targetFile.importDirectives.forEach(::tryConvertKotlinImport)
-            }
+
+        ProgressManager.getInstance().runProcessWithProgressSynchronously(
+            task, "Adding imports ...", true, project
+        )
     }
 
     fun tryResolveReferences() {
+        val task = {
+            fun performWriteAction(block: () -> Unit) {
+                ApplicationManager.getApplication().invokeAndWait { runWriteAction { block() } }
+            }
 
-        val elementsWithUnresolvedRef = PsiTreeUtil.collectElements(file) {
-            it.reference != null
-            && it.reference is PsiQualifiedReference
-            && it.reference?.resolve() == null
-        }
+            fun tryResolveReference(reference: PsiQualifiedReference): Boolean {
+                if (runReadAction { reference.resolve() } != null) return true
+                val referenceName = runReadAction { reference.referenceName } ?: return false
+                if (referenceName in failedToResolveReferenceNames) return false
+                if (runReadAction { reference.qualifier } != null) return false
 
-        fun tryResolveReference(reference: PsiQualifiedReference): Boolean {
-            if (reference.resolve() != null) return true
-            val referenceName = reference.referenceName ?: return false
-            if (referenceName in failedToResolveReferenceNames) return false
-            val classes = shortNameCache.getClassesByName(referenceName, scope)
-                    .mapNotNull { psiClass ->
-                        val containingFile = psiClass.containingFile
-                        if (ProjectRootsUtil.isInProjectOrLibraryContent(containingFile)) {
-                            psiClass to psiClass.getJavaMemberDescriptor() as? ClassDescriptor
-                        }
-                        else {
-                            null
-                        }
+                val classes = runReadAction {
+                    shortNameCache.getClassesByName(referenceName, scope)
+                        .mapNotNull { psiClass ->
+                            val containingFile = psiClass.containingFile
+                            if (ProjectRootsUtil.isInProjectOrLibraryContent(containingFile)) {
+                                psiClass to psiClass.getJavaMemberDescriptor() as? ClassDescriptor
+                            } else null
+                        }.filter { canBeImported(it.second) }
+                }
+
+                classes.find { (_, descriptor) ->
+                    JavaToKotlinClassMap.mapPlatformClass(descriptor!!).isNotEmpty()
+                }?.let { (psiClass, _) ->
+                    performWriteAction { addImport(psiElementFactory.createImportStatement(psiClass)) }
+                }
+                if (runReadAction { reference.resolve() } != null) return true
+
+                classes.singleOrNull()?.let { (psiClass, _) ->
+                    performWriteAction { addImport(psiElementFactory.createImportStatement(psiClass), true) }
+                }
+
+                when {
+                    runReadAction { reference.resolve() } != null -> return true
+                    classes.isNotEmpty() -> {
+                        ambiguityInResolution = true
+                        return false
                     }
-                    .filter { canBeImported(it.second) }
+                }
 
-            classes.find { (_, descriptor) -> JavaToKotlinClassMap.mapPlatformClass(descriptor!!).isNotEmpty() }
-                    ?.let { (psiClass, _) -> addImport(psiElementFactory.createImportStatement(psiClass)) }
-            if (reference.resolve() != null) return true
+                val members = runReadAction {
+                    (shortNameCache.getMethodsByName(referenceName, scope).asList() +
+                            shortNameCache.getFieldsByName(referenceName, scope).asList())
+                        .asSequence()
+                        .map { it as PsiMember }
+                        .filter { it.getNullableModuleInfo() != null }
+                        .map { it to it.getJavaMemberDescriptor(resolutionFacade) as? DeclarationDescriptorWithVisibility }
+                        .filter { canBeImported(it.second) }
+                        .toList()
+                }
 
-            classes.singleOrNull()?.let { (psiClass, _) ->
-                addImport(psiElementFactory.createImportStatement(psiClass), true)
+                members.singleOrNull()?.let { (psiMember, _) ->
+                    performWriteAction {
+                        addImport(
+                            psiElementFactory.createImportStaticStatement(psiMember.containingClass!!, psiMember.name!!),
+                            true
+                        )
+                    }
+                }
+
+                when {
+                    runReadAction { reference.resolve() } != null -> return false
+                    members.isNotEmpty() -> ambiguityInResolution = true
+                    else -> couldNotResolve = true
+                }
+                return false
             }
 
-            if (reference.resolve() != null) return true
-            else {
-                if (classes.isNotEmpty()) {
-                    ambiguityInResolution = true
-                    return false
+
+            val elementsWithUnresolvedRef = runReadAction {
+                PsiTreeUtil.collectElements(file) { element ->
+                    element.reference != null
+                            && element.reference is PsiQualifiedReference
+                            && element.reference?.resolve() == null
                 }
             }
 
-            val members = (shortNameCache.getMethodsByName(referenceName, scope).asList() +
-                           shortNameCache.getFieldsByName(referenceName, scope).asList())
-                    .map { it as PsiMember }
-                    .filter { it.getNullableModuleInfo() != null }
-                    .map { it to it.getJavaMemberDescriptor(resolutionFacade) as? DeclarationDescriptorWithVisibility }
-                    .filter { canBeImported(it.second) }
-
-            members.singleOrNull()?.let { (psiMember, _) ->
-                addImport(psiElementFactory.createImportStaticStatement(psiMember.containingClass!!, psiMember.name!!), true)
-            }
-
-            if (reference.resolve() != null) return false
-            else {
-                if (members.isNotEmpty()) {
-                    ambiguityInResolution = true
-                }
-                else {
-                    couldNotResolve = true
+            val reversed = elementsWithUnresolvedRef.reversedArray()
+            reversed.forEachIndexed { index, value ->
+                ProgressManager.getInstance().progressIndicator?.fraction = 1.0 * index / reversed.size
+                val reference = value.reference as PsiQualifiedReference
+                if (!tryResolveReference(reference)) {
+                    runReadAction { reference.referenceName }?.let {
+                        failedToResolveReferenceNames += it
+                    }
                 }
             }
-            return false
         }
 
-        runWriteAction {
-            elementsWithUnresolvedRef.reversed().forEach {
-                val reference = it.reference as PsiQualifiedReference
-                if (!tryResolveReference(reference)) failedToResolveReferenceNames += reference.referenceName!!
-            }
-        }
+        ProgressManager.getInstance().runProcessWithProgressSynchronously(
+            task, "Resolving references ...", true, project
+        )
+
     }
 }

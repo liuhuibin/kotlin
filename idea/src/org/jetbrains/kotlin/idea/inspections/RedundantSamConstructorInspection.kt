@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.inspections
@@ -10,10 +10,13 @@ import com.intellij.codeInspection.*
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElementVisitor
 import org.jetbrains.kotlin.codegen.SamCodegenUtil
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.idea.caches.resolve.analyze
 import org.jetbrains.kotlin.idea.caches.resolve.getResolutionFacade
+import org.jetbrains.kotlin.idea.codeInsight.forceEnableSamAdapters
+import org.jetbrains.kotlin.idea.project.languageVersionSettings
 import org.jetbrains.kotlin.idea.resolve.frontendService
 import org.jetbrains.kotlin.idea.util.getResolutionScope
 import org.jetbrains.kotlin.incremental.components.NoLookupLocation
@@ -24,6 +27,7 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.anyDescendantOfType
 import org.jetbrains.kotlin.psi.psiUtil.getElementTextWithContext
+import org.jetbrains.kotlin.psi.psiUtil.getQualifiedExpressionForSelector
 import org.jetbrains.kotlin.psi.psiUtil.getQualifiedExpressionForSelectorOrThis
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.BindingTraceContext
@@ -31,6 +35,7 @@ import org.jetbrains.kotlin.resolve.bindingContextUtil.getDataFlowInfoBefore
 import org.jetbrains.kotlin.resolve.calls.CallResolver
 import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall
 import org.jetbrains.kotlin.resolve.calls.model.isReallySuccess
+import org.jetbrains.kotlin.resolve.calls.tower.NewResolvedCallImpl
 import org.jetbrains.kotlin.resolve.calls.util.DelegatingCall
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 import org.jetbrains.kotlin.resolve.scopes.SyntheticScopes
@@ -51,7 +56,7 @@ class RedundantSamConstructorInspection : AbstractKotlinInspection() {
             if (single != null) {
                 val calleeExpression = single.calleeExpression ?: return
                 val problemDescriptor = holder.manager.createProblemDescriptor(
-                    single.getQualifiedExpressionForSelectorOrThis(),
+                    single.getQualifiedExpressionForSelector()?.receiverExpression ?: calleeExpression,
                     single.typeArgumentList ?: calleeExpression,
                     "Redundant SAM-constructor",
                     ProblemHighlightType.LIKE_UNUSED_SYMBOL,
@@ -101,7 +106,7 @@ class RedundantSamConstructorInspection : AbstractKotlinInspection() {
     companion object {
         fun replaceSamConstructorCall(callExpression: KtCallExpression): KtLambdaExpression {
             val functionalArgument = callExpression.samConstructorValueArgument()?.getArgumentExpression()
-                    ?: throw AssertionError("SAM-constructor should have a FunctionLiteralExpression as single argument: ${callExpression.getElementTextWithContext()}")
+                ?: throw AssertionError("SAM-constructor should have a FunctionLiteralExpression as single argument: ${callExpression.getElementTextWithContext()}")
             return callExpression.getQualifiedExpressionForSelectorOrThis().replace(functionalArgument) as KtLambdaExpression
         }
 
@@ -127,7 +132,17 @@ class RedundantSamConstructorInspection : AbstractKotlinInspection() {
 
             if (!resolutionResults.isSuccess) return false
 
-            val samAdapterOriginalDescriptor = SamCodegenUtil.getOriginalIfSamAdapter(resolutionResults.resultingDescriptor) ?: return false
+            val generatingAdditionalSamCandidateIsDisabled =
+                parentCall.languageVersionSettings.supportsFeature(LanguageFeature.SamConversionPerArgument) ||
+                        parentCall.languageVersionSettings.supportsFeature(LanguageFeature.ProhibitVarargAsArrayAfterSamArgument)
+
+            val samAdapterOriginalDescriptor =
+                if (generatingAdditionalSamCandidateIsDisabled && resolutionResults.resultingCall is NewResolvedCallImpl<*>) {
+                    resolutionResults.resultingDescriptor
+                } else {
+                    SamCodegenUtil.getOriginalIfSamAdapter(resolutionResults.resultingDescriptor) ?: return false
+                }
+
             return samAdapterOriginalDescriptor.original == originalCall.resultingDescriptor.original
         }
 
@@ -142,7 +157,7 @@ class RedundantSamConstructorInspection : AbstractKotlinInspection() {
                 newArguments = original.valueArguments.map { argument ->
                     val call = callArgumentMapToConvert[argument]
                     val newExpression = call?.samConstructorValueArgument()?.getArgumentExpression() ?: return@map argument
-                    factory.createArgument(newExpression, argument.getArgumentName()?.asName)
+                    factory.createArgument(newExpression, argument.getArgumentName()?.asName, reformat = false)
                 }
             }
 
@@ -175,7 +190,8 @@ class RedundantSamConstructorInspection : AbstractKotlinInspection() {
             val originalFunctionDescriptor = functionResolvedCall.resultingDescriptor.original as? FunctionDescriptor ?: return emptyList()
             val containingClass = originalFunctionDescriptor.containingDeclaration as? ClassDescriptor ?: return emptyList()
 
-            val syntheticScopes = functionCall.getResolutionFacade().getFrontendService(SyntheticScopes::class.java)
+            val syntheticScopes =
+                functionCall.getResolutionFacade().getFrontendService(SyntheticScopes::class.java).forceEnableSamAdapters()
 
             // SAM adapters for static functions
             val contributedFunctions = syntheticScopes.collectSyntheticStaticFunctions(containingClass.staticScope)

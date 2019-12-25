@@ -67,6 +67,7 @@ class BoxedValueDescriptor(
 
     var isSafeToRemove = true; private set
     val unboxedType: Type = getUnboxedType(boxedType, generationState)
+    val isInlineClassValue = isInlineClassValue(boxedType)
 
     fun getAssociatedInsns() = associatedInsns.toList()
 
@@ -117,6 +118,11 @@ fun getUnboxedType(boxedType: Type, state: GenerationState): Type {
 }
 
 fun unboxedTypeOfInlineClass(boxedType: Type, state: GenerationState): Type? {
-    val descriptor = state.jvmBackendClassResolver.resolveToClassDescriptors(boxedType).singleOrNull() ?: return null
-    return state.typeMapper.mapType(descriptor.defaultType)
+    val descriptor =
+        state.jvmBackendClassResolver.resolveToClassDescriptors(boxedType).singleOrNull()?.takeIf { it.isInline } ?: return null
+    return state.mapInlineClass(descriptor)
+}
+
+private fun isInlineClassValue(boxedType: Type): Boolean {
+    return !AsmUtil.isBoxedPrimitiveType(boxedType) && boxedType != AsmTypes.K_CLASS_TYPE
 }

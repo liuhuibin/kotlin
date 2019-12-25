@@ -1,83 +1,98 @@
 /*
- * Copyright 2010-2017 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.backend.jvm.codegen
 
+import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import org.jetbrains.kotlin.backend.common.CodegenUtil
+import org.jetbrains.kotlin.backend.common.ir.ir2string
+import org.jetbrains.kotlin.codegen.BaseExpressionCodegen
+import org.jetbrains.kotlin.codegen.ClassBuilder
 import org.jetbrains.kotlin.codegen.OwnerKind
-import org.jetbrains.kotlin.codegen.SourceInfo
+import org.jetbrains.kotlin.codegen.coroutines.INVOKE_SUSPEND_METHOD_NAME
 import org.jetbrains.kotlin.codegen.inline.*
+import org.jetbrains.kotlin.codegen.serialization.JvmSerializationBindings
 import org.jetbrains.kotlin.codegen.state.GenerationState
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptorWithSource
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.incremental.components.LookupLocation
 import org.jetbrains.kotlin.incremental.components.NoLookupLocation
 import org.jetbrains.kotlin.ir.declarations.IrClass
-import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.declarations.IrFunction
-import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrMemberAccessExpression
+import org.jetbrains.kotlin.ir.util.isSuspend
+import org.jetbrains.kotlin.ir.util.nameForIrSerialization
+import org.jetbrains.kotlin.ir.util.parentAsClass
+import org.jetbrains.kotlin.ir.util.render
 import org.jetbrains.kotlin.load.java.JvmAbi
+import org.jetbrains.kotlin.psi.KtElement
+import org.jetbrains.kotlin.resolve.DescriptorUtils
+import org.jetbrains.kotlin.resolve.jvm.diagnostics.JvmDeclarationOrigin
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodGenericSignature
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodSignature
-import org.jetbrains.org.objectweb.asm.Label
-import org.jetbrains.org.objectweb.asm.MethodVisitor
+import org.jetbrains.kotlin.resolve.source.getPsi
+import org.jetbrains.org.objectweb.asm.*
+import org.jetbrains.org.objectweb.asm.commons.InstructionAdapter
 import org.jetbrains.org.objectweb.asm.commons.Method
 import org.jetbrains.org.objectweb.asm.tree.MethodNode
 
 class IrSourceCompilerForInline(
     override val state: GenerationState,
     override val callElement: IrMemberAccessExpression,
-    private val codegen: ExpressionCodegen
+    private val callee: IrFunction,
+    internal val codegen: ExpressionCodegen,
+    private val data: BlockInfo
 ) : SourceCompilerForInline {
 
-
-    //TODO
+    //TODO: KotlinLookupLocation(callElement)
     override val lookupLocation: LookupLocation
         get() = NoLookupLocation.FROM_BACKEND
 
-    //TODO
     override val callElementText: String
-        get() = callElement.toString()
+        get() = ir2string(callElement)
 
-    //TODO
     override val callsiteFile: PsiFile?
-        get() = callElement.descriptor.psiElement?.containingFile
+        get() = codegen.context.psiSourceManager.getKtFile(codegen.irFunction.fileParent)
 
     override val contextKind: OwnerKind
-        get() = OwnerKind.getMemberOwnerKind(callElement.descriptor.containingDeclaration)
+        get() = OwnerKind.getMemberOwnerKind(callElement.symbol.descriptor.containingDeclaration!!)
 
     override val inlineCallSiteInfo: InlineCallSiteInfo
-        get() = InlineCallSiteInfo("TODO", null, null)
+        get() {
+            val root = generateSequence(codegen) { it.inlinedInto }.last()
+            return InlineCallSiteInfo(
+                root.classCodegen.type.internalName,
+                root.signature.asmMethod.name,
+                root.signature.asmMethod.descriptor,
+                //compilationContextFunctionDescriptor.isInlineOrInsideInline()
+                false,
+                compilationContextFunctionDescriptor.isSuspend,
+                findElement()?.let { CodegenUtil.getLineNumberForElement(it, false) } ?: 0
+            )
+        }
 
     override val lazySourceMapper: DefaultSourceMapper
         get() = codegen.classCodegen.getOrCreateSourceMapper()
 
-    override fun generateLambdaBody(adapter: MethodVisitor, jvmMethodSignature: JvmMethodSignature, lambdaInfo: ExpressionLambda): SMAP {
-        lambdaInfo as? IrExpressionLambda ?: error("Expecting ir lambda, but $lambdaInfo")
-
-        val functionCodegen = object : FunctionCodegen(lambdaInfo.function, codegen.classCodegen) {
+    private fun makeInlineNode(function: IrFunction, classCodegen: ClassCodegen, isLambda: Boolean): SMAPAndMethodNode {
+        var node: MethodNode? = null
+        val functionCodegen = object : FunctionCodegen(function, classCodegen, codegen.takeIf { isLambda }) {
             override fun createMethod(flags: Int, signature: JvmMethodGenericSignature): MethodVisitor {
-                return adapter
+                val asmMethod = signature.asmMethod
+                node = MethodNode(Opcodes.API_VERSION, flags, asmMethod.name, asmMethod.descriptor, signature.genericsSignature, null)
+                return wrapWithMaxLocalCalc(node!!)
             }
         }
         functionCodegen.generate()
-
-        return SMAP(codegen.classCodegen.getOrCreateSourceMapper().resultMappings)
+        return SMAPAndMethodNode(node!!, SMAP(classCodegen.getOrCreateSourceMapper().resultMappings))
     }
+
+    override fun generateLambdaBody(lambdaInfo: ExpressionLambda): SMAPAndMethodNode =
+        makeInlineNode((lambdaInfo as IrExpressionLambdaImpl).function, codegen.classCodegen, true)
 
     override fun doCreateMethodNodeFromSource(
         callableDescriptor: FunctionDescriptor,
@@ -85,79 +100,139 @@ class IrSourceCompilerForInline(
         callDefault: Boolean,
         asmMethod: Method
     ): SMAPAndMethodNode {
-        assert(callableDescriptor == callElement.descriptor.original)
-        val irFunction = ((callElement as IrCall).symbol.owner as IrFunction).let { irFunction ->
-            if (!callDefault) irFunction
-            else {
-                /*TODO: get rid of hack*/
-                val parent = irFunction.parent
-                val irClass = if (parent is IrFile) parent.declarations.filterIsInstance<IrClass>().single {
-                    //find class for package part
-                    it.thisReceiver == null
-                }
-                else parent as IrClass
-
-                irClass.declarations.filterIsInstance<IrFunction>().single {
-                    it.descriptor.name.asString() == jvmSignature.asmMethod.name + JvmAbi.DEFAULT_PARAMS_IMPL_SUFFIX &&
-                            state.typeMapper.mapSignatureSkipGeneric(callableDescriptor).asmMethod.descriptor.startsWith(
-                                jvmSignature.asmMethod.descriptor.substringBeforeLast(')')
-                            )
-                }
-            }
-        }
-
-        //ExpressionCodegen()
-        var node: MethodNode? = null
-        var maxCalcAdapter: MethodVisitor? = null
-        val functionCodegen = object : FunctionCodegen(irFunction, codegen.classCodegen) {
-            override fun createMethod(flags: Int, signature: JvmMethodGenericSignature): MethodVisitor {
-                node = MethodNode(
-                    API,
-                    flags,
-                    signature.asmMethod.name, signature.asmMethod.descriptor,
-                    signature.genericsSignature, null
-                )
-                maxCalcAdapter = wrapWithMaxLocalCalc(node!!)
-                return maxCalcAdapter!!
-            }
-        }
-        functionCodegen.generate()
-        maxCalcAdapter!!.visitMaxs(-1, -1)
-        maxCalcAdapter!!.visitEnd()
-
-        return SMAPAndMethodNode(node!!, SMAP(/*TODO*/listOf(FileMapping.SKIP)))
+        assert(callableDescriptor == callee.symbol.descriptor.original) { "Expected $callableDescriptor got ${callee.descriptor.original}" }
+        return makeInlineNode(callee, FakeClassCodegen(callee, codegen.classCodegen), false)
     }
 
-    override fun generateAndInsertFinallyBlocks(
-        intoNode: MethodNode,
-        insertPoints: List<MethodInliner.PointForExternalFinallyBlocks>,
-        offsetForFinallyLocalVar: Int
-    ) {
-        //TODO("not implemented")
+    override fun hasFinallyBlocks() = data.hasFinallyBlocks()
+
+    override fun generateFinallyBlocksIfNeeded(finallyCodegen: BaseExpressionCodegen, returnType: Type, afterReturnLabel: Label) {
+        require(finallyCodegen is ExpressionCodegen)
+        finallyCodegen.generateFinallyBlocksIfNeeded(returnType, afterReturnLabel, data)
     }
+
+    override fun createCodegenForExternalFinallyBlockGenerationOnNonLocalReturn(finallyNode: MethodNode, curFinallyDepth: Int) =
+        ExpressionCodegen(
+            codegen.irFunction, codegen.signature, codegen.frameMap, InstructionAdapter(finallyNode), codegen.classCodegen,
+            codegen.inlinedInto
+        ).also {
+            it.finallyDepth = curFinallyDepth
+        }
 
     override fun isCallInsideSameModuleAsDeclared(functionDescriptor: FunctionDescriptor): Boolean {
-        //TODO("not implemented")
-        return true
+        // TODO port to IR structures
+        return DescriptorUtils.areInSameModule(DescriptorUtils.getDirectMember(functionDescriptor), codegen.irFunction.descriptor)
     }
 
     override fun isFinallyMarkerRequired(): Boolean {
-        //TODO("not implemented")
-        return false
+        return codegen.isFinallyMarkerRequired()
     }
 
     override val compilationContextDescriptor: DeclarationDescriptor
-        get() = callElement.descriptor
+        get() = callElement.symbol.descriptor
 
     override val compilationContextFunctionDescriptor: FunctionDescriptor
-        get() = callElement.descriptor as FunctionDescriptor
+        get() = callElement.symbol.descriptor as FunctionDescriptor
 
     override fun getContextLabels(): Set<String> {
-        //TODO
-        return emptySet()
+        val name = codegen.irFunction.name.asString()
+        if (name == INVOKE_SUSPEND_METHOD_NAME) {
+            codegen.context.suspendLambdaToOriginalFunctionMap[codegen.irFunction.parentAsClass.attributeOwnerId]?.let {
+                return setOf(it.name.asString())
+            }
+        }
+        return setOf(name)
     }
 
-    override fun initializeInlineFunctionContext(functionDescriptor: FunctionDescriptor) {
-        //TODO
+    // TODO: Find a way to avoid using PSI here
+    override fun reportSuspensionPointInsideMonitor(stackTraceElement: String) {
+        org.jetbrains.kotlin.codegen.coroutines.reportSuspensionPointInsideMonitor(findElement()!!, state, stackTraceElement)
+    }
+
+    private fun findElement() = (callElement.symbol.descriptor.original as? DeclarationDescriptorWithSource)?.source?.getPsi() as? KtElement
+
+    internal val isPrimaryCopy: Boolean
+        get() = codegen.classCodegen !is FakeClassCodegen
+
+    private class FakeClassCodegen(irFunction: IrFunction, codegen: ClassCodegen) :
+        ClassCodegen(irFunction.parent as IrClass, codegen.context) {
+
+        override fun createClassBuilder(): ClassBuilder {
+            return FakeBuilder
+        }
+
+        companion object {
+            val FakeBuilder = object : ClassBuilder {
+                override fun newField(
+                    origin: JvmDeclarationOrigin,
+                    access: Int,
+                    name: String,
+                    desc: String,
+                    signature: String?,
+                    value: Any?
+                ): FieldVisitor {
+                    TODO("not implemented")
+                }
+
+                override fun newMethod(
+                    origin: JvmDeclarationOrigin,
+                    access: Int,
+                    name: String,
+                    desc: String,
+                    signature: String?,
+                    exceptions: Array<out String>?
+                ): MethodVisitor {
+                    TODO("not implemented")
+                }
+
+                override fun getSerializationBindings(): JvmSerializationBindings {
+                    return JvmSerializationBindings()
+                }
+
+                override fun newAnnotation(desc: String, visible: Boolean): AnnotationVisitor {
+                    TODO("not implemented")
+                }
+
+                override fun done() {
+                    TODO("not implemented")
+                }
+
+                override fun getVisitor(): ClassVisitor {
+                    TODO("not implemented")
+                }
+
+                override fun defineClass(
+                    origin: PsiElement?,
+                    version: Int,
+                    access: Int,
+                    name: String,
+                    signature: String?,
+                    superName: String,
+                    interfaces: Array<out String>
+                ) {
+                    TODO("not implemented")
+                }
+
+                override fun visitSource(name: String, debug: String?) {
+                    TODO("not implemented")
+                }
+
+                override fun visitOuterClass(owner: String, name: String?, desc: String?) {
+                    TODO("not implemented")
+                }
+
+                override fun visitInnerClass(name: String, outerName: String?, innerName: String?, access: Int) {
+                    TODO("not implemented")
+                }
+
+                override fun getThisName(): String {
+                    TODO("not implemented")
+                }
+
+                override fun addSMAP(mapping: FileMapping?) {
+                    TODO("not implemented")
+                }
+            }
+        }
     }
 }

@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.shortenRefs;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.shortenRefs;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -22,11 +21,11 @@ import java.util.regex.Pattern;
 @RunWith(JUnit3RunnerWithInners.class)
 public class ShortenRefsTestGenerated extends AbstractShortenRefsTest {
     private void runTest(String testDataFilePath) throws Exception {
-        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
 
     public void testAllFilesPresentInShortenRefs() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/shortenRefs"), Pattern.compile("^([^.]+)\\.kt$"), TargetBackend.ANY, true);
+        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/shortenRefs"), Pattern.compile("^([^.]+)\\.kt$"), null, true);
     }
 
     @TestMetadata("annotation.kt")
@@ -37,6 +36,11 @@ public class ShortenRefsTestGenerated extends AbstractShortenRefsTest {
     @TestMetadata("callableRefsOnCompanion.kt")
     public void testCallableRefsOnCompanion() throws Exception {
         runTest("idea/testData/shortenRefs/callableRefsOnCompanion.kt");
+    }
+
+    @TestMetadata("classInCompanionObject.kt")
+    public void testClassInCompanionObject() throws Exception {
+        runTest("idea/testData/shortenRefs/classInCompanionObject.kt");
     }
 
     @TestMetadata("ClassNameConflict.kt")
@@ -57,6 +61,21 @@ public class ShortenRefsTestGenerated extends AbstractShortenRefsTest {
     @TestMetadata("descriptorsChangeAfterImportInsertion.kt")
     public void testDescriptorsChangeAfterImportInsertion() throws Exception {
         runTest("idea/testData/shortenRefs/descriptorsChangeAfterImportInsertion.kt");
+    }
+
+    @TestMetadata("extensionForCompanionObject.kt")
+    public void testExtensionForCompanionObject() throws Exception {
+        runTest("idea/testData/shortenRefs/extensionForCompanionObject.kt");
+    }
+
+    @TestMetadata("extensionForObject.kt")
+    public void testExtensionForObject() throws Exception {
+        runTest("idea/testData/shortenRefs/extensionForObject.kt");
+    }
+
+    @TestMetadata("extensionForObject2.kt")
+    public void testExtensionForObject2() throws Exception {
+        runTest("idea/testData/shortenRefs/extensionForObject2.kt");
     }
 
     @TestMetadata("extensionFunctionVarInvokedWithQualifier.kt")
@@ -104,6 +123,11 @@ public class ShortenRefsTestGenerated extends AbstractShortenRefsTest {
         runTest("idea/testData/shortenRefs/PackagesToUseStarImports.kt");
     }
 
+    @TestMetadata("PropertyFunctionConflict.kt")
+    public void testPropertyFunctionConflict() throws Exception {
+        runTest("idea/testData/shortenRefs/PropertyFunctionConflict.kt");
+    }
+
     @TestMetadata("removeCompanionRefInCalleeExpression.kt")
     public void testRemoveCompanionRefInCalleeExpression() throws Exception {
         runTest("idea/testData/shortenRefs/removeCompanionRefInCalleeExpression.kt");
@@ -119,6 +143,11 @@ public class ShortenRefsTestGenerated extends AbstractShortenRefsTest {
         runTest("idea/testData/shortenRefs/shortCompanionRefInsideShortenedCall.kt");
     }
 
+    @TestMetadata("TopLevelFunctionImportWithLotsOfFqName.kt")
+    public void testTopLevelFunctionImportWithLotsOfFqName() throws Exception {
+        runTest("idea/testData/shortenRefs/TopLevelFunctionImportWithLotsOfFqName.kt");
+    }
+
     @TestMetadata("UnresolvedOverload.kt")
     public void testUnresolvedOverload() throws Exception {
         runTest("idea/testData/shortenRefs/UnresolvedOverload.kt");
@@ -129,11 +158,11 @@ public class ShortenRefsTestGenerated extends AbstractShortenRefsTest {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Constructor extends AbstractShortenRefsTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInConstructor() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/shortenRefs/constructor"), Pattern.compile("^([^.]+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/shortenRefs/constructor"), Pattern.compile("^([^.]+)\\.kt$"), null, true);
         }
 
         @TestMetadata("Ambiguous.kt")
@@ -222,11 +251,11 @@ public class ShortenRefsTestGenerated extends AbstractShortenRefsTest {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Imports extends AbstractShortenRefsTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInImports() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/shortenRefs/imports"), Pattern.compile("^([^.]+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/shortenRefs/imports"), Pattern.compile("^([^.]+)\\.kt$"), null, true);
         }
 
         @TestMetadata("importGlobalCallables.kt")
@@ -250,11 +279,11 @@ public class ShortenRefsTestGenerated extends AbstractShortenRefsTest {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Java extends AbstractShortenRefsTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInJava() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/shortenRefs/java"), Pattern.compile("^([^.]+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/shortenRefs/java"), Pattern.compile("^([^.]+)\\.kt$"), null, true);
         }
 
         @TestMetadata("innerClassImport.kt")
@@ -308,11 +337,11 @@ public class ShortenRefsTestGenerated extends AbstractShortenRefsTest {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Kt21515 extends AbstractShortenRefsTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInKt21515() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/shortenRefs/kt21515"), Pattern.compile("^([^.]+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/shortenRefs/kt21515"), Pattern.compile("^([^.]+)\\.kt$"), null, true);
         }
 
         @TestMetadata("callableReferenceOnClass.kt")
@@ -335,6 +364,11 @@ public class ShortenRefsTestGenerated extends AbstractShortenRefsTest {
             runTest("idea/testData/shortenRefs/kt21515/constructor.kt");
         }
 
+        @TestMetadata("staticFromJava.kt")
+        public void testStaticFromJava() throws Exception {
+            runTest("idea/testData/shortenRefs/kt21515/staticFromJava.kt");
+        }
+
         @TestMetadata("typeReference.kt")
         public void testTypeReference() throws Exception {
             runTest("idea/testData/shortenRefs/kt21515/typeReference.kt");
@@ -346,11 +380,11 @@ public class ShortenRefsTestGenerated extends AbstractShortenRefsTest {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class This extends AbstractShortenRefsTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInThis() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/shortenRefs/this"), Pattern.compile("^([^.]+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/shortenRefs/this"), Pattern.compile("^([^.]+)\\.kt$"), null, true);
         }
 
         @TestMetadata("cantShortenThis.kt")
@@ -399,11 +433,11 @@ public class ShortenRefsTestGenerated extends AbstractShortenRefsTest {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Type extends AbstractShortenRefsTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInType() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/shortenRefs/type"), Pattern.compile("^([^.]+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/shortenRefs/type"), Pattern.compile("^([^.]+)\\.kt$"), null, true);
         }
 
         @TestMetadata("ClassNameInsideArguments.kt")
@@ -502,11 +536,11 @@ public class ShortenRefsTestGenerated extends AbstractShortenRefsTest {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Typealias extends AbstractShortenRefsTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInTypealias() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/shortenRefs/typealias"), Pattern.compile("^([^.]+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/shortenRefs/typealias"), Pattern.compile("^([^.]+)\\.kt$"), null, true);
         }
 
         @TestMetadata("TypeAliasAsCtor.kt")

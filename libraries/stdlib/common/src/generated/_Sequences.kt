@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license 
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 @file:kotlin.jvm.JvmMultifileClass
@@ -13,10 +13,7 @@ package kotlin.sequences
 // See: https://github.com/JetBrains/kotlin/tree/master/libraries/stdlib
 //
 
-import kotlin.*
-import kotlin.text.*
-import kotlin.comparisons.*
-import kotlin.coroutines.experimental.*
+import kotlin.random.*
 
 /**
  * Returns `true` if [element] is found in the sequence.
@@ -31,6 +28,8 @@ public operator fun <@kotlin.internal.OnlyInputTypes T> Sequence<T>.contains(ele
  * Returns an element at the given [index] or throws an [IndexOutOfBoundsException] if the [index] is out of bounds of this sequence.
  *
  * The operation is _terminal_.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAt
  */
 public fun <T> Sequence<T>.elementAt(index: Int): T {
     return elementAtOrElse(index) { throw IndexOutOfBoundsException("Sequence doesn't contain element at index $index.") }
@@ -40,6 +39,8 @@ public fun <T> Sequence<T>.elementAt(index: Int): T {
  * Returns an element at the given [index] or the result of calling the [defaultValue] function if the [index] is out of bounds of this sequence.
  *
  * The operation is _terminal_.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrElse
  */
 public fun <T> Sequence<T>.elementAtOrElse(index: Int, defaultValue: (Int) -> T): T {
     if (index < 0)
@@ -58,6 +59,8 @@ public fun <T> Sequence<T>.elementAtOrElse(index: Int, defaultValue: (Int) -> T)
  * Returns an element at the given [index] or `null` if the [index] is out of bounds of this sequence.
  *
  * The operation is _terminal_.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrNull
  */
 public fun <T> Sequence<T>.elementAtOrNull(index: Int): T? {
     if (index < 0)
@@ -146,6 +149,7 @@ public inline fun <T> Sequence<T>.firstOrNull(predicate: (T) -> Boolean): T? {
 public fun <@kotlin.internal.OnlyInputTypes T> Sequence<T>.indexOf(element: T): Int {
     var index = 0
     for (item in this) {
+        checkIndexOverflow(index)
         if (element == item)
             return index
         index++
@@ -161,6 +165,7 @@ public fun <@kotlin.internal.OnlyInputTypes T> Sequence<T>.indexOf(element: T): 
 public inline fun <T> Sequence<T>.indexOfFirst(predicate: (T) -> Boolean): Int {
     var index = 0
     for (item in this) {
+        checkIndexOverflow(index)
         if (predicate(item))
             return index
         index++
@@ -177,6 +182,7 @@ public inline fun <T> Sequence<T>.indexOfLast(predicate: (T) -> Boolean): Int {
     var lastIndex = -1
     var index = 0
     for (item in this) {
+        checkIndexOverflow(index)
         if (predicate(item))
             lastIndex = index
         index++
@@ -229,6 +235,7 @@ public fun <@kotlin.internal.OnlyInputTypes T> Sequence<T>.lastIndexOf(element: 
     var lastIndex = -1
     var index = 0
     for (item in this) {
+        checkIndexOverflow(index)
         if (element == item)
             lastIndex = index
         index++
@@ -339,6 +346,8 @@ public inline fun <T> Sequence<T>.singleOrNull(predicate: (T) -> Boolean): T? {
  * Returns a sequence containing all elements except first [n] elements.
  *
  * The operation is _intermediate_ and _stateless_.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.drop
  */
@@ -471,6 +480,8 @@ public inline fun <T, C : MutableCollection<in T>> Sequence<T>.filterTo(destinat
  *
  * The operation is _intermediate_ and _stateless_.
  * 
+ * @throws IllegalArgumentException if [n] is negative.
+ * 
  * @sample samples.collections.Collections.Transformations.take
  */
 public fun <T> Sequence<T>.take(n: Int): Sequence<T> {
@@ -495,6 +506,8 @@ public fun <T> Sequence<T>.takeWhile(predicate: (T) -> Boolean): Sequence<T> {
 
 /**
  * Returns a sequence that yields elements of this sequence sorted according to their natural sort order.
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
  *
  * The operation is _intermediate_ and _stateful_.
  */
@@ -510,6 +523,8 @@ public fun <T : Comparable<T>> Sequence<T>.sorted(): Sequence<T> {
 
 /**
  * Returns a sequence that yields elements of this sequence sorted according to natural sort order of the value returned by specified [selector] function.
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
  *
  * The operation is _intermediate_ and _stateful_.
  */
@@ -519,6 +534,8 @@ public inline fun <T, R : Comparable<R>> Sequence<T>.sortedBy(crossinline select
 
 /**
  * Returns a sequence that yields elements of this sequence sorted descending according to natural sort order of the value returned by specified [selector] function.
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
  *
  * The operation is _intermediate_ and _stateful_.
  */
@@ -528,6 +545,8 @@ public inline fun <T, R : Comparable<R>> Sequence<T>.sortedByDescending(crossinl
 
 /**
  * Returns a sequence that yields elements of this sequence sorted descending according to their natural sort order.
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
  *
  * The operation is _intermediate_ and _stateful_.
  */
@@ -537,6 +556,8 @@ public fun <T : Comparable<T>> Sequence<T>.sortedDescending(): Sequence<T> {
 
 /**
  * Returns a sequence that yields elements of this sequence sorted according to the specified [comparator].
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
  *
  * The operation is _intermediate_ and _stateful_.
  */
@@ -559,6 +580,8 @@ public fun <T> Sequence<T>.sortedWith(comparator: Comparator<in T>): Sequence<T>
  * The returned map preserves the entry iteration order of the original sequence.
  *
  * The operation is _terminal_.
+ * 
+ * @sample samples.collections.Collections.Transformations.associate
  */
 public inline fun <T, K, V> Sequence<T>.associate(transform: (T) -> Pair<K, V>): Map<K, V> {
     return associateTo(LinkedHashMap<K, V>(), transform)
@@ -573,6 +596,8 @@ public inline fun <T, K, V> Sequence<T>.associate(transform: (T) -> Pair<K, V>):
  * The returned map preserves the entry iteration order of the original sequence.
  *
  * The operation is _terminal_.
+ * 
+ * @sample samples.collections.Collections.Transformations.associateBy
  */
 public inline fun <T, K> Sequence<T>.associateBy(keySelector: (T) -> K): Map<K, T> {
     return associateByTo(LinkedHashMap<K, T>(), keySelector)
@@ -586,6 +611,8 @@ public inline fun <T, K> Sequence<T>.associateBy(keySelector: (T) -> K): Map<K, 
  * The returned map preserves the entry iteration order of the original sequence.
  *
  * The operation is _terminal_.
+ * 
+ * @sample samples.collections.Collections.Transformations.associateByWithValueTransform
  */
 public inline fun <T, K, V> Sequence<T>.associateBy(keySelector: (T) -> K, valueTransform: (T) -> V): Map<K, V> {
     return associateByTo(LinkedHashMap<K, V>(), keySelector, valueTransform)
@@ -599,6 +626,8 @@ public inline fun <T, K, V> Sequence<T>.associateBy(keySelector: (T) -> K, value
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  *
  * The operation is _terminal_.
+ * 
+ * @sample samples.collections.Collections.Transformations.associateByTo
  */
 public inline fun <T, K, M : MutableMap<in K, in T>> Sequence<T>.associateByTo(destination: M, keySelector: (T) -> K): M {
     for (element in this) {
@@ -615,6 +644,8 @@ public inline fun <T, K, M : MutableMap<in K, in T>> Sequence<T>.associateByTo(d
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  *
  * The operation is _terminal_.
+ * 
+ * @sample samples.collections.Collections.Transformations.associateByToWithValueTransform
  */
 public inline fun <T, K, V, M : MutableMap<in K, in V>> Sequence<T>.associateByTo(destination: M, keySelector: (T) -> K, valueTransform: (T) -> V): M {
     for (element in this) {
@@ -630,10 +661,48 @@ public inline fun <T, K, V, M : MutableMap<in K, in V>> Sequence<T>.associateByT
  * If any of two pairs would have the same key the last one gets added to the map.
  *
  * The operation is _terminal_.
+ * 
+ * @sample samples.collections.Collections.Transformations.associateTo
  */
 public inline fun <T, K, V, M : MutableMap<in K, in V>> Sequence<T>.associateTo(destination: M, transform: (T) -> Pair<K, V>): M {
     for (element in this) {
         destination += transform(element)
+    }
+    return destination
+}
+
+/**
+ * Returns a [Map] where keys are elements from the given sequence and values are
+ * produced by the [valueSelector] function applied to each element.
+ * 
+ * If any two elements are equal, the last one gets added to the map.
+ * 
+ * The returned map preserves the entry iteration order of the original sequence.
+ *
+ * The operation is _terminal_.
+ * 
+ * @sample samples.collections.Collections.Transformations.associateWith
+ */
+@SinceKotlin("1.3")
+public inline fun <K, V> Sequence<K>.associateWith(valueSelector: (K) -> V): Map<K, V> {
+    val result = LinkedHashMap<K, V>()
+    return associateWithTo(result, valueSelector)
+}
+
+/**
+ * Populates and returns the [destination] mutable map with key-value pairs for each element of the given sequence,
+ * where key is the element itself and value is provided by the [valueSelector] function applied to that key.
+ * 
+ * If any two elements are equal, the last one overwrites the former value in the map.
+ *
+ * The operation is _terminal_.
+ * 
+ * @sample samples.collections.Collections.Transformations.associateWithTo
+ */
+@SinceKotlin("1.3")
+public inline fun <K, V, M : MutableMap<in K, in V>> Sequence<K>.associateWithTo(destination: M, valueSelector: (K) -> V): M {
+    for (element in this) {
+        destination.put(element, valueSelector(element))
     }
     return destination
 }
@@ -692,6 +761,8 @@ public fun <T> Sequence<T>.toSet(): Set<T> {
  * Returns a single sequence of all elements from results of [transform] function being invoked on each element of original sequence.
  *
  * The operation is _intermediate_ and _stateless_.
+ * 
+ * @sample samples.collections.Collections.Transformations.flatMap
  */
 public fun <T, R> Sequence<T>.flatMap(transform: (T) -> Sequence<R>): Sequence<R> {
     return FlatteningSequence(this, transform, { it.iterator() })
@@ -784,7 +855,7 @@ public inline fun <T, K, V, M : MutableMap<in K, MutableList<V>>> Sequence<T>.gr
  *
  * The operation is _intermediate_ and _stateless_.
  * 
- * @sample samples.collections.Collections.Transformations.groupingByEachCount
+ * @sample samples.collections.Grouping.groupingByEachCount
  */
 @SinceKotlin("1.1")
 public inline fun <T, K> Sequence<T>.groupingBy(crossinline keySelector: (T) -> K): Grouping<T, K> {
@@ -799,6 +870,8 @@ public inline fun <T, K> Sequence<T>.groupingBy(crossinline keySelector: (T) -> 
  * to each element in the original sequence.
  *
  * The operation is _intermediate_ and _stateless_.
+ * 
+ * @sample samples.collections.Collections.Transformations.map
  */
 public fun <T, R> Sequence<T>.map(transform: (T) -> R): Sequence<R> {
     return TransformingSequence(this, transform)
@@ -852,7 +925,7 @@ public inline fun <T, R : Any, C : MutableCollection<in R>> Sequence<T>.mapIndex
 public inline fun <T, R, C : MutableCollection<in R>> Sequence<T>.mapIndexedTo(destination: C, transform: (index: Int, T) -> R): C {
     var index = 0
     for (item in this)
-        destination.add(transform(index++, item))
+        destination.add(transform(checkIndexOverflow(index++), item))
     return destination
 }
 
@@ -890,7 +963,8 @@ public inline fun <T, R, C : MutableCollection<in R>> Sequence<T>.mapTo(destinat
 }
 
 /**
- * Returns a sequence of [IndexedValue] for each element of the original sequence.
+ * Returns a sequence that wraps each element of the original sequence
+ * into an [IndexedValue] containing the index of that element and the element itself.
  *
  * The operation is _intermediate_ and _stateless_.
  */
@@ -904,6 +978,8 @@ public fun <T> Sequence<T>.withIndex(): Sequence<IndexedValue<T>> {
  * The elements in the resulting sequence are in the same order as they were in the source sequence.
  *
  * The operation is _intermediate_ and _stateful_.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public fun <T> Sequence<T>.distinct(): Sequence<T> {
     return this.distinctBy { it }
@@ -916,6 +992,8 @@ public fun <T> Sequence<T>.distinct(): Sequence<T> {
  * The elements in the resulting sequence are in the same order as they were in the source sequence.
  *
  * The operation is _intermediate_ and _stateful_.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public fun <T, K> Sequence<T>.distinctBy(selector: (T) -> K): Sequence<T> {
     return DistinctSequence(this, selector)
@@ -976,7 +1054,7 @@ public inline fun <T> Sequence<T>.any(predicate: (T) -> Boolean): Boolean {
  */
 public fun <T> Sequence<T>.count(): Int {
     var count = 0
-    for (element in this) count++
+    for (element in this) checkCountOverflow(++count)
     return count
 }
 
@@ -987,7 +1065,7 @@ public fun <T> Sequence<T>.count(): Int {
  */
 public inline fun <T> Sequence<T>.count(predicate: (T) -> Boolean): Int {
     var count = 0
-    for (element in this) if (predicate(element)) count++
+    for (element in this) if (predicate(element)) checkCountOverflow(++count)
     return count
 }
 
@@ -1013,7 +1091,7 @@ public inline fun <T, R> Sequence<T>.fold(initial: R, operation: (acc: R, T) -> 
 public inline fun <T, R> Sequence<T>.foldIndexed(initial: R, operation: (index: Int, acc: R, T) -> R): R {
     var index = 0
     var accumulator = initial
-    for (element in this) accumulator = operation(index++, accumulator, element)
+    for (element in this) accumulator = operation(checkIndexOverflow(index++), accumulator, element)
     return accumulator
 }
 
@@ -1035,7 +1113,7 @@ public inline fun <T> Sequence<T>.forEach(action: (T) -> Unit): Unit {
  */
 public inline fun <T> Sequence<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit {
     var index = 0
-    for (item in this) action(index++, item)
+    for (item in this) action(checkIndexOverflow(index++), item)
 }
 
 /**
@@ -1100,20 +1178,23 @@ public fun <T : Comparable<T>> Sequence<T>.max(): T? {
  * Returns the first element yielding the largest value of the given function or `null` if there are no elements.
  *
  * The operation is _terminal_.
+ * 
+ * @sample samples.collections.Collections.Aggregates.maxBy
  */
 public inline fun <T, R : Comparable<R>> Sequence<T>.maxBy(selector: (T) -> R): T? {
     val iterator = iterator()
     if (!iterator.hasNext()) return null
     var maxElem = iterator.next()
+    if (!iterator.hasNext()) return maxElem
     var maxValue = selector(maxElem)
-    while (iterator.hasNext()) {
+    do {
         val e = iterator.next()
         val v = selector(e)
         if (maxValue < v) {
             maxElem = e
             maxValue = v
         }
-    }
+    } while (iterator.hasNext())
     return maxElem
 }
 
@@ -1195,20 +1276,23 @@ public fun <T : Comparable<T>> Sequence<T>.min(): T? {
  * Returns the first element yielding the smallest value of the given function or `null` if there are no elements.
  *
  * The operation is _terminal_.
+ * 
+ * @sample samples.collections.Collections.Aggregates.minBy
  */
 public inline fun <T, R : Comparable<R>> Sequence<T>.minBy(selector: (T) -> R): T? {
     val iterator = iterator()
     if (!iterator.hasNext()) return null
     var minElem = iterator.next()
+    if (!iterator.hasNext()) return minElem
     var minValue = selector(minElem)
-    while (iterator.hasNext()) {
+    do {
         val e = iterator.next()
         val v = selector(e)
         if (minValue > v) {
             minElem = e
             minValue = v
         }
-    }
+    } while (iterator.hasNext())
     return minElem
 }
 
@@ -1293,7 +1377,7 @@ public inline fun <S, T : S> Sequence<T>.reduceIndexed(operation: (index: Int, a
     var index = 1
     var accumulator: S = iterator.next()
     while (iterator.hasNext()) {
-        accumulator = operation(index++, accumulator, iterator.next())
+        accumulator = operation(checkIndexOverflow(index++), accumulator, iterator.next())
     }
     return accumulator
 }
@@ -1389,6 +1473,9 @@ public operator fun <T> Sequence<T>.minus(element: T): Sequence<T> {
  * 
  * Note that the source sequence and the array being subtracted are iterated only when an `iterator` is requested from
  * the resulting sequence. Changing any of them between successive calls to `iterator` may affect the result.
+ * 
+ * The [elements] array may be converted to a [HashSet] to speed up the operation, thus the elements are required to have
+ * a correct and stable implementation of `hashCode()` that doesn't change between successive invocations.
  *
  * The operation is _intermediate_ and _stateful_.
  */
@@ -1407,6 +1494,9 @@ public operator fun <T> Sequence<T>.minus(elements: Array<out T>): Sequence<T> {
  * 
  * Note that the source sequence and the collection being subtracted are iterated only when an `iterator` is requested from
  * the resulting sequence. Changing any of them between successive calls to `iterator` may affect the result.
+ * 
+ * The [elements] collection may be converted to a [HashSet] to speed up the operation, thus the elements are required to have
+ * a correct and stable implementation of `hashCode()` that doesn't change between successive invocations.
  *
  * The operation is _intermediate_ and _stateful_.
  */
@@ -1429,6 +1519,9 @@ public operator fun <T> Sequence<T>.minus(elements: Iterable<T>): Sequence<T> {
  * the resulting sequence. Changing any of them between successive calls to `iterator` may affect the result.
  * 
  * The operation is _intermediate_ for this sequence and _terminal_ and _stateful_ for the [elements] sequence.
+ * 
+ * The [elements] sequence may be converted to a [HashSet] to speed up the operation, thus the elements are required to have
+ * a correct and stable implementation of `hashCode()` that doesn't change between successive invocations.
  */
 public operator fun <T> Sequence<T>.minus(elements: Sequence<T>): Sequence<T> {
     return object: Sequence<T> {
@@ -1620,7 +1713,7 @@ public fun <T> Sequence<T>.zipWithNext(): Sequence<Pair<T, T>> {
  */
 @SinceKotlin("1.2")
 public fun <T, R> Sequence<T>.zipWithNext(transform: (a: T, b: T) -> R): Sequence<R> {
-    return buildSequence result@ {
+    return sequence result@ {
         val iterator = iterator()
         if (!iterator.hasNext()) return@result
         var current = iterator.next()
@@ -1696,7 +1789,7 @@ public fun Sequence<Byte>.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        checkCountOverflow(++count)
     }
     return if (count == 0) Double.NaN else sum / count
 }
@@ -1712,7 +1805,7 @@ public fun Sequence<Short>.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        checkCountOverflow(++count)
     }
     return if (count == 0) Double.NaN else sum / count
 }
@@ -1728,7 +1821,7 @@ public fun Sequence<Int>.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        checkCountOverflow(++count)
     }
     return if (count == 0) Double.NaN else sum / count
 }
@@ -1744,7 +1837,7 @@ public fun Sequence<Long>.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        checkCountOverflow(++count)
     }
     return if (count == 0) Double.NaN else sum / count
 }
@@ -1760,7 +1853,7 @@ public fun Sequence<Float>.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        checkCountOverflow(++count)
     }
     return if (count == 0) Double.NaN else sum / count
 }
@@ -1776,7 +1869,7 @@ public fun Sequence<Double>.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        checkCountOverflow(++count)
     }
     return if (count == 0) Double.NaN else sum / count
 }

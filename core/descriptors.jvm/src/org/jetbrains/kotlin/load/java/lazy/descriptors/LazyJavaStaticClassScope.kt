@@ -35,9 +35,9 @@ import org.jetbrains.kotlin.resolve.scopes.MemberScope
 import org.jetbrains.kotlin.utils.DFS
 
 class LazyJavaStaticClassScope(
-        c: LazyJavaResolverContext,
-        private val jClass: JavaClass,
-        override val ownerDescriptor: LazyJavaClassDescriptor
+    c: LazyJavaResolverContext,
+    private val jClass: JavaClass,
+    override val ownerDescriptor: LazyJavaClassDescriptor
 ) : LazyJavaStaticScope(c) {
 
     override fun computeMemberIndex() = ClassDeclaredMemberIndex(jClass) { it.isStatic }
@@ -64,7 +64,14 @@ class LazyJavaStaticClassScope(
 
     override fun computeNonDeclaredFunctions(result: MutableCollection<SimpleFunctionDescriptor>, name: Name) {
         val functionsFromSupertypes = getStaticFunctionsFromJavaSuperClasses(name, ownerDescriptor)
-        result.addAll(resolveOverridesForStaticMembers(name, functionsFromSupertypes, result, ownerDescriptor, c.components.errorReporter))
+        result.addAll(resolveOverridesForStaticMembers(
+            name,
+            functionsFromSupertypes,
+            result,
+            ownerDescriptor,
+            c.components.errorReporter,
+            c.components.kotlinTypeChecker.overridingUtil
+        ))
 
         if (jClass.isEnum) {
             when (name) {
@@ -80,15 +87,24 @@ class LazyJavaStaticClassScope(
         }
 
         if (result.isNotEmpty()) {
-            result.addAll(resolveOverridesForStaticMembers(
-                    name, propertiesFromSupertypes, result, ownerDescriptor, c.components.errorReporter
-            ))
-        }
-        else {
+            result.addAll(
+                resolveOverridesForStaticMembers(
+                    name,
+                    propertiesFromSupertypes,
+                    result,
+                    ownerDescriptor,
+                    c.components.errorReporter,
+                    c.components.kotlinTypeChecker.overridingUtil
+                )
+            )
+        } else {
             result.addAll(propertiesFromSupertypes.groupBy {
                 it.realOriginal
             }.flatMap {
-                resolveOverridesForStaticMembers(name, it.value, result, ownerDescriptor, c.components.errorReporter)
+                resolveOverridesForStaticMembers(
+                    name, it.value, result, ownerDescriptor, c.components.errorReporter,
+                    c.components.kotlinTypeChecker.overridingUtil
+                )
             })
         }
     }
@@ -99,14 +115,14 @@ class LazyJavaStaticClassScope(
     }
 
     private fun <R> flatMapJavaStaticSupertypesScopes(
-            root: ClassDescriptor,
-            result: MutableSet<R>,
-            onJavaStaticScope: (MemberScope) -> Collection<R>
+        root: ClassDescriptor,
+        result: MutableSet<R>,
+        onJavaStaticScope: (MemberScope) -> Collection<R>
     ): Set<R> {
         DFS.dfs(listOf(root),
                 {
-                    it.typeConstructor.supertypes.asSequence().mapNotNull {
-                        supertype -> supertype.constructor.declarationDescriptor as? ClassDescriptor
+                    it.typeConstructor.supertypes.asSequence().mapNotNull { supertype ->
+                        supertype.constructor.declarationDescriptor as? ClassDescriptor
                     }.asIterable()
                 },
                 object : DFS.AbstractNodeHandler<ClassDescriptor, Unit>() {

@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.quickfix
@@ -35,9 +24,12 @@ import org.jetbrains.kotlin.idea.util.IdeDescriptorRenderers
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.createSmartPointer
 import org.jetbrains.kotlin.psi.psiUtil.endOffset
+import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
+import org.jetbrains.kotlin.psi.psiUtil.hasExpectModifier
 import org.jetbrains.kotlin.renderer.DescriptorRenderer
 import org.jetbrains.kotlin.renderer.render
 import org.jetbrains.kotlin.resolve.BindingContext
+import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.TypeConstructorSubstitution
@@ -64,7 +56,9 @@ object SuperClassNotInitialized : KotlinIntentionActionsFactory() {
         val constructors = superClass.constructors.filter {
             it.isVisible(classDescriptor) || (superClass.modality == Modality.SEALED && inSameFile)
         }
-        if (constructors.isEmpty()) return emptyList() // no accessible constructor
+        if (constructors.isEmpty() && (!superClass.isExpect || superClass.kind != ClassKind.CLASS)) {
+            return emptyList() // no accessible constructor
+        }
 
         val fixes = ArrayList<IntentionAction>()
 
@@ -81,8 +75,10 @@ object SuperClassNotInitialized : KotlinIntentionActionsFactory() {
                 val substitutor = TypeConstructorSubstitution.create(superClass.typeConstructor, superType.arguments).buildSubstitutor()
 
                 val substitutedConstructors = constructors
+                    .asSequence()
                     .filter { it.valueParameters.isNotEmpty() }
                     .mapNotNull { it.substitute(substitutor) }
+                    .toList()
 
                 if (substitutedConstructors.isNotEmpty()) {
                     val parameterTypes: List<List<KotlinType>> = substitutedConstructors.map {
@@ -91,7 +87,7 @@ object SuperClassNotInitialized : KotlinIntentionActionsFactory() {
 
                     fun canRenderOnlyFirstParameters(n: Int) = parameterTypes.map { it.take(n) }.toSet().size == parameterTypes.size
 
-                    val maxParams = parameterTypes.map { it.size }.max()!!
+                    val maxParams = parameterTypes.asSequence().map { it.size }.max()!!
                     val maxParamsToDisplay = if (maxParams <= DISPLAY_MAX_PARAMS) {
                         maxParams
                     } else {
@@ -99,7 +95,9 @@ object SuperClassNotInitialized : KotlinIntentionActionsFactory() {
                     }
 
                     for ((constructor, types) in substitutedConstructors.zip(parameterTypes)) {
-                        val typesRendered = types.take(maxParamsToDisplay).map { DescriptorRenderer.SHORT_NAMES_IN_TYPES.renderType(it) }
+                        val typesRendered =
+                            types.asSequence().take(maxParamsToDisplay).map { DescriptorRenderer.SHORT_NAMES_IN_TYPES.renderType(it) }
+                                .toList()
                         val parameterString = typesRendered.joinToString(", ", "(", if (types.size <= maxParamsToDisplay) ")" else ",...)")
                         val text = "Add constructor parameters from " + superClass.name.asString() + parameterString
                         fixes.addIfNotNull(AddParametersFix.create(delegator, classOrObjectDeclaration, constructor, text))
@@ -122,7 +120,13 @@ object SuperClassNotInitialized : KotlinIntentionActionsFactory() {
 
         override fun invoke(project: Project, editor: Editor?, file: KtFile) {
             val element = element ?: return
+            val context = (element.getStrictParentOfType<KtClassOrObject>() ?: element).analyze()
+            val baseClass = AddDefaultConstructorFix.superTypeEntryToClass(element, context)
+
             val newSpecifier = element.replaced(KtPsiFactory(project).createSuperTypeCallEntry(element.text + "()"))
+            if (baseClass != null && baseClass.hasExpectModifier() && baseClass.secondaryConstructors.isEmpty()) {
+                baseClass.createPrimaryConstructorIfAbsent()
+            }
 
             if (putCaretIntoParenthesis) {
                 if (editor != null) {
@@ -174,14 +178,21 @@ object SuperClassNotInitialized : KotlinIntentionActionsFactory() {
                     val existingParameter = oldParameters.firstOrNull { it.name == nameString }
                     if (existingParameter != null) {
                         val type = (existingParameter.resolveToParameterDescriptorIfAny() as? VariableDescriptor)?.type
-                                ?: return null
+                            ?: return null
                         if (type.isSubtypeOf(parameter.type)) continue // use existing parameter
                     }
 
-                    val parameterText = if (varargElementType != null)
+                    val defaultValue = if (parameter.declaresDefaultValue()) {
+                        (DescriptorToSourceUtils.descriptorToDeclaration(parameter) as? KtParameter)
+                            ?.defaultValue?.text?.let { " = $it" } ?: ""
+                    } else {
+                        ""
+                    }
+                    val parameterText = if (varargElementType != null) {
                         "vararg " + nameRendered + ":" + IdeDescriptorRenderers.SOURCE_CODE.renderType(varargElementType)
-                    else
+                    } else {
                         nameRendered + ":" + IdeDescriptorRenderers.SOURCE_CODE.renderType(parameter.type)
+                    } + defaultValue
                     parametersToAdd.add(KtPsiFactory(element).createParameter(parameterText))
                 }
 

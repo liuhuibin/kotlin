@@ -18,14 +18,17 @@ package org.jetbrains.kotlin.resolve.checkers
 
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
-import org.jetbrains.kotlin.config.AnalysisFlag
+import org.jetbrains.kotlin.config.AnalysisFlags
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.diagnostics.DiagnosticFactory1
 import org.jetbrains.kotlin.diagnostics.Errors
+import org.jetbrains.kotlin.diagnostics.reportDiagnosticOnce
 import org.jetbrains.kotlin.incremental.components.NoLookupLocation
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
 import org.jetbrains.kotlin.psi.psiUtil.getTopmostParentQualifiedExpressionForSelector
 import org.jetbrains.kotlin.resolve.*
 import org.jetbrains.kotlin.resolve.calls.checkers.CallChecker
@@ -34,9 +37,12 @@ import org.jetbrains.kotlin.resolve.calls.model.ResolvedCall
 import org.jetbrains.kotlin.resolve.constants.ArrayValue
 import org.jetbrains.kotlin.resolve.constants.EnumValue
 import org.jetbrains.kotlin.resolve.constants.KClassValue
+import org.jetbrains.kotlin.resolve.deprecation.CoroutineCompatibilitySupport
+import org.jetbrains.kotlin.resolve.deprecation.DeprecationLevelValue
+import org.jetbrains.kotlin.resolve.deprecation.DeprecationResolver
+import org.jetbrains.kotlin.resolve.deprecation.DeprecationSettings
 import org.jetbrains.kotlin.resolve.descriptorUtil.annotationClass
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
-import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameUnsafe
 import org.jetbrains.kotlin.resolve.descriptorUtil.module
 import org.jetbrains.kotlin.storage.LockBasedStorageManager
 import org.jetbrains.kotlin.utils.SmartSet
@@ -45,13 +51,18 @@ import org.jetbrains.kotlin.utils.addIfNotNull
 class ExperimentalUsageChecker(project: Project) : CallChecker {
     private val moduleAnnotationsResolver = ModuleAnnotationsResolver.getInstance(project)
 
-    internal data class Experimentality(val annotationFqName: FqName, val severity: Severity) {
+    data class Experimentality(val annotationFqName: FqName, val severity: Severity) {
         enum class Severity { WARNING, ERROR }
 
         companion object {
             val DEFAULT_SEVERITY = Severity.ERROR
         }
     }
+
+    data class ExperimentalityDiagnostics(
+        val warning: DiagnosticFactory1<PsiElement, FqName>,
+        val error: DiagnosticFactory1<PsiElement, FqName>
+    )
 
     override fun check(resolvedCall: ResolvedCall<*>, reportOn: PsiElement, context: CallCheckerContext) {
         val experimentalities =
@@ -60,8 +71,14 @@ class ExperimentalUsageChecker(project: Project) : CallChecker {
     }
 
     companion object {
-        val EXPERIMENTAL_FQ_NAME = FqName("kotlin.Experimental")
-        val USE_EXPERIMENTAL_FQ_NAME = FqName("kotlin.UseExperimental")
+        val OLD_EXPERIMENTAL_FQ_NAME = FqName("kotlin.Experimental")
+        val OLD_USE_EXPERIMENTAL_FQ_NAME = FqName("kotlin.UseExperimental")
+        val REQUIRES_OPT_IN_FQ_NAME = FqName("kotlin.RequiresOptIn")
+        val OPT_IN_FQ_NAME = FqName("kotlin.OptIn")
+
+        val EXPERIMENTAL_FQ_NAMES = setOf(OLD_EXPERIMENTAL_FQ_NAME, REQUIRES_OPT_IN_FQ_NAME)
+        val USE_EXPERIMENTAL_FQ_NAMES = setOf(OLD_USE_EXPERIMENTAL_FQ_NAME, OPT_IN_FQ_NAME)
+
         internal val WAS_EXPERIMENTAL_FQ_NAME = FqName("kotlin.WasExperimental")
         internal val USE_EXPERIMENTAL_ANNOTATION_CLASS = Name.identifier("markerClass")
         internal val WAS_EXPERIMENTAL_ANNOTATION_CLASS = Name.identifier("markerClass")
@@ -70,24 +87,37 @@ class ExperimentalUsageChecker(project: Project) : CallChecker {
         private val WARNING_LEVEL = Name.identifier("WARNING")
         private val ERROR_LEVEL = Name.identifier("ERROR")
 
-        private val EXPERIMENTAL_SHORT_NAME = EXPERIMENTAL_FQ_NAME.shortName()
-        private val USE_EXPERIMENTAL_SHORT_NAME = USE_EXPERIMENTAL_FQ_NAME.shortName()
+        private val EXPERIMENTAL_API_DIAGNOSTICS = ExperimentalityDiagnostics(
+            Errors.EXPERIMENTAL_API_USAGE, Errors.EXPERIMENTAL_API_USAGE_ERROR
+        )
 
-        private fun reportNotAcceptedExperimentalities(
+        fun reportNotAcceptedExperimentalities(
             experimentalities: Collection<Experimentality>, element: PsiElement, context: CheckerContext
         ) {
+            reportNotAcceptedExperimentalities(
+                experimentalities, element, context.languageVersionSettings, context.trace, EXPERIMENTAL_API_DIAGNOSTICS
+            )
+        }
+
+        fun reportNotAcceptedExperimentalities(
+            experimentalities: Collection<Experimentality>,
+            element: PsiElement,
+            languageVersionSettings: LanguageVersionSettings,
+            trace: BindingTrace,
+            diagnostics: ExperimentalityDiagnostics
+        ) {
             for ((annotationFqName, severity) in experimentalities) {
-                if (!element.isExperimentalityAccepted(annotationFqName, context)) {
+                if (!element.isExperimentalityAccepted(annotationFqName, languageVersionSettings, trace.bindingContext)) {
                     val diagnostic = when (severity) {
-                        Experimentality.Severity.WARNING -> Errors.EXPERIMENTAL_API_USAGE
-                        Experimentality.Severity.ERROR -> Errors.EXPERIMENTAL_API_USAGE_ERROR
+                        Experimentality.Severity.WARNING -> diagnostics.warning
+                        Experimentality.Severity.ERROR -> diagnostics.error
                     }
-                    context.trace.report(diagnostic.on(element, annotationFqName))
+                    trace.reportDiagnosticOnce(diagnostic.on(element, annotationFqName))
                 }
             }
         }
 
-        private fun DeclarationDescriptor.loadExperimentalities(
+        fun DeclarationDescriptor.loadExperimentalities(
             moduleAnnotationsResolver: ModuleAnnotationsResolver,
             languageVersionSettings: LanguageVersionSettings
         ): Set<Experimentality> {
@@ -118,7 +148,10 @@ class ExperimentalUsageChecker(project: Project) : CallChecker {
         }
 
         internal fun ClassDescriptor.loadExperimentalityForMarkerAnnotation(): Experimentality? {
-            val experimental = annotations.findAnnotation(EXPERIMENTAL_FQ_NAME) ?: return null
+            val experimental =
+                annotations.findAnnotation(REQUIRES_OPT_IN_FQ_NAME)
+                    ?: annotations.findAnnotation(OLD_EXPERIMENTAL_FQ_NAME)
+                    ?: return null
 
             val severity = when ((experimental.allValueArguments[LEVEL] as? EnumValue)?.enumEntryName) {
                 WARNING_LEVEL -> Experimentality.Severity.WARNING
@@ -141,8 +174,8 @@ class ExperimentalUsageChecker(project: Project) : CallChecker {
             languageVersionSettings: LanguageVersionSettings,
             bindingContext: BindingContext
         ): Boolean =
-            annotationFqName.asString() in languageVersionSettings.getFlag(AnalysisFlag.experimental) ||
-                    annotationFqName.asString() in languageVersionSettings.getFlag(AnalysisFlag.useExperimental) ||
+            annotationFqName.asString() in languageVersionSettings.getFlag(AnalysisFlags.experimental) ||
+                    annotationFqName.asString() in languageVersionSettings.getFlag(AnalysisFlags.useExperimental) ||
                     anyParentMatches { element ->
                         element.isDeclarationAnnotatedWith(annotationFqName, bindingContext) ||
                                 element.isElementAnnotatedWithUseExperimentalOf(annotationFqName, bindingContext)
@@ -159,10 +192,13 @@ class ExperimentalUsageChecker(project: Project) : CallChecker {
         private fun PsiElement.isElementAnnotatedWithUseExperimentalOf(annotationFqName: FqName, bindingContext: BindingContext): Boolean {
             return this is KtAnnotated && annotationEntries.any { entry ->
                 val descriptor = bindingContext.get(BindingContext.ANNOTATION, entry)
-                if (descriptor?.fqName == USE_EXPERIMENTAL_FQ_NAME) {
+                if (descriptor != null && descriptor.fqName in USE_EXPERIMENTAL_FQ_NAMES) {
                     val annotationClasses = descriptor.allValueArguments[USE_EXPERIMENTAL_ANNOTATION_CLASS]
                     annotationClasses is ArrayValue && annotationClasses.value.any { annotationClass ->
-                        (annotationClass as? KClassValue)?.value?.constructor?.declarationDescriptor?.fqNameSafe == annotationFqName
+                        annotationClass is KClassValue && annotationClass.value.let { value ->
+                            value is KClassValue.Value.NormalClass &&
+                                    value.classId.asSingleFqName() == annotationFqName && value.arrayDimensions == 0
+                        }
                     }
                 } else false
             }
@@ -185,36 +221,35 @@ class ExperimentalUsageChecker(project: Project) : CallChecker {
             // Ideally, we should run full resolution (with all classifier usage checkers) on classifiers used in "-Xexperimental" and
             // "-Xuse-experimental" arguments. However, it's not easy to do this. This should be solved in the future with the support of
             // module annotations. For now, we only check deprecations because this is needed to correctly retire unneeded compiler arguments.
-            val deprecationResolver = DeprecationResolver(LockBasedStorageManager(), languageVersionSettings)
+            val deprecationResolver =
+                DeprecationResolver(LockBasedStorageManager("ExperimentalUsageChecker"), languageVersionSettings, CoroutineCompatibilitySupport.ENABLED, DeprecationSettings.Default)
 
+            // Returns true if fqName refers to a valid experimental API marker.
             fun checkAnnotation(fqName: String): Boolean {
                 val descriptor = module.resolveClassByFqName(FqName(fqName), NoLookupLocation.FOR_NON_TRACKED_SCOPE)
-                val experimentality = descriptor?.loadExperimentalityForMarkerAnnotation()
-                val message = when {
-                    descriptor == null ->
-                        "Experimental API marker $fqName is unresolved. Please make sure it's present in the module dependencies"
-                    experimentality == null ->
-                        "Class $fqName is not an experimental API marker annotation"
-                    else -> {
-                        for (deprecation in deprecationResolver.getDeprecations(descriptor)) {
-                            val report = when (deprecation.deprecationLevel) {
-                                DeprecationLevelValue.WARNING -> reportWarning
-                                DeprecationLevelValue.ERROR, DeprecationLevelValue.HIDDEN -> reportError
-                            }
-                            report("Experimental API marker $fqName is deprecated" + deprecation.message?.let { ". $it" }.orEmpty())
-                        }
-                        return true
-                    }
+                if (descriptor == null) {
+                    reportWarning("Experimental API marker $fqName is unresolved. Please make sure it's present in the module dependencies")
+                    return false
                 }
 
-                reportError(message)
+                if (descriptor.loadExperimentalityForMarkerAnnotation() == null) {
+                    reportWarning("Class $fqName is not an experimental API marker annotation")
+                    return false
+                }
 
-                return false
+                for (deprecation in deprecationResolver.getDeprecations(descriptor)) {
+                    val report = when (deprecation.deprecationLevel) {
+                        DeprecationLevelValue.WARNING -> reportWarning
+                        DeprecationLevelValue.ERROR, DeprecationLevelValue.HIDDEN -> reportError
+                    }
+                    report("Experimental API marker $fqName is deprecated" + deprecation.message?.let { ". $it" }.orEmpty())
+                }
+                return true
             }
 
-            val validExperimental = languageVersionSettings.getFlag(AnalysisFlag.experimental).filter(::checkAnnotation)
-            val validUseExperimental = languageVersionSettings.getFlag(AnalysisFlag.useExperimental).filter { fqName ->
-                fqName == EXPERIMENTAL_FQ_NAME.asString() || checkAnnotation(fqName)
+            val validExperimental = languageVersionSettings.getFlag(AnalysisFlags.experimental).filter(::checkAnnotation)
+            val validUseExperimental = languageVersionSettings.getFlag(AnalysisFlags.useExperimental).filter { fqName ->
+                fqName == REQUIRES_OPT_IN_FQ_NAME.asString() || fqName == OLD_EXPERIMENTAL_FQ_NAME.asString() || checkAnnotation(fqName)
             }
 
             for (fqName in validExperimental.intersect(validUseExperimental)) {
@@ -228,16 +263,14 @@ class ExperimentalUsageChecker(project: Project) : CallChecker {
 
         override fun check(targetDescriptor: ClassifierDescriptor, element: PsiElement, context: ClassifierUsageCheckerContext) {
             val name = targetDescriptor.name
-            if (name == EXPERIMENTAL_SHORT_NAME || name == USE_EXPERIMENTAL_SHORT_NAME) {
-                val fqName = targetDescriptor.fqNameUnsafe
-                if (fqName == EXPERIMENTAL_FQ_NAME.toUnsafe() || fqName == USE_EXPERIMENTAL_FQ_NAME.toUnsafe()) {
+            if (name == OLD_EXPERIMENTAL_FQ_NAME.shortName() || name == REQUIRES_OPT_IN_FQ_NAME.shortName() ||
+                name == OLD_USE_EXPERIMENTAL_FQ_NAME.shortName() || name == OPT_IN_FQ_NAME.shortName()) {
+                val fqName = targetDescriptor.fqNameSafe
+                if (fqName in EXPERIMENTAL_FQ_NAMES || fqName in USE_EXPERIMENTAL_FQ_NAMES) {
                     checkUsageOfKotlinExperimentalOrUseExperimental(element, context)
                     return
                 }
             }
-
-            val experimentalities = targetDescriptor.loadExperimentalities(moduleAnnotationsResolver, context.languageVersionSettings)
-            reportNotAcceptedExperimentalities(experimentalities, element, context)
 
             val targetClass = when (targetDescriptor) {
                 is ClassDescriptor -> targetDescriptor
@@ -253,10 +286,17 @@ class ExperimentalUsageChecker(project: Project) : CallChecker {
                     )
                 }
             }
+
+            if (element.getParentOfType<KtImportDirective>(false) == null) {
+                val experimentalities = targetDescriptor.loadExperimentalities(moduleAnnotationsResolver, context.languageVersionSettings)
+                reportNotAcceptedExperimentalities(experimentalities, element, context)
+            }
         }
 
         private fun checkUsageOfKotlinExperimentalOrUseExperimental(element: PsiElement, context: CheckerContext) {
-            if (EXPERIMENTAL_FQ_NAME.asString() !in context.languageVersionSettings.getFlag(AnalysisFlag.useExperimental)) {
+            val useExperimentalFqNames = context.languageVersionSettings.getFlag(AnalysisFlags.useExperimental)
+            if (REQUIRES_OPT_IN_FQ_NAME.asString() !in useExperimentalFqNames &&
+                OLD_EXPERIMENTAL_FQ_NAME.asString() !in useExperimentalFqNames) {
                 context.trace.report(Errors.EXPERIMENTAL_IS_NOT_ENABLED.on(element))
             }
 
@@ -276,15 +316,19 @@ class ExperimentalUsageChecker(project: Project) : CallChecker {
             return false
         }
 
-        private fun PsiElement.isUsageAsUseExperimentalArgument(bindingContext: BindingContext): Boolean =
-            parent is KtClassLiteralExpression &&
+        private fun PsiElement.isUsageAsUseExperimentalArgument(bindingContext: BindingContext): Boolean {
+            val qualifier = (this as? KtSimpleNameExpression)?.getTopmostParentQualifiedExpressionForSelector() ?: this
+            val parent = qualifier.parent
+
+            return parent is KtClassLiteralExpression &&
                     parent.parent is KtValueArgument &&
                     parent.parent.parent is KtValueArgumentList &&
                     parent.parent.parent.parent.let { entry ->
                         entry is KtAnnotationEntry && bindingContext.get(BindingContext.ANNOTATION, entry)?.let { annotation ->
-                            annotation.fqName == USE_EXPERIMENTAL_FQ_NAME || annotation.fqName == WAS_EXPERIMENTAL_FQ_NAME
+                            annotation.fqName in USE_EXPERIMENTAL_FQ_NAMES || annotation.fqName == WAS_EXPERIMENTAL_FQ_NAME
                         } == true
                     }
+        }
     }
 
     class Overrides(project: Project) : DeclarationChecker {

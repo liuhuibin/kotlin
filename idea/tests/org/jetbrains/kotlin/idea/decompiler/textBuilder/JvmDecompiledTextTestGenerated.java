@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.decompiler.textBuilder;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.idea.decompiler.textBuilder;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -22,11 +21,11 @@ import java.util.regex.Pattern;
 @RunWith(JUnit3RunnerWithInners.class)
 public class JvmDecompiledTextTestGenerated extends AbstractJvmDecompiledTextTest {
     private void runTest(String testDataFilePath) throws Exception {
-        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
 
     public void testAllFilesPresentInDecompiledTextJvm() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/decompiler/decompiledTextJvm"), Pattern.compile("^([^\\.]+)$"), TargetBackend.ANY, true);
+        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/decompiler/decompiledTextJvm"), Pattern.compile("^([^\\.]+)$"), null, true);
     }
 
     @TestMetadata("Modifiers")
@@ -54,11 +53,11 @@ public class JvmDecompiledTextTestGenerated extends AbstractJvmDecompiledTextTes
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Modifiers extends AbstractJvmDecompiledTextTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInModifiers() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/decompiler/decompiledTextJvm/Modifiers"), Pattern.compile("^([^\\.]+)$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/decompiler/decompiledTextJvm/Modifiers"), Pattern.compile("^([^\\.]+)$"), null, true);
         }
     }
 
@@ -67,11 +66,11 @@ public class JvmDecompiledTextTestGenerated extends AbstractJvmDecompiledTextTes
     @RunWith(JUnit3RunnerWithInners.class)
     public static class MultifileClass extends AbstractJvmDecompiledTextTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInMultifileClass() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/decompiler/decompiledTextJvm/MultifileClass"), Pattern.compile("^([^\\.]+)$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/decompiler/decompiledTextJvm/MultifileClass"), Pattern.compile("^([^\\.]+)$"), null, true);
         }
     }
 
@@ -80,11 +79,11 @@ public class JvmDecompiledTextTestGenerated extends AbstractJvmDecompiledTextTes
     @RunWith(JUnit3RunnerWithInners.class)
     public static class TestKt extends AbstractJvmDecompiledTextTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInTestKt() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/decompiler/decompiledTextJvm/TestKt"), Pattern.compile("^([^\\.]+)$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/decompiler/decompiledTextJvm/TestKt"), Pattern.compile("^([^\\.]+)$"), null, true);
         }
     }
 
@@ -93,11 +92,11 @@ public class JvmDecompiledTextTestGenerated extends AbstractJvmDecompiledTextTes
     @RunWith(JUnit3RunnerWithInners.class)
     public static class TypeAliases extends AbstractJvmDecompiledTextTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInTypeAliases() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/decompiler/decompiledTextJvm/TypeAliases"), Pattern.compile("^([^\\.]+)$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/decompiler/decompiledTextJvm/TypeAliases"), Pattern.compile("^([^\\.]+)$"), null, true);
         }
     }
 }

@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.types;
@@ -18,10 +18,13 @@ import org.jetbrains.kotlin.descriptors.annotations.Annotations;
 import org.jetbrains.kotlin.name.FqName;
 import org.jetbrains.kotlin.name.FqNameUnsafe;
 import org.jetbrains.kotlin.resolve.DescriptorUtils;
+import org.jetbrains.kotlin.resolve.constants.IntegerLiteralTypeConstructor;
 import org.jetbrains.kotlin.resolve.constants.IntegerValueTypeConstructor;
 import org.jetbrains.kotlin.resolve.scopes.MemberScope;
 import org.jetbrains.kotlin.types.checker.KotlinTypeChecker;
+import org.jetbrains.kotlin.types.checker.KotlinTypeRefiner;
 import org.jetbrains.kotlin.types.checker.NewTypeVariableConstructor;
+import org.jetbrains.kotlin.types.refinement.TypeRefinement;
 
 import java.util.*;
 
@@ -58,6 +61,20 @@ public class TypeUtils {
         @Override
         public String toString() {
             return name;
+        }
+
+        @NotNull
+        @Override
+        @TypeRefinement
+        public DelegatingSimpleType replaceDelegate(@NotNull SimpleType delegate) {
+            throw new IllegalStateException(name);
+        }
+
+        @NotNull
+        @Override
+        @TypeRefinement
+        public SpecialType refine(@NotNull KotlinTypeRefiner kotlinTypeRefiner) {
+            return this;
         }
     }
 
@@ -184,18 +201,31 @@ public class TypeUtils {
     }
 
     @NotNull
-    public static SimpleType makeUnsubstitutedType(ClassifierDescriptor classifierDescriptor, MemberScope unsubstitutedMemberScope) {
+    public static SimpleType makeUnsubstitutedType(
+            ClassifierDescriptor classifierDescriptor, MemberScope unsubstitutedMemberScope,
+            Function1<KotlinTypeRefiner, SimpleType> refinedTypeFactory
+    ) {
         if (ErrorUtils.isError(classifierDescriptor)) {
             return ErrorUtils.createErrorType("Unsubstituted type for " + classifierDescriptor);
         }
         TypeConstructor typeConstructor = classifierDescriptor.getTypeConstructor();
+        return makeUnsubstitutedType(typeConstructor, unsubstitutedMemberScope, refinedTypeFactory);
+    }
+
+    @NotNull
+    public static SimpleType makeUnsubstitutedType(
+            @NotNull TypeConstructor typeConstructor,
+            @NotNull MemberScope unsubstitutedMemberScope,
+            @NotNull Function1<KotlinTypeRefiner, SimpleType> refinedTypeFactory
+    ) {
         List<TypeProjection> arguments = getDefaultTypeProjections(typeConstructor.getParameters());
         return KotlinTypeFactory.simpleTypeWithNonTrivialMemberScope(
                 Annotations.Companion.getEMPTY(),
                 typeConstructor,
                 arguments,
                 false,
-                unsubstitutedMemberScope
+                unsubstitutedMemberScope,
+                refinedTypeFactory
         );
     }
 
@@ -385,19 +415,29 @@ public class TypeUtils {
             @Nullable KotlinType type,
             @NotNull Function1<UnwrappedType, Boolean> isSpecialType
     ) {
+        return contains(type, isSpecialType, new HashSet<KotlinType>());
+    }
+
+    private static boolean contains(
+            @Nullable KotlinType type,
+            @NotNull Function1<UnwrappedType, Boolean> isSpecialType,
+            HashSet<KotlinType> visited
+    ) {
         if (type == null) return false;
+        if (visited.contains(type)) return false;
+        visited.add(type);
 
         UnwrappedType unwrappedType = type.unwrap();
         if (isSpecialType.invoke(unwrappedType)) return true;
 
         FlexibleType flexibleType = unwrappedType instanceof FlexibleType ? (FlexibleType) unwrappedType : null;
         if (flexibleType != null
-            && (contains(flexibleType.getLowerBound(), isSpecialType) || contains(flexibleType.getUpperBound(), isSpecialType))) {
+            && (contains(flexibleType.getLowerBound(), isSpecialType, visited) || contains(flexibleType.getUpperBound(), isSpecialType, visited))) {
             return true;
         }
 
         if (unwrappedType instanceof DefinitelyNotNullType &&
-            contains(((DefinitelyNotNullType) unwrappedType).getOriginal(), isSpecialType)) {
+            contains(((DefinitelyNotNullType) unwrappedType).getOriginal(), isSpecialType, visited)) {
             return true;
         }
 
@@ -405,13 +445,13 @@ public class TypeUtils {
         if (typeConstructor instanceof IntersectionTypeConstructor) {
             IntersectionTypeConstructor intersectionTypeConstructor = (IntersectionTypeConstructor) typeConstructor;
             for (KotlinType supertype : intersectionTypeConstructor.getSupertypes()) {
-                if (contains(supertype, isSpecialType)) return true;
+                if (contains(supertype, isSpecialType, visited)) return true;
             }
             return false;
         }
 
         for (TypeProjection projection : type.getArguments()) {
-            if (!projection.isStarProjection() && contains(projection.getType(), isSpecialType)) return true;
+            if (!projection.isStarProjection() && contains(projection.getType(), isSpecialType, visited)) return true;
         }
         return false;
     }
@@ -486,6 +526,30 @@ public class TypeUtils {
             }
         }
         return getDefaultPrimitiveNumberType(numberValueTypeConstructor);
+    }
+
+    @NotNull
+    public static KotlinType getPrimitiveNumberType(
+            @NotNull IntegerLiteralTypeConstructor literalTypeConstructor,
+            @NotNull KotlinType expectedType
+    ) {
+        if (noExpectedType(expectedType) || KotlinTypeKt.isError(expectedType)) {
+            return literalTypeConstructor.getApproximatedType();
+        }
+
+        // If approximated type does not mathc expected type then expected type is very
+        //  specific type (e.g. Comparable<Byte>), so only one of possible types could match it
+        KotlinType approximatedType = literalTypeConstructor.getApproximatedType();
+        if (KotlinTypeChecker.DEFAULT.isSubtypeOf(approximatedType, expectedType)) {
+            return approximatedType;
+        }
+
+        for (KotlinType primitiveNumberType : literalTypeConstructor.getPossibleTypes()) {
+            if (KotlinTypeChecker.DEFAULT.isSubtypeOf(primitiveNumberType, expectedType)) {
+                return primitiveNumberType;
+            }
+        }
+        return literalTypeConstructor.getApproximatedType();
     }
 
     public static boolean isTypeParameter(@NotNull KotlinType type) {

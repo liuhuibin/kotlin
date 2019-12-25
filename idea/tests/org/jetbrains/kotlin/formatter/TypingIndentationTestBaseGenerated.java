@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.formatter;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.formatter;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -24,7 +23,7 @@ public class TypingIndentationTestBaseGenerated extends AbstractTypingIndentatio
     @RunWith(JUnit3RunnerWithInners.class)
     public static class DirectSettings extends AbstractTypingIndentationTestBase {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doNewlineTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doNewlineTest, this, testDataFilePath);
         }
 
         @TestMetadata("AfterCatch.after.kt")
@@ -53,12 +52,17 @@ public class TypingIndentationTestBaseGenerated extends AbstractTypingIndentatio
         }
 
         public void testAllFilesPresentInDirectSettings() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/indentationOnNewline"), Pattern.compile("^([^\\.]+)\\.after\\.kt.*$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/indentationOnNewline"), Pattern.compile("^([^\\.]+)\\.after\\.kt.*$"), null, true);
         }
 
         @TestMetadata("Annotation.after.kt")
         public void testAnnotation() throws Exception {
             runTest("idea/testData/indentationOnNewline/Annotation.after.kt");
+        }
+
+        @TestMetadata("AnnotationInDeclaration.after.kt")
+        public void testAnnotationInDeclaration() throws Exception {
+            runTest("idea/testData/indentationOnNewline/AnnotationInDeclaration.after.kt");
         }
 
         @TestMetadata("ArgumentListNormalIndent.after.kt")
@@ -231,6 +235,11 @@ public class TypingIndentationTestBaseGenerated extends AbstractTypingIndentatio
             runTest("idea/testData/indentationOnNewline/KT20783.after.kt");
         }
 
+        @TestMetadata("ModifierListInUnfinishedDeclaration.after.kt")
+        public void testModifierListInUnfinishedDeclaration() throws Exception {
+            runTest("idea/testData/indentationOnNewline/ModifierListInUnfinishedDeclaration.after.kt");
+        }
+
         @TestMetadata("MultideclarationAfterEq.after.kt")
         public void testMultideclarationAfterEq() throws Exception {
             runTest("idea/testData/indentationOnNewline/MultideclarationAfterEq.after.kt");
@@ -271,11 +280,11 @@ public class TypingIndentationTestBaseGenerated extends AbstractTypingIndentatio
         @RunWith(JUnit3RunnerWithInners.class)
         public static class Script extends AbstractTypingIndentationTestBase {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doNewlineTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doNewlineTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInScript() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/indentationOnNewline/script"), Pattern.compile("^([^\\.]+)\\.after\\.kt.*$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/indentationOnNewline/script"), Pattern.compile("^([^\\.]+)\\.after\\.kt.*$"), null, true);
             }
 
             @TestMetadata("ScriptAfterClosingBrace.after.kts")
@@ -315,11 +324,11 @@ public class TypingIndentationTestBaseGenerated extends AbstractTypingIndentatio
     @RunWith(JUnit3RunnerWithInners.class)
     public static class InvertedSettings extends AbstractTypingIndentationTestBase {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doNewlineTestWithInvert, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doNewlineTestWithInvert, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInInvertedSettings() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/indentationOnNewline"), Pattern.compile("^([^\\.]+)\\.after\\.inv\\.kt.*$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/indentationOnNewline"), Pattern.compile("^([^\\.]+)\\.after\\.inv\\.kt.*$"), null, true);
         }
 
         @TestMetadata("AssignmentAfterEq.after.inv.kt")
@@ -407,11 +416,11 @@ public class TypingIndentationTestBaseGenerated extends AbstractTypingIndentatio
         @RunWith(JUnit3RunnerWithInners.class)
         public static class Script extends AbstractTypingIndentationTestBase {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doNewlineTestWithInvert, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doNewlineTestWithInvert, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInScript() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/indentationOnNewline/script"), Pattern.compile("^([^\\.]+)\\.after\\.inv\\.kt.*$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/indentationOnNewline/script"), Pattern.compile("^([^\\.]+)\\.after\\.inv\\.kt.*$"), null, true);
             }
         }
     }

@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.inspections.api
@@ -67,7 +67,7 @@ class IncompatibleAPIInspection : LocalInspectionTool(), CustomSuppressableInspe
 
             element.language == JavaLanguage.INSTANCE -> {
                 val key = HighlightDisplayKey.find(shortName)
-                        ?: throw AssertionError("HighlightDisplayKey.find($shortName) is null. Inspection: $javaClass")
+                    ?: throw AssertionError("HighlightDisplayKey.find($shortName) is null. Inspection: $javaClass")
                 return SuppressManager.getInstance().createSuppressActions(key)
             }
 
@@ -190,7 +190,10 @@ internal fun findProblem(
 internal fun getQualifiedNameFromProviders(element: PsiElement): String? {
     DumbService.getInstance(element.project).isAlternativeResolveEnabled = true
     try {
-        for (provider in Extensions.getExtensions(QualifiedNameProvider.EP_NAME)) {
+        @Suppress("DEPRECATION")
+        val extensions = Extensions.getExtensions(QualifiedNameProvider.EP_NAME)
+
+        for (provider in extensions) {
             val result = provider.getQualifiedName(element)
             if (result != null) return result
         }

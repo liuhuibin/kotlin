@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.decompiler.textBuilder;
@@ -26,7 +26,7 @@ public class JsDecompiledTextFromJsMetadataTestGenerated extends AbstractJsDecom
     }
 
     public void testAllFilesPresentInDecompiledTextJs() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/decompiler/decompiledTextJs"), Pattern.compile("^([^\\.]+)$"), TargetBackend.JS, true);
+        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/decompiler/decompiledTextJs"), Pattern.compile("^([^\\.]+)$"), null, TargetBackend.JS, true);
     }
 
     @TestMetadata("TestPackage")
@@ -48,7 +48,7 @@ public class JsDecompiledTextFromJsMetadataTestGenerated extends AbstractJsDecom
         }
 
         public void testAllFilesPresentInTestPackage() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/decompiler/decompiledTextJs/TestPackage"), Pattern.compile("^([^\\.]+)$"), TargetBackend.JS, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/decompiler/decompiledTextJs/TestPackage"), Pattern.compile("^([^\\.]+)$"), null, TargetBackend.JS, true);
         }
     }
 
@@ -61,7 +61,7 @@ public class JsDecompiledTextFromJsMetadataTestGenerated extends AbstractJsDecom
         }
 
         public void testAllFilesPresentInTypeAliases() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/decompiler/decompiledTextJs/TypeAliases"), Pattern.compile("^([^\\.]+)$"), TargetBackend.JS, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/decompiler/decompiledTextJs/TypeAliases"), Pattern.compile("^([^\\.]+)$"), null, TargetBackend.JS, true);
         }
     }
 }

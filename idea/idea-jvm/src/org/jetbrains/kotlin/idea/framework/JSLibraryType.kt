@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2017 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.framework
@@ -30,7 +19,6 @@ import com.intellij.openapi.roots.libraries.ui.RootDetector
 import com.intellij.openapi.roots.ui.configuration.libraryEditor.DefaultLibraryRootsComponentDescriptor
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
-import org.jetbrains.kotlin.config.TargetPlatformKind
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.idea.KotlinIcons
 import javax.swing.JComponent
@@ -40,17 +28,20 @@ class JSLibraryType : LibraryType<DummyLibraryProperties>(JSLibraryKind) {
 
     override fun getCreateActionName() = "Kotlin/JS"
 
-    override fun createNewLibrary(parentComponent: JComponent,
-                                  contextDirectory: VirtualFile?,
-                                  project: Project): NewLibraryConfiguration? {
-        return LibraryTypeService.getInstance().createLibraryFromFiles(RootsComponentDescriptor,
-                                                                       parentComponent, contextDirectory, this,
-                                                                       project)
-    }
+    override fun createNewLibrary(
+        parentComponent: JComponent,
+        contextDirectory: VirtualFile?,
+        project: Project
+    ): NewLibraryConfiguration? = LibraryTypeService.getInstance().createLibraryFromFiles(
+        RootsComponentDescriptor,
+        parentComponent, contextDirectory, this,
+        project
+    )
 
     override fun getIcon(properties: DummyLibraryProperties?) = KotlinIcons.JS
 
     companion object {
+        @Suppress("DEPRECATION")
         fun getInstance() = Extensions.findExtension(EP_NAME, JSLibraryType::class.java)
     }
 
@@ -69,12 +60,10 @@ class JSLibraryType : LibraryType<DummyLibraryProperties>(JSLibraryKind) {
 
         override fun getRootTypes() = arrayOf(OrderRootType.CLASSES, OrderRootType.SOURCES)
 
-        override fun getRootDetectors(): List<RootDetector> {
-            return arrayListOf(
-                    JSRootFilter,
-                    FileTypeBasedRootFilter(OrderRootType.SOURCES, false, KotlinFileType.INSTANCE, "sources")
-            )
-        }
+        override fun getRootDetectors(): List<RootDetector> = arrayListOf(
+            JSRootFilter,
+            FileTypeBasedRootFilter(OrderRootType.SOURCES, false, KotlinFileType.INSTANCE, "sources")
+        )
     }
 
     object JSRootFilter : FileTypeBasedRootFilter(OrderRootType.CLASSES, false, PlainTextFileType.INSTANCE, "JS files") {
@@ -85,9 +74,11 @@ class JSLibraryType : LibraryType<DummyLibraryProperties>(JSLibraryKind) {
 
 private fun isAcceptedForJsLibrary(extension: String?) = extension == "js" || extension == "kjsm"
 
-val TargetPlatformKind<*>.libraryKind: PersistentLibraryKind<*>?
-    get() = when(this) {
-        TargetPlatformKind.JavaScript -> JSLibraryKind
-        TargetPlatformKind.Common -> CommonLibraryKind
+@Suppress("DEPRECATION_ERROR")
+// Can't import a member annotated with DEPRECATION_ERROR
+val org.jetbrains.kotlin.config.TargetPlatformKind<*>.libraryKind: PersistentLibraryKind<*>?
+    get() = when (this) {
+        org.jetbrains.kotlin.config.TargetPlatformKind.JavaScript -> JSLibraryKind
+        org.jetbrains.kotlin.config.TargetPlatformKind.Common -> CommonLibraryKind
         else -> null
     }

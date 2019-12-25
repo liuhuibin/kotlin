@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.cli.common.arguments
@@ -16,37 +16,41 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
     }
 
     @Argument(value = "-d", valueDescription = "<directory|jar>", description = "Destination for generated class files")
-    var destination: String? by FreezableVar(null)
+    var destination: String? by NullableStringFreezableVar(null)
 
-    @Argument(value = "-classpath", shortName = "-cp", valueDescription = "<path>", description = "Paths where to find user class files")
-    var classpath: String? by FreezableVar(null)
+    @Argument(
+        value = "-classpath",
+        shortName = "-cp",
+        valueDescription = "<path>",
+        description = "List of directories and JAR/ZIP archives to search for user class files")
+    var classpath: String? by NullableStringFreezableVar(null)
 
     @GradleOption(DefaultValues.BooleanFalseDefault::class)
-    @Argument(value = "-include-runtime", description = "Include Kotlin runtime in to resulting .jar")
+    @Argument(value = "-include-runtime", description = "Include Kotlin runtime into the resulting JAR")
     var includeRuntime: Boolean by FreezableVar(false)
 
     @GradleOption(DefaultValues.StringNullDefault::class)
     @Argument(
         value = "-jdk-home",
         valueDescription = "<path>",
-        description = "Path to JDK home directory to include into classpath, if differs from default JAVA_HOME"
+        description = "Include a custom JDK from the specified location into the classpath instead of the default JAVA_HOME"
     )
-    var jdkHome: String? by FreezableVar(null)
+    var jdkHome: String? by NullableStringFreezableVar(null)
 
     @GradleOption(DefaultValues.BooleanFalseDefault::class)
-    @Argument(value = "-no-jdk", description = "Don't include Java runtime into classpath")
+    @Argument(value = "-no-jdk", description = "Don't automatically include the Java runtime into the classpath")
     var noJdk: Boolean by FreezableVar(false)
 
     @GradleOption(DefaultValues.BooleanTrueDefault::class)
-    @Argument(value = "-no-stdlib", description = "Don't include kotlin-stdlib.jar or kotlin-reflect.jar into classpath")
+    @Argument(value = "-no-stdlib", description = "Don't automatically include the Kotlin/JVM stdlib and Kotlin reflection into the classpath")
     var noStdlib: Boolean by FreezableVar(false)
 
     @GradleOption(DefaultValues.BooleanTrueDefault::class)
-    @Argument(value = "-no-reflect", description = "Don't include kotlin-reflect.jar into classpath")
+    @Argument(value = "-no-reflect", description = "Don't automatically include Kotlin reflection into the classpath")
     var noReflect: Boolean by FreezableVar(false)
 
-    @Argument(value = "-script", description = "Evaluate the script file")
-    var script: Boolean by FreezableVar(false)
+    @Argument(value = "-Xexpression", description = "Evaluate the given string as a Kotlin script")
+    var expressions: Array<String>? by FreezableVar(null)
 
     @Argument(
         value = "-script-templates",
@@ -56,15 +60,15 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
     var scriptTemplates: Array<String>? by FreezableVar(null)
 
     @Argument(value = "-module-name", valueDescription = "<name>", description = "Name of the generated .kotlin_module file")
-    var moduleName: String? by FreezableVar(null)
+    var moduleName: String? by NullableStringFreezableVar(null)
 
     @GradleOption(DefaultValues.JvmTargetVersions::class)
     @Argument(
         value = "-jvm-target",
         valueDescription = "<version>",
-        description = "Target version of the generated JVM bytecode (1.6 or 1.8), default is 1.6"
+        description = "Target version of the generated JVM bytecode (1.6, 1.8, 9, 10, 11, 12 or 13), default is 1.6"
     )
-    var jvmTarget: String? by FreezableVar(JvmTarget.DEFAULT.description)
+    var jvmTarget: String? by NullableStringFreezableVar(JvmTarget.DEFAULT.description)
 
     @GradleOption(DefaultValues.BooleanFalseDefault::class)
     @Argument(value = "-java-parameters", description = "Generate metadata for Java 1.8 reflection on method parameters")
@@ -72,8 +76,18 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
 
     // Advanced options
 
+    @GradleOption(DefaultValues.BooleanFalseDefault::class)
+    @Argument(value = "-Xuse-ir", description = "Use the IR backend")
+    var useIR: Boolean by FreezableVar(false)
+
+    @Argument(
+        value = "-Xir-check-local-names",
+        description = "Check that names of local classes and anonymous objects are the same in the IR backend as in the old backend"
+    )
+    var irCheckLocalNames: Boolean by FreezableVar(false)
+
     @Argument(value = "-Xmodule-path", valueDescription = "<path>", description = "Paths where to find Java 9+ modules")
-    var javaModulePath: String? by FreezableVar(null)
+    var javaModulePath: String? by NullableStringFreezableVar(null)
 
     @Argument(
         value = "-Xadd-modules",
@@ -107,9 +121,11 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
     @Argument(
         value = "-Xnormalize-constructor-calls",
         valueDescription = "{disable|enable}",
-        description = "Normalize constructor calls (disable: don't normalize; enable: normalize), default is disable"
+        description = "Normalize constructor calls (disable: don't normalize; enable: normalize),\n" +
+                "default is 'disable' in language version 1.2 and below,\n" +
+                "'enable' since language version 1.3"
     )
-    var constructorCallNormalizationMode: String? by FreezableVar(JVMConstructorCallNormalizationMode.DEFAULT.description)
+    var constructorCallNormalizationMode: String? by NullableStringFreezableVar(null)
 
     @Argument(
         value = "-Xassertions", valueDescription = "{always-enable|always-disable|jvm|legacy}",
@@ -120,7 +136,7 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
                 "-Xassertions=legacy:         calculate condition on each call, check depends on jvm assertion settings in the kotlin package;\n" +
                 "default: legacy"
     )
-    var assertionsMode: String? by FreezableVar(JVMAssertionsMode.DEFAULT.description)
+    var assertionsMode: String? by NullableStringFreezableVar(JVMAssertionsMode.DEFAULT.description)
 
     @Argument(
         value = "-Xbuild-file",
@@ -128,7 +144,7 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
         valueDescription = "<path>",
         description = "Path to the .xml build file to compile"
     )
-    var buildFile: String? by FreezableVar(null)
+    var buildFile: String? by NullableStringFreezableVar(null)
 
     @Argument(value = "-Xmultifile-parts-inherit", description = "Compile multifile classes as a hierarchy of parts and facade")
     var inheritMultifileParts: Boolean by FreezableVar(false)
@@ -144,8 +160,8 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
 
     @Argument(
         value = "-Xuse-old-class-files-reading",
-        description = "Use old class files reading implementation " +
-                "(may slow down the build and should be used in case of problems with the new implementation)"
+        description = "Use old class files reading implementation. This may slow down the build and cause problems with Groovy interop.\n" +
+                "Should be used in case of problems with the new implementation"
     )
     var useOldClassFilesReading: Boolean by FreezableVar(false)
 
@@ -154,22 +170,16 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
         valueDescription = "<path>",
         description = "Path to JSON file to dump Java to Kotlin declaration mappings"
     )
-    var declarationsOutputPath: String? by FreezableVar(null)
+    var declarationsOutputPath: String? by NullableStringFreezableVar(null)
 
     @Argument(value = "-Xsingle-module", description = "Combine modules for source files and binary dependencies into a single module")
     var singleModule: Boolean by FreezableVar(false)
 
     @Argument(
-        value = "-Xadd-compiler-builtins",
-        description = "Add definitions of built-in declarations to the compilation classpath (useful with -no-stdlib)"
+        value = "-Xsuppress-missing-builtins-error",
+        description = "Suppress the \"cannot access built-in declaration\" error (useful with -no-stdlib)"
     )
-    var addCompilerBuiltIns: Boolean by FreezableVar(false)
-
-    @Argument(
-        value = "-Xload-builtins-from-dependencies",
-        description = "Load definitions of built-in declarations from module dependencies, instead of from the compiler"
-    )
-    var loadBuiltInsFromDependencies: Boolean by FreezableVar(false)
+    var suppressMissingBuiltinsError: Boolean by FreezableVar(false)
 
     @Argument(
         value = "-Xscript-resolver-environment",
@@ -191,6 +201,20 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
         description = "Java compiler arguments"
     )
     var javacArguments: Array<String>? by FreezableVar(null)
+
+
+    @Argument(
+        value = "-Xjava-source-roots",
+        valueDescription = "<path>",
+        description = "Paths to directories with Java source files"
+    )
+    var javaSourceRoots: Array<String>? by FreezableVar(null)
+
+    @Argument(
+        value = "-Xjava-package-prefix",
+        description = "Package prefix for Java files"
+    )
+    var javaPackagePrefix: String? by FreezableVar(null)
 
     @Argument(
         value = "-Xjsr305",
@@ -215,7 +239,7 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
         description = "Specify behavior for Checker Framework compatqual annotations (NullableDecl/NonNullDecl).\n" +
                 "Default value is 'enable'"
     )
-    var supportCompatqualCheckerFrameworkAnnotations: String? by FreezableVar(null)
+    var supportCompatqualCheckerFrameworkAnnotations: String? by NullableStringFreezableVar(null)
 
     @Argument(
         value = "-Xno-exception-on-explicit-equals-for-boxed-null",
@@ -235,28 +259,54 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
     )
     var jvmDefault: String by FreezableVar(JvmDefaultMode.DEFAULT.description)
 
-    @Argument(value = "-Xdisable-default-scripting-plugin", description = "Do not enable scripting plugin by default")
-    var disableDefaultScriptingPlugin: Boolean by FreezableVar(false)
-
     @Argument(value = "-Xdisable-standard-script", description = "Disable standard kotlin script support")
     var disableStandardScript: Boolean by FreezableVar(false)
 
-    // Paths to output directories for friend modules.
+    @Argument(
+        value = "-Xgenerate-strict-metadata-version",
+        description = "Generate metadata with strict version semantics (see kdoc on Metadata.extraInt)"
+    )
+    var strictMetadataVersionSemantics: Boolean by FreezableVar(false)
+
+    @Argument(
+        value = "-Xsanitize-parentheses",
+        description = "Transform '(' and ')' in method names to some other character sequence.\n" +
+                "This mode can BREAK BINARY COMPATIBILITY and is only supposed to be used to workaround\n" +
+                "problems with parentheses in identifiers on certain platforms"
+    )
+    var sanitizeParentheses: Boolean by FreezableVar(false)
+
+    @Argument(
+        value = "-Xfriend-paths",
+        valueDescription = "<path>",
+        description = "Paths to output directories for friend modules (whose internals should be visible)"
+    )
     var friendPaths: Array<String>? by FreezableVar(null)
+
+    @Argument(
+        value = "-Xallow-no-source-files",
+        description = "Allow no source files"
+    )
+    var allowNoSourceFiles: Boolean by FreezableVar(false)
 
     override fun configureAnalysisFlags(collector: MessageCollector): MutableMap<AnalysisFlag<*>, Any> {
         val result = super.configureAnalysisFlags(collector)
-        result[AnalysisFlag.jsr305] = Jsr305Parser(collector).parse(
+        result[JvmAnalysisFlags.strictMetadataVersionSemantics] = strictMetadataVersionSemantics
+        result[JvmAnalysisFlags.jsr305] = Jsr305Parser(collector).parse(
             jsr305,
             supportCompatqualCheckerFrameworkAnnotations
         )
-        result[AnalysisFlag.ignoreDataFlowInAssert] = JVMAssertionsMode.fromString(assertionsMode) != JVMAssertionsMode.LEGACY
-        JvmDefaultMode.fromStringOrNull(jvmDefault)?.let { result[AnalysisFlag.jvmDefaultMode] = it }
-                ?: collector.report(
-                    CompilerMessageSeverity.ERROR,
-                    "Unknown @JvmDefault mode: $jvmDefault, " +
-                            "supported modes: ${JvmDefaultMode.values().map { it.description }}"
-                )
+        result[AnalysisFlags.ignoreDataFlowInAssert] = JVMAssertionsMode.fromString(assertionsMode) != JVMAssertionsMode.LEGACY
+        JvmDefaultMode.fromStringOrNull(jvmDefault)?.let { result[JvmAnalysisFlags.jvmDefaultMode] = it }
+            ?: collector.report(
+                CompilerMessageSeverity.ERROR,
+                "Unknown @JvmDefault mode: $jvmDefault, " +
+                        "supported modes: ${JvmDefaultMode.values().map { it.description }}"
+            )
+        result[JvmAnalysisFlags.inheritMultifileParts] = inheritMultifileParts
+        result[JvmAnalysisFlags.sanitizeParentheses] = sanitizeParentheses
+        result[JvmAnalysisFlags.suppressMissingBuiltinsError] = suppressMissingBuiltinsError
+        result[JvmAnalysisFlags.irCheckLocalNames] = irCheckLocalNames
         return result
     }
 

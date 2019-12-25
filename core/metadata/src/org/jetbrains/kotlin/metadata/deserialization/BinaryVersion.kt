@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.metadata.deserialization
@@ -35,6 +35,9 @@ abstract class BinaryVersion(private vararg val numbers: Int) {
         else major == ourVersion.major && minor <= ourVersion.minor
     }
 
+    fun isAtLeast(version: BinaryVersion): Boolean =
+        isAtLeast(version.major, version.minor, version.patch)
+
     fun isAtLeast(major: Int, minor: Int, patch: Int): Boolean {
         if (this.major > major) return true
         if (this.major < major) return false
@@ -65,5 +68,11 @@ abstract class BinaryVersion(private vararg val numbers: Int) {
 
     companion object {
         private const val UNKNOWN = -1
+
+        @JvmStatic
+        fun parseVersionArray(string: String): IntArray? =
+            string.split(".")
+                .map { part -> part.toIntOrNull() ?: return null }
+                .toTypedArray().toIntArray()
     }
 }

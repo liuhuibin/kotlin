@@ -1,3 +1,5 @@
+// IGNORE_BACKEND: JVM_IR
+// IGNORE_BACKEND_MULTI_MODULE: JVM_IR
 // NO_CHECK_LAMBDA_INLINING
 // FILE: 1.kt
 // WITH_RUNTIME
@@ -25,7 +27,7 @@ fun box(): String {
 
     result = ""
     invokeOrder = ""
-    result = inlineFun(constraints = { invokeOrder += "constraints";A("C") }(),
+    result = inlineFun(constraints = *arrayOf({ invokeOrder += "constraints";A("C") }()),
                        receiver = { invokeOrder += " receiver"; "R" }(),
                        init = { invokeOrder += " init"; "I" }())
     if (result != "C, R, I") return "fail 1: $result"
@@ -36,7 +38,7 @@ fun box(): String {
     result = ""
     invokeOrder = ""
     result = inlineFun(init = { invokeOrder += "init"; "I" }(),
-                       constraints = { invokeOrder += "constraints";A("C") }(),
+                       constraints = *arrayOf({ invokeOrder += "constraints";A("C") }()),
                        receiver = { invokeOrder += " receiver"; "R" }()
     )
     if (result != "C, R, I") return "fail 3: $result"
@@ -46,7 +48,7 @@ fun box(): String {
     result = ""
     invokeOrder = ""
     result = inlineFun(init = { invokeOrder += "init"; "I" }(),
-                       constraints = { invokeOrder += " constraints";A("C") }())
+                       constraints = *arrayOf({ invokeOrder += " constraints";A("C") }()))
     if (result != "C, DEFAULT, I") return "fail 5: $result"
     if (invokeOrder != "init constraints default receiver") return "fail 6: $invokeOrder"
 

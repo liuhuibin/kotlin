@@ -1,4 +1,6 @@
+// IGNORE_BACKEND_FIR: JVM_IR
 @Target(AnnotationTarget.EXPRESSION)
+@Retention(AnnotationRetention.SOURCE)
 annotation class Annotation
 
 fun box(): String {

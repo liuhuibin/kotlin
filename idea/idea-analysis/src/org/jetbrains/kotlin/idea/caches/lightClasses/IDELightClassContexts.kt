@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2017 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.caches.lightClasses
@@ -34,13 +23,16 @@ import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.descriptors.impl.CompositePackageFragmentProvider
 import org.jetbrains.kotlin.descriptors.impl.ModuleDescriptorImpl
 import org.jetbrains.kotlin.frontend.di.configureModule
-import org.jetbrains.kotlin.idea.caches.project.getModuleInfo
-import org.jetbrains.kotlin.idea.caches.resolve.getResolutionFacade
 import org.jetbrains.kotlin.idea.caches.lightClasses.IDELightClassConstructionContext.Mode.EXACT
 import org.jetbrains.kotlin.idea.caches.lightClasses.IDELightClassConstructionContext.Mode.LIGHT
+import org.jetbrains.kotlin.idea.caches.lightClasses.annotations.KOTLINX_SERIALIZABLE_FQ_NAME
+import org.jetbrains.kotlin.idea.caches.lightClasses.annotations.KOTLINX_SERIALIZER_FQ_NAME
+import org.jetbrains.kotlin.idea.caches.project.getModuleInfo
+import org.jetbrains.kotlin.idea.caches.resolve.getResolutionFacade
 import org.jetbrains.kotlin.idea.compiler.IDELanguageSettingsProvider
 import org.jetbrains.kotlin.idea.project.IdeaEnvironment
 import org.jetbrains.kotlin.idea.project.ResolveElementCache
+import org.jetbrains.kotlin.idea.project.languageVersionSettings
 import org.jetbrains.kotlin.idea.stubindex.KotlinOverridableInternalMembersShortNameIndex
 import org.jetbrains.kotlin.incremental.components.ExpectActualTracker
 import org.jetbrains.kotlin.incremental.components.LookupTracker
@@ -48,6 +40,7 @@ import org.jetbrains.kotlin.incremental.components.NoLookupLocation
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getElementTextWithContext
 import org.jetbrains.kotlin.resolve.*
@@ -60,7 +53,8 @@ import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowInfoFactory
 import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowValueFactory
 import org.jetbrains.kotlin.resolve.calls.util.CallMaker
 import org.jetbrains.kotlin.resolve.constants.evaluate.ConstantExpressionEvaluator
-import org.jetbrains.kotlin.resolve.jvm.platform.JvmPlatform
+import org.jetbrains.kotlin.resolve.jvm.annotations.JVM_SYNTHETIC_ANNOTATION_FQ_NAME
+import org.jetbrains.kotlin.resolve.jvm.platform.JvmPlatformAnalyzerServices
 import org.jetbrains.kotlin.resolve.lazy.FileScopeProviderImpl
 import org.jetbrains.kotlin.resolve.lazy.ForceResolveUtil
 import org.jetbrains.kotlin.resolve.lazy.ResolveSession
@@ -75,8 +69,11 @@ import org.jetbrains.kotlin.types.WrappedTypeFactory
 import org.jetbrains.kotlin.utils.sure
 
 
-class IDELightClassConstructionContext(bindingContext: BindingContext, module: ModuleDescriptor, val mode: Mode) :
-    LightClassConstructionContext(bindingContext, module) {
+class IDELightClassConstructionContext(
+    bindingContext: BindingContext, module: ModuleDescriptor,
+    languageVersionSettings: LanguageVersionSettings,
+    val mode: Mode
+) : LightClassConstructionContext(bindingContext, module, languageVersionSettings) {
     enum class Mode {
         LIGHT,
         EXACT
@@ -103,7 +100,12 @@ internal object IDELightClassContexts {
             "Class descriptor was not found for ${classOrObject.getElementTextWithContext()}"
         }
         ForceResolveUtil.forceResolveAllContents(classDescriptor)
-        return IDELightClassConstructionContext(bindingContext, resolutionFacade.moduleDescriptor, EXACT)
+        return IDELightClassConstructionContext(
+            bindingContext,
+            resolutionFacade.moduleDescriptor,
+            classOrObject.languageVersionSettings,
+            EXACT
+        )
     }
 
     fun contextForLocalClassOrObject(classOrObject: KtClassOrObject): LightClassConstructionContext {
@@ -114,12 +116,22 @@ internal object IDELightClassContexts {
 
         if (descriptor == null) {
             LOG.warn("No class descriptor in context for class: " + classOrObject.getElementTextWithContext())
-            return IDELightClassConstructionContext(bindingContext, resolutionFacade.moduleDescriptor, EXACT)
+            return IDELightClassConstructionContext(
+                bindingContext,
+                resolutionFacade.moduleDescriptor,
+                classOrObject.languageVersionSettings,
+                EXACT
+            )
         }
 
         ForceResolveUtil.forceResolveAllContents(descriptor)
 
-        return IDELightClassConstructionContext(bindingContext, resolutionFacade.moduleDescriptor, EXACT)
+        return IDELightClassConstructionContext(
+            bindingContext,
+            resolutionFacade.moduleDescriptor,
+            classOrObject.languageVersionSettings,
+            EXACT
+        )
     }
 
 
@@ -127,7 +139,12 @@ internal object IDELightClassContexts {
         val resolveSession = files.first().getResolutionFacade().getFrontendService(ResolveSession::class.java)
 
         forceResolvePackageDeclarations(files, resolveSession)
-        return IDELightClassConstructionContext(resolveSession.bindingContext, resolveSession.moduleDescriptor, EXACT)
+        return IDELightClassConstructionContext(
+            resolveSession.bindingContext,
+            resolveSession.moduleDescriptor,
+            files.first().languageVersionSettings,
+            EXACT
+        )
     }
 
     fun contextForScript(script: KtScript): LightClassConstructionContext {
@@ -137,12 +154,17 @@ internal object IDELightClassContexts {
         val descriptor = bindingContext[BindingContext.SCRIPT, script]
         if (descriptor == null) {
             LOG.warn("No script descriptor in context for script: " + script.getElementTextWithContext())
-            return IDELightClassConstructionContext(bindingContext, resolutionFacade.moduleDescriptor, EXACT)
+            return IDELightClassConstructionContext(
+                bindingContext,
+                resolutionFacade.moduleDescriptor,
+                script.languageVersionSettings,
+                EXACT
+            )
         }
 
         ForceResolveUtil.forceResolveAllContents(descriptor)
 
-        return IDELightClassConstructionContext(bindingContext, resolutionFacade.moduleDescriptor, EXACT)
+        return IDELightClassConstructionContext(bindingContext, resolutionFacade.moduleDescriptor, script.languageVersionSettings, EXACT)
     }
 
     fun lightContextForClassOrObject(classOrObject: KtClassOrObject): LightClassConstructionContext? {
@@ -154,9 +176,17 @@ internal object IDELightClassContexts {
             listOf(classOrObject.containingKtFile)
         )
 
-        ForceResolveUtil.forceResolveAllContents(resolveSession.resolveToDescriptor(classOrObject))
+        val descriptor = resolveSession.resolveToDescriptor(classOrObject) as? ClassDescriptor ?: return null
+        if (!isDummyResolveApplicableByDescriptor(descriptor)) return null
 
-        return IDELightClassConstructionContext(resolveSession.bindingContext, resolveSession.moduleDescriptor, LIGHT)
+        ForceResolveUtil.forceResolveAllContents(descriptor)
+
+        return IDELightClassConstructionContext(
+            resolveSession.bindingContext,
+            resolveSession.moduleDescriptor,
+            classOrObject.languageVersionSettings,
+            LIGHT
+        )
     }
 
     fun lightContextForFacade(files: List<KtFile>): LightClassConstructionContext {
@@ -165,32 +195,58 @@ internal object IDELightClassContexts {
 
         forceResolvePackageDeclarations(files, resolveSession)
 
-        return IDELightClassConstructionContext(resolveSession.bindingContext, resolveSession.moduleDescriptor, LIGHT)
-    }
-
-    fun lightContextForScript(script: KtScript): LightClassConstructionContext {
-        val resolveSession = setupAdHocResolve(
-            script.project,
-            script.getResolutionFacade().moduleDescriptor,
-            listOf(script.containingKtFile)
+        return IDELightClassConstructionContext(
+            resolveSession.bindingContext,
+            resolveSession.moduleDescriptor,
+            files.first().languageVersionSettings,
+            LIGHT
         )
-
-        ForceResolveUtil.forceResolveAllContents(resolveSession.resolveToDescriptor(script))
-
-        return IDELightClassConstructionContext(resolveSession.bindingContext, resolveSession.moduleDescriptor, LIGHT)
     }
 
     private fun isDummyResolveApplicable(classOrObject: KtClassOrObject): Boolean {
+        if (classOrObject.hasModifier(KtTokens.INLINE_KEYWORD)) return false
+
         if (classOrObject.hasLightClassMatchingErrors) return false
 
         if (hasDelegatedSupertypes(classOrObject)) return false
 
         if (isDataClassWithGeneratedMembersOverridden(classOrObject)) return false
 
+        if (isDataClassWhichExtendsOtherClass(classOrObject)) return false
+
         if (hasMembersOverridingInternalMembers(classOrObject)) return false
+
+        if (hasSerializationLikeAnnotations(classOrObject)) return false
+
+        if (hasJvmSyntheticMembers(classOrObject)) return false
 
         return classOrObject.declarations.filterIsInstance<KtClassOrObject>().all { isDummyResolveApplicable(it) }
     }
+
+    private fun hasSerializationLikeAnnotations(classOrObject: KtClassOrObject) =
+        classOrObject.annotationEntries.any { isSerializableOrSerializerShortName(it.shortName) }
+
+    private fun isDummyResolveApplicableByDescriptor(classDescriptor: ClassDescriptor): Boolean {
+        if (classDescriptor.annotations.any { isSerializableOrSerializerFqName(it.fqName) }) return false
+
+        return classDescriptor
+            .unsubstitutedInnerClassesScope
+            .getContributedDescriptors()
+            .filterIsInstance<ClassDescriptor>()
+            .all(::isDummyResolveApplicableByDescriptor)
+    }
+
+    private fun isSerializableOrSerializerShortName(shortName: Name?) =
+        shortName == KOTLINX_SERIALIZABLE_FQ_NAME.shortName() || shortName == KOTLINX_SERIALIZER_FQ_NAME.shortName()
+
+    private fun isSerializableOrSerializerFqName(fqName: FqName?) =
+        fqName == KOTLINX_SERIALIZABLE_FQ_NAME || fqName == KOTLINX_SERIALIZER_FQ_NAME
+
+    private fun hasJvmSyntheticMembers(classOrObject: KtClassOrObject) =
+        classOrObject.declarations.filterIsInstance<KtFunction>().any { isJvmSynthetic(it) }
+
+    private fun isJvmSynthetic(fn: KtFunction) =
+        fn.annotationEntries.any { it.shortName == JVM_SYNTHETIC_ANNOTATION_FQ_NAME.shortName() }
 
     private fun hasDelegatedSupertypes(classOrObject: KtClassOrObject) =
         classOrObject.superTypeListEntries.any { it is KtDelegatedSuperTypeEntry }
@@ -203,12 +259,17 @@ internal object IDELightClassContexts {
     }
 
     private fun isGeneratedForDataClass(name: Name): Boolean {
-        return name == DataClassDescriptorResolver.EQUALS_METHOD_NAME ||
+        return name == FunctionsFromAny.EQUALS_METHOD_NAME ||
                 // known failure is related to equals override, checking for other methods 'just in case'
                 name == DataClassDescriptorResolver.COPY_METHOD_NAME ||
-                name == DataClassDescriptorResolver.HASH_CODE_METHOD_NAME ||
-                name == DataClassDescriptorResolver.TO_STRING_METHOD_NAME ||
+                name == FunctionsFromAny.HASH_CODE_METHOD_NAME ||
+                name == FunctionsFromAny.TO_STRING_METHOD_NAME ||
                 DataClassDescriptorResolver.isComponentLike(name)
+    }
+
+    private fun isDataClassWhichExtendsOtherClass(classOrObject: KtClassOrObject): Boolean {
+        return classOrObject.hasModifier(KtTokens.DATA_KEYWORD) &&
+                classOrObject.superTypeListEntries.isNotEmpty()
     }
 
     private fun hasMembersOverridingInternalMembers(classOrObject: KtClassOrObject): Boolean {
@@ -281,23 +342,24 @@ internal object IDELightClassContexts {
     private fun setupAdHocResolve(project: Project, realWorldModule: ModuleDescriptor, files: List<KtFile>): ResolveSession {
         val trace = BindingTraceContext()
         val sm = LockBasedStorageManager.NO_LOCKS
-        val moduleDescriptor = ModuleDescriptorImpl(realWorldModule.name, sm, realWorldModule.builtIns)
+        val moduleDescriptor =
+            ModuleDescriptorImpl(realWorldModule.name, sm, realWorldModule.builtIns, stableName = realWorldModule.stableName)
 
         moduleDescriptor.setDependencies(moduleDescriptor, moduleDescriptor.builtIns.builtInsModule)
 
         val moduleInfo = files.first().getModuleInfo()
-        val container = createContainer("LightClassStub", JvmPlatform) {
-            val jvmTarget = IDELanguageSettingsProvider.getTargetPlatform(moduleInfo) as? JvmTarget
+        val container = createContainer("LightClassStub", JvmPlatformAnalyzerServices) {
+            val jvmTarget = IDELanguageSettingsProvider.getTargetPlatform(moduleInfo, project) as? JvmTarget ?: JvmTarget.DEFAULT
             configureModule(
-                ModuleContext(moduleDescriptor, project), JvmPlatform,
-                jvmTarget ?: JvmTarget.DEFAULT, trace
+                ModuleContext(moduleDescriptor, project, "ad hoc resolve"), JvmPlatforms.jvmPlatformByTargetVersion(jvmTarget),
+                JvmPlatformAnalyzerServices, trace,
+                IDELanguageSettingsProvider.getLanguageVersionSettings(moduleInfo, project)
             )
 
             useInstance(GlobalSearchScope.EMPTY_SCOPE)
             useInstance(LookupTracker.DO_NOTHING)
             useInstance(ExpectActualTracker.DoNothing)
             useImpl<FileScopeProviderImpl>()
-            useInstance(IDELanguageSettingsProvider.getLanguageVersionSettings(moduleInfo, project))
             useInstance(FileBasedDeclarationProviderFactory(sm, files))
 
             useInstance(CodegenAffectingAnnotations(realWorldModule))
@@ -337,14 +399,16 @@ internal object IDELightClassContexts {
                 FqName("kotlin.PublishedApi") +
                 FqName("kotlin.Deprecated") +
                 FqName("kotlin.internal.InlineOnly") +
-                FqName("kotlinx.android.parcel.Parcelize")
+                FqName("kotlinx.android.parcel.Parcelize") +
+                KOTLINX_SERIALIZABLE_FQ_NAME +
+                KOTLINX_SERIALIZER_FQ_NAME
     }
 
     class AdHocAnnotationResolver(
         private val codegenAffectingAnnotations: CodegenAffectingAnnotations,
         private val callResolver: CallResolver,
         private val languageVersionSettings: LanguageVersionSettings,
-        private val dataFlowValueFactory: DataFlowValueFactory,constantExpressionEvaluator: ConstantExpressionEvaluator,
+        private val dataFlowValueFactory: DataFlowValueFactory, constantExpressionEvaluator: ConstantExpressionEvaluator,
         storageManager: StorageManager
     ) : AnnotationResolverImpl(callResolver, constantExpressionEvaluator, storageManager) {
 
@@ -364,7 +428,7 @@ internal object IDELightClassContexts {
             trace: BindingTrace
         ): OverloadResolutionResults<FunctionDescriptor> {
             val annotationConstructor = annotationClassByEntry(annotationEntry)?.constructors?.singleOrNull()
-                    ?: return super.resolveAnnotationCall(annotationEntry, scope, trace)
+                ?: return super.resolveAnnotationCall(annotationEntry, scope, trace)
 
             @Suppress("UNCHECKED_CAST")
             return callResolver.resolveConstructorCall(

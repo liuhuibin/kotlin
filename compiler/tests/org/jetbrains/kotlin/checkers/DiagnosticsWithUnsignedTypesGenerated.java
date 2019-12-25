@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.checkers;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.checkers;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -22,16 +21,21 @@ import java.util.regex.Pattern;
 @RunWith(JUnit3RunnerWithInners.class)
 public class DiagnosticsWithUnsignedTypesGenerated extends AbstractDiagnosticsWithUnsignedTypes {
     private void runTest(String testDataFilePath) throws Exception {
-        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
 
     public void testAllFilesPresentInTestsWithUnsignedTypes() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/diagnostics/testsWithUnsignedTypes"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/diagnostics/testsWithUnsignedTypes"), Pattern.compile("^(.+)\\.kt$"), null, true);
     }
 
     @TestMetadata("allowedVarargsOfUnsignedTypes.kt")
     public void testAllowedVarargsOfUnsignedTypes() throws Exception {
         runTest("compiler/testData/diagnostics/testsWithUnsignedTypes/allowedVarargsOfUnsignedTypes.kt");
+    }
+
+    @TestMetadata("callDefaultConstructorOfUnsignedType.kt")
+    public void testCallDefaultConstructorOfUnsignedType() throws Exception {
+        runTest("compiler/testData/diagnostics/testsWithUnsignedTypes/callDefaultConstructorOfUnsignedType.kt");
     }
 
     @TestMetadata("explicitUnsignedLongTypeCheck.kt")
@@ -44,6 +48,11 @@ public class DiagnosticsWithUnsignedTypesGenerated extends AbstractDiagnosticsWi
         runTest("compiler/testData/diagnostics/testsWithUnsignedTypes/forbiddenEqualsOnUnsignedTypes.kt");
     }
 
+    @TestMetadata("lateinitUnsignedType.kt")
+    public void testLateinitUnsignedType() throws Exception {
+        runTest("compiler/testData/diagnostics/testsWithUnsignedTypes/lateinitUnsignedType.kt");
+    }
+
     @TestMetadata("overloadResolutionOfBasicOperations.kt")
     public void testOverloadResolutionOfBasicOperations() throws Exception {
         runTest("compiler/testData/diagnostics/testsWithUnsignedTypes/overloadResolutionOfBasicOperations.kt");
@@ -52,6 +61,11 @@ public class DiagnosticsWithUnsignedTypesGenerated extends AbstractDiagnosticsWi
     @TestMetadata("unsignedLiteralsInsideConstVals.kt")
     public void testUnsignedLiteralsInsideConstVals() throws Exception {
         runTest("compiler/testData/diagnostics/testsWithUnsignedTypes/unsignedLiteralsInsideConstVals.kt");
+    }
+
+    @TestMetadata("unsignedLiteralsOn1_2.kt")
+    public void testUnsignedLiteralsOn1_2() throws Exception {
+        runTest("compiler/testData/diagnostics/testsWithUnsignedTypes/unsignedLiteralsOn1_2.kt");
     }
 
     @TestMetadata("unsignedLiteralsOverflowSignedBorder.kt")
@@ -72,5 +86,38 @@ public class DiagnosticsWithUnsignedTypesGenerated extends AbstractDiagnosticsWi
     @TestMetadata("wrongLongSuffixForULong.kt")
     public void testWrongLongSuffixForULong() throws Exception {
         runTest("compiler/testData/diagnostics/testsWithUnsignedTypes/wrongLongSuffixForULong.kt");
+    }
+
+    @TestMetadata("compiler/testData/diagnostics/testsWithUnsignedTypes/conversions")
+    @TestDataPath("$PROJECT_ROOT")
+    @RunWith(JUnit3RunnerWithInners.class)
+    public static class Conversions extends AbstractDiagnosticsWithUnsignedTypes {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        public void testAllFilesPresentInConversions() throws Exception {
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/diagnostics/testsWithUnsignedTypes/conversions"), Pattern.compile("^(.+)\\.kt$"), null, true);
+        }
+
+        @TestMetadata("conversionOfSignedToUnsigned.kt")
+        public void testConversionOfSignedToUnsigned() throws Exception {
+            runTest("compiler/testData/diagnostics/testsWithUnsignedTypes/conversions/conversionOfSignedToUnsigned.kt");
+        }
+
+        @TestMetadata("inferenceForSignedAndUnsignedTypes.kt")
+        public void testInferenceForSignedAndUnsignedTypes() throws Exception {
+            runTest("compiler/testData/diagnostics/testsWithUnsignedTypes/conversions/inferenceForSignedAndUnsignedTypes.kt");
+        }
+
+        @TestMetadata("overloadResolutionForSignedAndUnsignedTypes.kt")
+        public void testOverloadResolutionForSignedAndUnsignedTypes() throws Exception {
+            runTest("compiler/testData/diagnostics/testsWithUnsignedTypes/conversions/overloadResolutionForSignedAndUnsignedTypes.kt");
+        }
+
+        @TestMetadata("signedToUnsignedConversionWithExpectedType.kt")
+        public void testSignedToUnsignedConversionWithExpectedType() throws Exception {
+            runTest("compiler/testData/diagnostics/testsWithUnsignedTypes/conversions/signedToUnsignedConversionWithExpectedType.kt");
+        }
     }
 }

@@ -1,8 +1,11 @@
+// IGNORE_BACKEND_FIR: JVM_IR
 // IGNORE_BACKEND: JS_IR
 // TODO: muted automatically, investigate should it be ran for JS or not
 // IGNORE_BACKEND: JS, NATIVE
 
 // WITH_REFLECT
+
+package test
 
 class A
 
@@ -13,7 +16,7 @@ fun box(): String {
     assert(A::equals.call(a, a))
     assert(!A::equals.call(a, 0))
     assert(A::hashCode.call(a) == A::hashCode.call(a))
-    assert(A::toString.call(a).startsWith("A@"))
+    assert(A::toString.call(a).startsWith("test.A@"))
 
     assert(D::equals.call(D("foo"), D("foo")))
     assert(!D::equals.call(D("foo"), D("bar")))

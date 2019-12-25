@@ -1,22 +1,22 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.serialization.deserialization
 
-import org.jetbrains.kotlin.builtins.isFunctionType
-import org.jetbrains.kotlin.builtins.transformRuntimeFunctionTypeToSuspendFunction
+import org.jetbrains.kotlin.builtins.*
 import org.jetbrains.kotlin.descriptors.*
-import org.jetbrains.kotlin.descriptors.annotations.AnnotationWithTarget
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.metadata.ProtoBuf
 import org.jetbrains.kotlin.metadata.deserialization.*
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameOrNull
-import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedAnnotationsWithPossibleTargets
+import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
+import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedAnnotations
 import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedTypeParameterDescriptor
 import org.jetbrains.kotlin.types.*
+import org.jetbrains.kotlin.types.typeUtil.builtIns
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 import java.util.*
 
@@ -24,7 +24,9 @@ class TypeDeserializer(
     private val c: DeserializationContext,
     private val parent: TypeDeserializer?,
     typeParameterProtos: List<ProtoBuf.TypeParameter>,
-    private val debugName: String
+    private val debugName: String,
+    private val containerPresentableName: String,
+    var experimentalSuspendFunctionTypeEncountered: Boolean = false
 ) {
     private val classDescriptors: (Int) -> ClassDescriptor? = c.storageManager.createMemoizedFunctionWithNullableValues { fqNameIndex ->
         computeClassDescriptor(fqNameIndex)
@@ -50,18 +52,18 @@ class TypeDeserializer(
         get() = typeParameterDescriptors.values.toList()
 
     // TODO: don't load identical types from TypeTable more than once
-    fun type(proto: ProtoBuf.Type, additionalAnnotations: Annotations = Annotations.EMPTY): KotlinType {
+    fun type(proto: ProtoBuf.Type): KotlinType {
         if (proto.hasFlexibleTypeCapabilitiesId()) {
             val id = c.nameResolver.getString(proto.flexibleTypeCapabilitiesId)
-            val lowerBound = simpleType(proto, additionalAnnotations)
-            val upperBound = simpleType(proto.flexibleUpperBound(c.typeTable)!!, additionalAnnotations)
+            val lowerBound = simpleType(proto)
+            val upperBound = simpleType(proto.flexibleUpperBound(c.typeTable)!!)
             return c.components.flexibleTypeDeserializer.create(proto, id, lowerBound, upperBound)
         }
 
-        return simpleType(proto, additionalAnnotations)
+        return simpleType(proto)
     }
 
-    fun simpleType(proto: ProtoBuf.Type, additionalAnnotations: Annotations = Annotations.EMPTY): SimpleType {
+    fun simpleType(proto: ProtoBuf.Type): SimpleType {
         val localClassifierType = when {
             proto.hasClassName() -> computeLocalClassifierReplacementType(proto.className)
             proto.hasTypeAliasName() -> computeLocalClassifierReplacementType(proto.typeAliasName)
@@ -75,28 +77,25 @@ class TypeDeserializer(
             return ErrorUtils.createErrorTypeWithCustomConstructor(constructor.toString(), constructor)
         }
 
-        val annotations = DeserializedAnnotationsWithPossibleTargets(c.storageManager) {
+        val annotations = DeserializedAnnotations(c.storageManager) {
             c.components.annotationAndConstantLoader.loadTypeAnnotations(proto, c.nameResolver)
-                .map { AnnotationWithTarget(it, null) }
-                .plus(additionalAnnotations.getAllAnnotations())
-                .toList()
         }
 
         fun ProtoBuf.Type.collectAllArguments(): List<ProtoBuf.Type.Argument> =
             argumentList + outerType(c.typeTable)?.collectAllArguments().orEmpty()
 
-        val arguments = proto.collectAllArguments().mapIndexed { index, proto ->
-            typeArgument(constructor.parameters.getOrNull(index), proto)
+        val arguments = proto.collectAllArguments().mapIndexed { index, argumentProto ->
+            typeArgument(constructor.parameters.getOrNull(index), argumentProto)
         }.toList()
 
         val simpleType = if (Flags.SUSPEND_TYPE.get(proto.flags)) {
-            createSuspendFunctionType(annotations, constructor, arguments, proto.nullable, c.components.configuration.releaseCoroutines)
+            createSuspendFunctionType(annotations, constructor, arguments, proto.nullable)
         } else {
             KotlinTypeFactory.simpleType(annotations, constructor, arguments, proto.nullable)
         }
 
         val abbreviatedTypeProto = proto.abbreviatedType(c.typeTable) ?: return simpleType
-        return simpleType.withAbbreviation(simpleType(abbreviatedTypeProto, additionalAnnotations))
+        return simpleType.withAbbreviation(simpleType(abbreviatedTypeProto))
     }
 
     private fun typeConstructor(proto: ProtoBuf.Type): TypeConstructor {
@@ -114,7 +113,9 @@ class TypeDeserializer(
             proto.hasClassName() -> (classDescriptors(proto.className) ?: notFoundClass(proto.className)).typeConstructor
             proto.hasTypeParameter() ->
                 typeParameterTypeConstructor(proto.typeParameter)
-                        ?: ErrorUtils.createErrorTypeConstructor("Unknown type parameter ${proto.typeParameter}")
+                    ?: ErrorUtils.createErrorTypeConstructor(
+                        "Unknown type parameter ${proto.typeParameter}. Please try recompiling module containing \"$containerPresentableName\""
+                    )
             proto.hasTypeParameterName() -> {
                 val container = c.containingDeclaration
                 val name = c.nameResolver.getString(proto.typeParameterName)
@@ -130,11 +131,10 @@ class TypeDeserializer(
         annotations: Annotations,
         functionTypeConstructor: TypeConstructor,
         arguments: List<TypeProjection>,
-        nullable: Boolean,
-        isReleaseCoroutines: Boolean
+        nullable: Boolean
     ): SimpleType {
         val result = when (functionTypeConstructor.parameters.size - arguments.size) {
-            0 -> createSuspendFunctionTypeForBasicCase(annotations, functionTypeConstructor, arguments, nullable, isReleaseCoroutines)
+            0 -> createSuspendFunctionTypeForBasicCase(annotations, functionTypeConstructor, arguments, nullable)
             // This case for types written by eap compiler 1.1
             1 -> {
                 val arity = arguments.size - 1
@@ -161,25 +161,56 @@ class TypeDeserializer(
         annotations: Annotations,
         functionTypeConstructor: TypeConstructor,
         arguments: List<TypeProjection>,
-        nullable: Boolean,
-        isReleaseCoroutines: Boolean
+        nullable: Boolean
     ): SimpleType? {
         val functionType = KotlinTypeFactory.simpleType(annotations, functionTypeConstructor, arguments, nullable)
-        if (!functionType.isFunctionType) return null
+        return if (!functionType.isFunctionType) null
+        else transformRuntimeFunctionTypeToSuspendFunction(functionType)
+    }
 
-        transformRuntimeFunctionTypeToSuspendFunction(functionType, isReleaseCoroutines)?.let { return it }
+    private fun transformRuntimeFunctionTypeToSuspendFunction(funType: KotlinType): SimpleType? {
+        val isReleaseCoroutines = c.components.configuration.releaseCoroutines
 
-        // kotlin.suspend is still built with LV=1.2, thus it references old Continuation
-        // And otherwise, once stdlib is compiled with 1.3 one may want to stay at LV=1.2
-        if (c.containingDeclaration.safeAs<CallableDescriptor>()?.fqNameOrNull() == KOTLIN_SUSPEND_BUILT_IN_FUNCTION_FQ_NAME) {
-            transformRuntimeFunctionTypeToSuspendFunction(functionType, !isReleaseCoroutines)?.let { return it }
+        val continuationArgumentType = funType.getValueParameterTypesFromFunctionType().lastOrNull()?.type ?: return null
+        val continuationArgumentFqName = continuationArgumentType.constructor.declarationDescriptor?.fqNameSafe
+        if (continuationArgumentType.arguments.size != 1 || !(isContinuation(continuationArgumentFqName, true) ||
+                    isContinuation(continuationArgumentFqName, false))
+        ) {
+            return funType as SimpleType?
         }
 
-        return null
+        val suspendReturnType = continuationArgumentType.arguments.single().type
+
+        // Load kotlin.suspend as accepting and returning suspend function type independent of its version requirement
+        if (c.containingDeclaration.safeAs<CallableDescriptor>()?.fqNameOrNull() == KOTLIN_SUSPEND_BUILT_IN_FUNCTION_FQ_NAME) {
+            return createSimpleSuspendFunctionType(funType, suspendReturnType)
+        }
+
+        // Load experimental suspend function type as suspend function type
+        experimentalSuspendFunctionTypeEncountered = experimentalSuspendFunctionTypeEncountered ||
+                (isReleaseCoroutines && isContinuation(continuationArgumentFqName, !isReleaseCoroutines))
+
+        return createSimpleSuspendFunctionType(funType, suspendReturnType)
+    }
+
+    private fun createSimpleSuspendFunctionType(
+        funType: KotlinType,
+        suspendReturnType: KotlinType
+    ): SimpleType {
+        return createFunctionType(
+            funType.builtIns,
+            funType.annotations,
+            funType.getReceiverTypeFromFunctionType(),
+            funType.getValueParameterTypesFromFunctionType().dropLast(1).map(TypeProjection::getType),
+            // TODO: names
+            null,
+            suspendReturnType,
+            suspendFunction = true
+        ).makeNullableAsSpecified(funType.isMarkedNullable)
     }
 
     private fun typeParameterTypeConstructor(typeParameterId: Int): TypeConstructor? =
-        typeParameterDescriptors.get(typeParameterId)?.typeConstructor ?: parent?.typeParameterTypeConstructor(typeParameterId)
+        typeParameterDescriptors[typeParameterId]?.typeConstructor ?: parent?.typeParameterTypeConstructor(typeParameterId)
 
     private fun computeClassDescriptor(fqNameIndex: Int): ClassDescriptor? {
         val id = c.nameResolver.getClassId(fqNameIndex)
@@ -210,7 +241,7 @@ class TypeDeserializer(
     private fun typeArgument(parameter: TypeParameterDescriptor?, typeArgumentProto: ProtoBuf.Type.Argument): TypeProjection {
         if (typeArgumentProto.projection == ProtoBuf.Type.Argument.Projection.STAR) {
             return if (parameter == null)
-                TypeBasedStarProjectionImpl(c.components.moduleDescriptor.builtIns.nullableAnyType)
+                StarProjectionForAbsentTypeParameter(c.components.moduleDescriptor.builtIns)
             else
                 StarProjectionImpl(parameter)
         }

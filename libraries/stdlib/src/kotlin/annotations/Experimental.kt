@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package kotlin
@@ -13,8 +13,10 @@ import kotlin.internal.RequireKotlinVersionKind
 import kotlin.reflect.KClass
 
 /**
- * Signals that the annotated annotation class is a marker of an experimental API. Any declaration annotated with that marker is thus
- * considered an experimental declaration and its call sites should accept the experimental aspect of it either by using [UseExperimental],
+ * Signals that the annotated annotation class is a marker of an experimental API.
+ *
+ * Any declaration annotated with that marker is considered an experimental declaration
+ * and its call sites should accept the experimental aspect of it either by using [UseExperimental],
  * or by being annotated with that marker themselves, effectively causing further propagation of that experimental aspect.
  *
  * This class is experimental itself and can only be used with the compiler argument `-Xuse-experimental=kotlin.Experimental`.

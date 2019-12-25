@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package templates
@@ -205,6 +205,11 @@ object Snapshots : TemplateGroupBase() {
             The returned map preserves the entry iteration order of the original ${f.collection}.
             """
         }
+        sample(when (family) {
+            CharSequences -> "samples.text.Strings.associate"
+            ArraysOfObjects, ArraysOfPrimitives -> "samples.collections.Arrays.Transformations.associateArrayOfPrimitives"
+            else -> "samples.collections.Collections.Transformations.associate"
+        })
         body {
             """
             val capacity = mapCapacity(collectionSizeOrDefault(10)).coerceAtLeast(16)
@@ -247,6 +252,11 @@ object Snapshots : TemplateGroupBase() {
             If any of two pairs would have the same key the last one gets added to the map.
             """
         }
+        sample(when (family) {
+            CharSequences -> "samples.text.Strings.associateTo"
+            ArraysOfObjects, ArraysOfPrimitives -> "samples.collections.Arrays.Transformations.associateArrayOfPrimitivesTo"
+            else -> "samples.collections.Collections.Transformations.associateTo"
+        })
         body {
             """
             for (element in this) {
@@ -273,6 +283,11 @@ object Snapshots : TemplateGroupBase() {
             The returned map preserves the entry iteration order of the original ${f.collection}.
             """
         }
+        sample(when (family) {
+            CharSequences -> "samples.text.Strings.associateBy"
+            ArraysOfObjects, ArraysOfPrimitives -> "samples.collections.Arrays.Transformations.associateArrayOfPrimitivesBy"
+            else -> "samples.collections.Collections.Transformations.associateBy"
+        })
         returns("Map<K, T>")
 
         // Collection size helper methods are private, so we fall back to the calculation from HashSet's Collection
@@ -319,6 +334,11 @@ object Snapshots : TemplateGroupBase() {
             If any two ${f.element.pluralize()} would have the same key returned by [keySelector] the last one gets added to the map.
             """
         }
+        sample(when (family) {
+            CharSequences -> "samples.text.Strings.associateByTo"
+            ArraysOfObjects, ArraysOfPrimitives -> "samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByTo"
+            else -> "samples.collections.Collections.Transformations.associateByTo"
+        })
         body {
             """
             for (element in this) {
@@ -345,6 +365,11 @@ object Snapshots : TemplateGroupBase() {
             The returned map preserves the entry iteration order of the original ${f.collection}.
             """
         }
+        sample(when (family) {
+            CharSequences -> "samples.text.Strings.associateByWithValueTransform"
+            ArraysOfObjects, ArraysOfPrimitives -> "samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByWithValueTransform"
+            else -> "samples.collections.Collections.Transformations.associateByWithValueTransform"
+        })
         returns("Map<K, V>")
 
         /**
@@ -396,10 +421,81 @@ object Snapshots : TemplateGroupBase() {
             If any two ${f.element.pluralize()} would have the same key returned by [keySelector] the last one gets added to the map.
             """
         }
+        sample(when (family) {
+            CharSequences -> "samples.text.Strings.associateByToWithValueTransform"
+            ArraysOfObjects, ArraysOfPrimitives -> "samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByToWithValueTransform"
+            else -> "samples.collections.Collections.Transformations.associateByToWithValueTransform"
+        })
         body {
             """
             for (element in this) {
                 destination.put(keySelector(element), valueTransform(element))
+            }
+            return destination
+            """
+        }
+    }
+
+    val f_associateWith = fn("associateWith(valueSelector: (K) -> V)") {
+        include(Iterables, Sequences, CharSequences)
+    } builder {
+        inline()
+        since("1.3")
+        typeParam("K", primary = true)
+        typeParam("V")
+        returns("Map<K, V>")
+        doc {
+            """
+            Returns a [Map] where keys are ${f.element.pluralize()} from the given ${f.collection} and values are
+            produced by the [valueSelector] function applied to each ${f.element}.
+
+            If any two ${f.element.pluralize()} are equal, the last one gets added to the map.
+
+            The returned map preserves the entry iteration order of the original ${f.collection}.
+            """
+        }
+        sample(when (family) {
+            CharSequences -> "samples.text.Strings.associateWith"
+            else -> "samples.collections.Collections.Transformations.associateWith"
+        })
+        body {
+            val resultMap = when (family) {
+                Iterables -> "LinkedHashMap<K, V>(mapCapacity(collectionSizeOrDefault(10)).coerceAtLeast(16))"
+                CharSequences -> "LinkedHashMap<K, V>(mapCapacity(length).coerceAtLeast(16))"
+                else -> "LinkedHashMap<K, V>()"
+            }
+            """
+            val result = $resultMap
+            return associateWithTo(result, valueSelector)
+            """
+        }
+    }
+
+    val f_associateWithTo = fn("associateWithTo(destination: M, valueSelector: (K) -> V)") {
+        include(Iterables, Sequences, CharSequences)
+    } builder {
+        inline()
+        since("1.3")
+        typeParam("K", primary = true)
+        typeParam("V")
+        typeParam("M : MutableMap<in K, in V>")
+        returns("M")
+        doc {
+            """
+            Populates and returns the [destination] mutable map with key-value pairs for each ${f.element} of the given ${f.collection},
+            where key is the ${f.element} itself and value is provided by the [valueSelector] function applied to that key.
+
+            If any two ${f.element.pluralize()} are equal, the last one overwrites the former value in the map.
+            """
+        }
+        sample(when (family) {
+            CharSequences -> "samples.text.Strings.associateWithTo"
+            else -> "samples.collections.Collections.Transformations.associateWithTo"
+        })
+        body {
+            """
+            for (element in this) {
+                destination.put(element, valueSelector(element))
             }
             return destination
             """

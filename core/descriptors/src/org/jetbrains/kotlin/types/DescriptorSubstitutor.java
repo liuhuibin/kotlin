@@ -16,10 +16,10 @@
 
 package org.jetbrains.kotlin.types;
 
-import org.jetbrains.annotations.Mutable;
+import kotlin.annotations.jvm.Mutable;
+import kotlin.annotations.jvm.ReadOnly;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.ReadOnly;
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor;
 import org.jetbrains.kotlin.descriptors.SourceElement;
 import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor;
@@ -40,7 +40,9 @@ public class DescriptorSubstitutor {
             @NotNull DeclarationDescriptor newContainingDeclaration,
             @NotNull @Mutable List<TypeParameterDescriptor> result
     ) {
-        TypeSubstitutor substitutor = substituteTypeParameters(typeParameters, originalSubstitution, newContainingDeclaration, result, null);
+        TypeSubstitutor substitutor = substituteTypeParameters(
+                typeParameters, originalSubstitution, newContainingDeclaration, result, null
+        );
         if (substitutor == null) throw new AssertionError("Substitution failed");
         return substitutor;
     }
@@ -65,7 +67,8 @@ public class DescriptorSubstitutor {
                     descriptor.getVariance(),
                     descriptor.getName(),
                     index++,
-                    SourceElement.NO_SOURCE
+                    SourceElement.NO_SOURCE,
+                    descriptor.getStorageManager()
             );
 
             mutableSubstitution.put(descriptor.getTypeConstructor(), new TypeProjectionImpl(substituted.getDefaultType()));

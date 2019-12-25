@@ -1,4 +1,4 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
 // WITH_RUNTIME
 // WITH_COROUTINES
 // COMMON_COROUTINES_TEST
@@ -40,7 +40,7 @@ fun box(): String {
     return "OK"
 }
 
-suspend fun suspendAndContinue(): Unit = suspendCoroutineOrReturn { c ->
+suspend fun suspendAndContinue(): Unit = suspendCoroutineUninterceptedOrReturn { c ->
     postponed = {
         c.resume(Unit)
     }

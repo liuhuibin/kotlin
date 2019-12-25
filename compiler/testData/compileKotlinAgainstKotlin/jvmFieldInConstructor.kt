@@ -1,4 +1,4 @@
-// IGNORE_BACKEND: NATIVE
+// TARGET_BACKEND: JVM
 // FILE: A.kt
 
 open class A(@JvmField public val publicField: String = "1",
@@ -11,7 +11,7 @@ open class B : A()
 
 open class C : B() {
     fun test(): String {
-        return super.publicField + super.internalField + super.protectedfield
+        return publicField + super.internalField + super.protectedfield
     }
 }
 

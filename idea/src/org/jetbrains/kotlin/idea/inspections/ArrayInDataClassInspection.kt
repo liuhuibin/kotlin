@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.inspections
@@ -34,10 +34,12 @@ class ArrayInDataClassInspection : AbstractKotlinInspection() {
                 if (!parameter.hasValOrVar()) continue
                 val type = context.get(BindingContext.TYPE, parameter.typeReference) ?: continue
                 if (KotlinBuiltIns.isArray(type) || KotlinBuiltIns.isPrimitiveArray(type)) {
-                    holder.registerProblem(parameter,
-                                           "Array property in data class: it's recommended to override equals() / hashCode()",
-                                           ProblemHighlightType.GENERIC_ERROR_OR_WARNING,
-                                           GenerateEqualsAndHashcodeFix())
+                    holder.registerProblem(
+                        parameter,
+                        "Array property in data class: it's recommended to override equals() / hashCode()",
+                        ProblemHighlightType.GENERIC_ERROR_OR_WARNING,
+                        GenerateEqualsAndHashcodeFix()
+                    )
                 }
             }
         }

@@ -1,6 +1,3 @@
-// WITH_RUNTIME
-// TARGET_BACKEND: JVM
-
 // FILE: Dummy.kt
 // Empty body to trigger multifile test mode
 
@@ -35,12 +32,16 @@ class TestAccessor {
 
 // @TestMethod.class:
 // 0 INVOKESTATIC kotlin/jvm/internal/Intrinsics.checkParameterIsNotNull \(Ljava/lang/Object;Ljava/lang/String;\)V
+// 0 INVOKESTATIC kotlin/jvm/internal/Intrinsics.checkNotNullParameter \(Ljava/lang/Object;Ljava/lang/String;\)V
 
 // @TestMethodOverloads.class:
 // 0 INVOKESTATIC kotlin/jvm/internal/Intrinsics.checkParameterIsNotNull \(Ljava/lang/Object;Ljava/lang/String;\)V
+// 0 INVOKESTATIC kotlin/jvm/internal/Intrinsics.checkNotNullParameter \(Ljava/lang/Object;Ljava/lang/String;\)V
 
 // @TestProperty.class:
 // 0 INVOKESTATIC kotlin/jvm/internal/Intrinsics.checkParameterIsNotNull \(Ljava/lang/Object;Ljava/lang/String;\)V
+// 0 INVOKESTATIC kotlin/jvm/internal/Intrinsics.checkNotNullParameter \(Ljava/lang/Object;Ljava/lang/String;\)V
 
 // @TestAccessor.class:
 // 0 INVOKESTATIC kotlin/jvm/internal/Intrinsics.checkParameterIsNotNull \(Ljava/lang/Object;Ljava/lang/String;\)V
+// 0 INVOKESTATIC kotlin/jvm/internal/Intrinsics.checkNotNullParameter \(Ljava/lang/Object;Ljava/lang/String;\)V

@@ -1,4 +1,4 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
 // WITH_RUNTIME
 // WITH_COROUTINES
 // COMMON_COROUTINES_TEST
@@ -22,7 +22,7 @@ suspend fun foo(y: A?): String {
     return res
 }
 
-suspend fun baz(y: String): Unit = suspendCoroutineOrReturn { x ->
+suspend fun baz(y: String): Unit = suspendCoroutineUninterceptedOrReturn { x ->
     res += y[res.length]
     x.resume(Unit)
     COROUTINE_SUSPENDED

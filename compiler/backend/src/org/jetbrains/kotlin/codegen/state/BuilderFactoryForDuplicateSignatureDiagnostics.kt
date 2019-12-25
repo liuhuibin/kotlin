@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.codegen.state
@@ -10,6 +10,7 @@ import com.intellij.util.containers.MultiMap
 import org.jetbrains.kotlin.codegen.ClassBuilderFactory
 import org.jetbrains.kotlin.codegen.ClassBuilderMode
 import org.jetbrains.kotlin.codegen.SignatureCollectingClassBuilderFactory
+import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.CallableMemberDescriptor.Kind.DELEGATION
 import org.jetbrains.kotlin.descriptors.CallableMemberDescriptor.Kind.FAKE_OVERRIDE
@@ -22,6 +23,7 @@ import org.jetbrains.kotlin.resolve.descriptorUtil.overriddenTreeUniqueAsSequenc
 import org.jetbrains.kotlin.resolve.jvm.diagnostics.*
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
 import org.jetbrains.kotlin.utils.addIfNotNull
+import org.jetbrains.org.objectweb.asm.commons.Method
 import java.util.*
 
 private val EXTERNAL_SOURCES_KINDS = arrayOf(
@@ -47,14 +49,17 @@ class BuilderFactoryForDuplicateSignatureDiagnostics(
     bindingContext: BindingContext,
     private val diagnostics: DiagnosticSink,
     moduleName: String,
-    isReleaseCoroutines: Boolean,
-    shouldGenerate: (JvmDeclarationOrigin) -> Boolean
+    languageVersionSettings: LanguageVersionSettings,
+    shouldGenerate: (JvmDeclarationOrigin) -> Boolean,
+    mapAsmMethod: ((FunctionDescriptor) -> Method)?
 ) : SignatureCollectingClassBuilderFactory(builderFactory, shouldGenerate) {
 
-    // Avoid errors when some classes are not loaded for some reason
-    private val typeMapper = KotlinTypeMapper(
-        bindingContext, ClassBuilderMode.LIGHT_CLASSES, IncompatibleClassTracker.DoNothing, moduleName, false, isReleaseCoroutines
-    )
+    private val mapAsmMethod = mapAsmMethod
+        ?: KotlinTypeMapper(
+            // Avoid errors when some classes are not loaded for some reason
+            bindingContext, ClassBuilderMode.LIGHT_CLASSES, moduleName, languageVersionSettings, isIrBackend = false
+        )::mapAsmMethod
+
     private val reportDiagnosticsTasks = ArrayList<() -> Unit>()
 
     fun reportDiagnostics() {
@@ -237,7 +242,7 @@ class BuilderFactoryForDuplicateSignatureDiagnostics(
     }
 
     private fun FunctionDescriptor.asRawSignature() =
-        with(typeMapper.mapAsmMethod(this)) {
+        with(mapAsmMethod(this)) {
             RawSignature(name, descriptor, MemberKind.METHOD)
         }
 

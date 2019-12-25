@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.inspections
@@ -209,8 +209,10 @@ class ConvertScopeFunctionToParameter(counterpartName: String) : ConvertScopeFun
                 if (dispatchReceiverTarget == lambdaDescriptor || extensionReceiverTarget == lambdaDescriptor) {
                     val parent = expression.parent
                     if (parent is KtCallExpression && expression == parent.calleeExpression) {
-                        replacements.add(parent) { element ->
-                            factory.createExpressionByPattern("$0.$1", parameterName, element)
+                        if ((parent.parent as? KtQualifiedExpression)?.receiverExpression !is KtThisExpression) {
+                            replacements.add(parent) { element ->
+                                factory.createExpressionByPattern("$0.$1", parameterName, element)
+                            }
                         }
                     } else if (parent is KtQualifiedExpression && parent.receiverExpression is KtThisExpression) {
                         // do nothing
@@ -226,7 +228,8 @@ class ConvertScopeFunctionToParameter(counterpartName: String) : ConvertScopeFun
             override fun visitThisExpression(expression: KtThisExpression) {
                 val resolvedCall = expression.getResolvedCall(bindingContext) ?: return
                 if (resolvedCall.resultingDescriptor == lambdaDispatchReceiver ||
-                    resolvedCall.resultingDescriptor == lambdaExtensionReceiver) {
+                    resolvedCall.resultingDescriptor == lambdaExtensionReceiver
+                ) {
                     replacements.add(expression) { createExpression(parameterName) }
                 }
             }

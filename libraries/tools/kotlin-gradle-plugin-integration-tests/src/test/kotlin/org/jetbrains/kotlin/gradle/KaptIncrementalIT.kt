@@ -1,17 +1,15 @@
 package org.jetbrains.kotlin.gradle
 
-import org.jetbrains.kotlin.gradle.util.allKotlinFiles
-import org.jetbrains.kotlin.gradle.util.findFileByName
-import org.jetbrains.kotlin.gradle.util.getFileByName
-import org.jetbrains.kotlin.gradle.util.modify
+import org.jetbrains.kotlin.gradle.util.*
 import org.junit.Test
+import kotlin.test.assertEquals
 
-class KaptIncrementalIT : BaseGradleIT() {
+open class KaptIncrementalIT : BaseGradleIT() {
     companion object {
         private val EXAMPLE_ANNOTATION_REGEX = "@(field:)?example.ExampleAnnotation".toRegex()
     }
 
-    private fun getProject() =
+    open fun getProject() =
         Project(
             "kaptIncrementalCompilationProject",
             GradleVersionRequired.None
@@ -25,24 +23,18 @@ class KaptIncrementalIT : BaseGradleIT() {
 
     @Test
     fun testAddNewLine() {
-        val project = Project("simple", directoryPrefix = "kapt2")
+        val project = getProject()
 
         project.build("clean", "build") {
             assertSuccessful()
         }
 
-        project.projectFile("test.kt").modify { "\n$it" }
+        project.projectFile("useB.kt").modify { "\n$it" }
         project.build("build") {
             assertSuccessful()
             assertTasksExecuted(":kaptGenerateStubsKotlin", ":compileKotlin")
             assertTasksUpToDate(":kaptKotlin")
-
-            // compileJava is up-to-date with Gradle >= 4.3, executed otherwise
-            if (project.testGradleVersionAtLeast("4.3")) {
-                assertTasksUpToDate(":compileJava")
-            } else {
-                assertTasksExecuted(":compileJava")
-            }
+            assertTasksUpToDate(":compileJava")
         }
     }
 
@@ -68,6 +60,32 @@ class KaptIncrementalIT : BaseGradleIT() {
                 ":kaptKotlin",
                 ":kaptGenerateStubsKotlin"
             )
+        }
+    }
+
+    @Test
+    fun testCompileError() {
+        val project = getProject()
+
+        project.build("build") {
+            assertSuccessful()
+        }
+
+        val bKt = project.projectDir.getFileByName("B.kt")
+        val errorKt = bKt.resolveSibling("error.kt")
+        errorKt.writeText("<COMPILE_ERROR_MARKER>")
+
+        project.build("build") {
+            assertFailed()
+            assertTasksFailed(":kaptGenerateStubsKotlin")
+        }
+
+        errorKt.delete()
+        bKt.modify { "$it\n" }
+        project.build("build") {
+            assertSuccessful()
+            assertCompiledKotlinSources(project.relativize(bKt))
+            assertTasksExecuted(":kaptGenerateStubsKotlin", ":compileKotlin")
         }
     }
 
@@ -181,6 +199,40 @@ class KaptIncrementalIT : BaseGradleIT() {
             val affectedElements = arrayOf("B", "funB", "valB", "useB")
             checkGenerated(*(annotatedElements.toSet() - affectedElements).toTypedArray())
             checkNotGenerated(*affectedElements)
+        }
+    }
+
+    @Test
+    fun testRemoveAllKotlinSources() {
+        val project = getProject()
+        val kapt3StubsPath = "build/tmp/kapt3/stubs/main"
+
+        project.build("build") {
+            assertSuccessful()
+            assertFileExists("$kapt3StubsPath/bar/UseBKt.java")
+        }
+
+        with(project.projectDir) {
+            resolve("src/").deleteRecursively()
+            resolve("src/main/java/bar").mkdirs()
+            resolve("src/main/java/bar/MyClass.java").writeText(
+                """
+                package bar;
+                public class MyClass {}
+            """.trimIndent()
+            )
+        }
+
+        project.build("build") {
+            assertSuccessful()
+
+            // Make sure all generated stubs are removed (except for NonExistentClass).
+            assertEquals(
+                listOf(fileInWorkingDir("$kapt3StubsPath/error/NonExistentClass.java").canonicalPath),
+                fileInWorkingDir(kapt3StubsPath).walk().filter { it.extension == "java" }.map { it.canonicalPath }.toList()
+            )
+            // Make sure all compiled kt files are cleaned up.
+            assertEquals(emptyList(), fileInWorkingDir("build/classes/kotlin").walk().filter { it.extension == "class" }.toList())
         }
     }
 

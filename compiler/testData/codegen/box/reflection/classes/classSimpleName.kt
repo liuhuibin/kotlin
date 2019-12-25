@@ -1,8 +1,6 @@
-// IGNORE_BACKEND: JS_IR
-// TODO: muted automatically, investigate should it be ran for JS or not
-// IGNORE_BACKEND: JS, NATIVE
-
-// WITH_REFLECT
+// IGNORE_BACKEND_FIR: JVM_IR
+// TARGET_BACKEND: JVM
+// WITH_RUNTIME
 
 import kotlin.test.assertEquals
 
@@ -12,7 +10,6 @@ fun box(): String {
     assertEquals("Klass", Klass::class.simpleName)
     assertEquals("Date", java.util.Date::class.simpleName)
     assertEquals("ObjectRef", kotlin.jvm.internal.Ref.ObjectRef::class.simpleName)
-    assertEquals("Void", java.lang.Void::class.simpleName)
 
     return "OK"
 }

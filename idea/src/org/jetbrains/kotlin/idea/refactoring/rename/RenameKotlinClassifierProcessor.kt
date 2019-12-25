@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2016 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.refactoring.rename
@@ -19,17 +8,15 @@ package org.jetbrains.kotlin.idea.refactoring.rename
 import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiReference
-import com.intellij.refactoring.JavaRefactoringSettings
 import com.intellij.refactoring.listeners.RefactoringElementListener
-import com.intellij.refactoring.rename.RenamePsiElementProcessor
 import com.intellij.usageView.UsageInfo
 import org.jetbrains.kotlin.asJava.classes.KtLightClass
 import org.jetbrains.kotlin.asJava.classes.KtLightClassForFacade
 import org.jetbrains.kotlin.asJava.classes.KtLightClassForSourceDeclaration
 import org.jetbrains.kotlin.asJava.namedUnwrappedElement
-import org.jetbrains.kotlin.descriptors.ClassifierDescriptor
 import org.jetbrains.kotlin.idea.caches.resolve.analyze
-import org.jetbrains.kotlin.idea.caches.resolve.unsafeResolveToDescriptor
+import org.jetbrains.kotlin.idea.refactoring.KotlinRefactoringSettings
+import org.jetbrains.kotlin.idea.refactoring.withExpectedActuals
 import org.jetbrains.kotlin.idea.references.KtSimpleNameReference
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext
@@ -42,16 +29,16 @@ class RenameKotlinClassifierProcessor : RenameKotlinPsiProcessor() {
         return element is KtClassOrObject || element is KtLightClass || element is KtConstructor<*> || element is KtTypeAlias
     }
 
-    override fun isToSearchInComments(psiElement: PsiElement) = JavaRefactoringSettings.getInstance().RENAME_SEARCH_IN_COMMENTS_FOR_CLASS
+    override fun isToSearchInComments(psiElement: PsiElement) = KotlinRefactoringSettings.instance.RENAME_SEARCH_IN_COMMENTS_FOR_CLASS
 
     override fun setToSearchInComments(element: PsiElement, enabled: Boolean) {
-        JavaRefactoringSettings.getInstance().RENAME_SEARCH_IN_COMMENTS_FOR_CLASS = enabled
+        KotlinRefactoringSettings.instance.RENAME_SEARCH_IN_COMMENTS_FOR_CLASS = enabled
     }
 
-    override fun isToSearchForTextOccurrences(element: PsiElement) = JavaRefactoringSettings.getInstance().RENAME_SEARCH_FOR_TEXT_FOR_CLASS
+    override fun isToSearchForTextOccurrences(element: PsiElement) = KotlinRefactoringSettings.instance.RENAME_SEARCH_FOR_TEXT_FOR_CLASS
 
     override fun setToSearchForTextOccurrences(element: PsiElement, enabled: Boolean) {
-        JavaRefactoringSettings.getInstance().RENAME_SEARCH_FOR_TEXT_FOR_CLASS = enabled
+        KotlinRefactoringSettings.instance.RENAME_SEARCH_FOR_TEXT_FOR_CLASS = enabled
     }
 
     override fun substituteElementToRename(element: PsiElement, editor: Editor?) = getClassOrObject(element)
@@ -61,15 +48,16 @@ class RenameKotlinClassifierProcessor : RenameKotlinPsiProcessor() {
 
         val classOrObject = getClassOrObject(element) as? KtClassOrObject ?: return
 
-        val file = classOrObject.containingKtFile
-
-        val virtualFile = file.virtualFile
-        if (virtualFile != null) {
-            val nameWithoutExtensions = virtualFile.nameWithoutExtension
-            if (nameWithoutExtensions == classOrObject.name) {
-                val newFileName = newName + "." + virtualFile.extension
-                allRenames.put(file, newFileName)
-                RenamePsiElementProcessor.forElement(file).prepareRenaming(file, newFileName, allRenames)
+        classOrObject.withExpectedActuals().forEach {
+            val file = it.containingKtFile
+            val virtualFile = file.virtualFile
+            if (virtualFile != null) {
+                val nameWithoutExtensions = virtualFile.nameWithoutExtension
+                if (nameWithoutExtensions == it.name) {
+                    val newFileName = newName + "." + virtualFile.extension
+                    allRenames.put(file, newFileName)
+                    forElement(file).prepareRenaming(file, newFileName, allRenames)
+                }
             }
         }
     }
@@ -90,16 +78,15 @@ class RenameKotlinClassifierProcessor : RenameKotlinPsiProcessor() {
     }
 
     override fun findCollisions(
-            element: PsiElement,
-            newName: String,
-            allRenames: MutableMap<out PsiElement, String>,
-            result: MutableList<UsageInfo>
+        element: PsiElement,
+        newName: String,
+        allRenames: MutableMap<out PsiElement, String>,
+        result: MutableList<UsageInfo>
     ) {
         val declaration = element.namedUnwrappedElement as? KtNamedDeclaration ?: return
-        val descriptor = declaration.unsafeResolveToDescriptor() as ClassifierDescriptor
 
         val collisions = SmartList<UsageInfo>()
-        checkRedeclarations(descriptor, newName, collisions)
+        checkRedeclarations(declaration, newName, collisions)
         checkOriginalUsagesRetargeting(declaration, newName, result, collisions)
         checkNewNameUsagesRetargeting(declaration, newName, collisions)
         result += collisions
@@ -127,8 +114,7 @@ class RenameKotlinClassifierProcessor : RenameKotlinPsiProcessor() {
         for (usage in usages) {
             if (usage.isAmbiguousImportUsage()) {
                 ambiguousImportUsages += usage
-            }
-            else {
+            } else {
                 simpleUsages += usage
             }
         }

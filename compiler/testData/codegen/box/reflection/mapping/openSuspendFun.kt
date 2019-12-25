@@ -1,6 +1,6 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
 // WITH_REFLECT
-// IGNORE_BACKEND: JS, NATIVE
+// TARGET_BACKEND: JVM
 
 import kotlin.reflect.full.declaredMemberFunctions
 import kotlin.reflect.jvm.javaMethod

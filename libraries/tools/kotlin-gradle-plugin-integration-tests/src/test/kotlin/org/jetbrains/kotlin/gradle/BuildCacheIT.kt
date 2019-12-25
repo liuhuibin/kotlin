@@ -25,23 +25,7 @@ class BuildCacheIT : BaseGradleIT() {
         super.defaultBuildOptions().copy(withBuildCache = true)
 
     companion object {
-        private val GRADLE_VERSION = GradleVersionRequired.AtLeast("4.3")
-    }
-
-    @Test
-    fun testNoCacheWithGradlePre43() = with(Project("simpleProject", GradleVersionRequired.Exact("4.2"))) {
-        // Check that even with the build cache enabled, the Kotlin tasks are not cacheable with Gradle < 4.3:
-        val optionsWithCache = defaultBuildOptions().copy(withBuildCache = true)
-
-        build("assemble", options = optionsWithCache) {
-            assertSuccessful()
-            assertNotContains("Packing task ':compileKotlin'")
-        }
-        build("clean", "assemble", options = optionsWithCache) {
-            assertSuccessful()
-            assertNotContains(":compileKotlin FROM-CACHE")
-            assertContains(":compileJava FROM-CACHE")
-        }
+        private val GRADLE_VERSION = GradleVersionRequired.None
     }
 
     @Test
@@ -70,6 +54,7 @@ class BuildCacheIT : BaseGradleIT() {
         build("clean", "assemble") {
             assertSuccessful()
             assertContains(":compileKotlin FROM-CACHE")
+            assertContains(":compileJava FROM-CACHE")
         }
     }
 
@@ -135,34 +120,33 @@ class BuildCacheIT : BaseGradleIT() {
     }
 
     @Test
-    fun testKaptCachingDisabledByDefault() = with(Project("simple", GRADLE_VERSION, directoryPrefix = "kapt2")) {
-        prepareLocalBuildCache()
+    fun testKaptCachingWithIncrementalApt() {
+        with(Project("kaptAvoidance", GRADLE_VERSION, directoryPrefix = "kapt2")) {
+            prepareLocalBuildCache()
 
-        build("build") {
-            assertSuccessful()
-            assertContains("Packing task ':kaptGenerateStubsKotlin'")
-            assertNotContains("Packing task ':kaptKotlin'")
-            assertContains("Caching disabled for task ':kaptKotlin': 'Caching is disabled by default for kapt")
-        }
-
-        File(projectDir, "build.gradle").appendText(
-            "\n" + """
-            afterEvaluate {
-                kaptKotlin.useBuildCache = true
+            val options = defaultBuildOptions().copy(
+                kaptOptions = KaptOptions(
+                    verbose = true,
+                    useWorkers = false,
+                    incrementalKapt = true,
+                    includeCompileClasspath = false
+                )
+            )
+            build(options = options, params = *arrayOf("clean", ":app:build")) {
+                assertSuccessful()
+                assertContains("Packing task ':app:kaptGenerateStubsKotlin'")
+                assertContains("Packing task ':app:kaptKotlin'")
             }
-            """.trimIndent()
-        )
 
-        build("clean", "build") {
-            assertSuccessful()
-            assertContains(":kaptGenerateStubsKotlin FROM-CACHE")
-            assertContains("Packing task ':kaptKotlin'")
-        }
+            // copy project to a new location
+            val copyProject = projectDir.resolveSibling("copy_${projectDir.name}").also { it.mkdirs() }
+            copyRecursively(projectDir, copyProject)
 
-        build("clean", "build") {
-            assertSuccessful()
-            assertContains(":kaptGenerateStubsKotlin FROM-CACHE")
-            assertContains(":kaptKotlin FROM-CACHE")
+            build(options = options, projectDir = copyProject.resolve(projectName), params = *arrayOf("clean", "build")) {
+                assertSuccessful()
+                assertContains(":app:kaptGenerateStubsKotlin FROM-CACHE")
+                assertContains(":app:kaptKotlin FROM-CACHE")
+            }
         }
     }
 }

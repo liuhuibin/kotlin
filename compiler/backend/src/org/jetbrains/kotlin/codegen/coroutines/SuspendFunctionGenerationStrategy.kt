@@ -1,17 +1,15 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.codegen.coroutines
 
 import org.jetbrains.kotlin.backend.common.CodegenUtil
-import org.jetbrains.kotlin.codegen.ClassBuilder
-import org.jetbrains.kotlin.codegen.ExpressionCodegen
-import org.jetbrains.kotlin.codegen.FunctionGenerationStrategy
-import org.jetbrains.kotlin.codegen.TransformationMethodVisitor
+import org.jetbrains.kotlin.codegen.*
 import org.jetbrains.kotlin.codegen.binding.CodegenBinding
 import org.jetbrains.kotlin.codegen.inline.addFakeContinuationConstructorCallMarker
+import org.jetbrains.kotlin.codegen.inline.coroutines.SurroundSuspendLambdaCallsWithSuspendMarkersMethodVisitor
 import org.jetbrains.kotlin.codegen.state.GenerationState
 import org.jetbrains.kotlin.config.JVMConstructorCallNormalizationMode
 import org.jetbrains.kotlin.config.LanguageVersionSettings
@@ -22,18 +20,21 @@ import org.jetbrains.kotlin.psi.KtFunction
 import org.jetbrains.kotlin.psi.psiUtil.getElementTextWithContext
 import org.jetbrains.kotlin.resolve.jvm.diagnostics.OtherOrigin
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodSignature
+import org.jetbrains.kotlin.types.typeUtil.isUnit
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
+import org.jetbrains.kotlin.utils.sure
 import org.jetbrains.org.objectweb.asm.MethodVisitor
 import org.jetbrains.org.objectweb.asm.Opcodes
 import org.jetbrains.org.objectweb.asm.Type
 import org.jetbrains.org.objectweb.asm.tree.MethodNode
 
 open class SuspendFunctionGenerationStrategy(
-        state: GenerationState,
-        protected val originalSuspendDescriptor: FunctionDescriptor,
-        protected val declaration: KtFunction,
-        private val containingClassInternalName: String,
-        private val constructorCallNormalizationMode: JVMConstructorCallNormalizationMode
+    state: GenerationState,
+    protected val originalSuspendDescriptor: FunctionDescriptor,
+    protected val declaration: KtFunction,
+    protected val containingClassInternalName: String,
+    private val constructorCallNormalizationMode: JVMConstructorCallNormalizationMode,
+    protected val functionCodegen: FunctionCodegen
 ) : FunctionGenerationStrategy.CodegenBased(state) {
 
     private lateinit var codegen: ExpressionCodegen
@@ -46,7 +47,7 @@ open class SuspendFunctionGenerationStrategy(
             declaration.containingFile
         ).also {
             val coroutineCodegen =
-                    CoroutineCodegenForNamedFunction.create(it, codegen, originalSuspendDescriptor, declaration)
+                CoroutineCodegenForNamedFunction.create(it, codegen, originalSuspendDescriptor, declaration)
             coroutineCodegen.generate()
         }
     }
@@ -54,28 +55,77 @@ open class SuspendFunctionGenerationStrategy(
     override fun wrapMethodVisitor(mv: MethodVisitor, access: Int, name: String, desc: String): MethodVisitor {
         if (access and Opcodes.ACC_ABSTRACT != 0) return mv
 
-        if (state.bindingContext[CodegenBinding.CAPTURES_CROSSINLINE_SUSPEND_LAMBDA, originalSuspendDescriptor] == true) {
-            return AddConstructorCallForCoroutineRegeneration(
-                mv, access, name, desc, null, null, this::classBuilderForCoroutineState,
+        val stateMachineBuilder = createStateMachineBuilder(mv, access, name, desc)
+
+        val forInline = state.bindingContext[CodegenBinding.CAPTURES_CROSSINLINE_LAMBDA, originalSuspendDescriptor] == true
+        // Both capturing and inline functions share the same suffix, however, inline functions can also be capturing
+        // they are already covered by SuspendInlineFunctionGenerationStrategy, thus, if we generate yet another copy,
+        // we will get name+descriptor clash
+        return if (forInline && !originalSuspendDescriptor.isInline)
+            AddConstructorCallForCoroutineRegeneration(
+                MethodNodeCopyingMethodVisitor(
+                    SurroundSuspendLambdaCallsWithSuspendMarkersMethodVisitor(
+                        stateMachineBuilder,
+                        access, name, desc, containingClassInternalName,
+                        isCapturedSuspendLambda = {
+                            isCapturedSuspendLambda(
+                                functionCodegen.closure.sure {
+                                    "Anonymous object should have closure"
+                                },
+                                it.name,
+                                state.bindingContext
+                            )
+                        }
+                    ), access, name, desc,
+                    newMethod = { origin, newAccess, newName, newDesc ->
+                        functionCodegen.newMethod(origin, newAccess, newName, newDesc, null, null)
+                    }
+                ), access, name, desc, null, null, this::classBuilderForCoroutineState,
                 containingClassInternalName,
                 originalSuspendDescriptor.dispatchReceiverParameter != null,
                 containingClassInternalNameOrNull(),
                 languageVersionSettings
-            )
-        }
+            ) else stateMachineBuilder
+    }
+
+    protected fun createStateMachineBuilder(
+        mv: MethodVisitor,
+        access: Int,
+        name: String,
+        desc: String
+    ): CoroutineTransformerMethodVisitor {
         return CoroutineTransformerMethodVisitor(
             mv, access, name, desc, null, null, containingClassInternalName, this::classBuilderForCoroutineState,
             isForNamedFunction = true,
+            reportSuspensionPointInsideMonitor = { reportSuspensionPointInsideMonitor(declaration, state, it) },
             lineNumber = CodegenUtil.getLineNumberForElement(declaration, false) ?: 0,
+            sourceFile = declaration.containingKtFile.name,
             shouldPreserveClassInitialization = constructorCallNormalizationMode.shouldPreserveClassInitialization,
             needDispatchReceiver = originalSuspendDescriptor.dispatchReceiverParameter != null,
             internalNameForDispatchReceiver = containingClassInternalNameOrNull(),
-            languageVersionSettings = languageVersionSettings
+            languageVersionSettings = languageVersionSettings,
+            disableTailCallOptimizationForFunctionReturningUnit = originalSuspendDescriptor.returnType?.isUnit() == true &&
+                    originalSuspendDescriptor.overriddenDescriptors.isNotEmpty() &&
+                    !originalSuspendDescriptor.allOverriddenFunctionsReturnUnit()
         )
     }
 
+    private fun FunctionDescriptor.allOverriddenFunctionsReturnUnit(): Boolean {
+        val visited = mutableSetOf<FunctionDescriptor>()
+
+        fun bfs(descriptor: FunctionDescriptor): Boolean {
+            if (!visited.add(descriptor)) return true
+            if (descriptor.original.returnType?.isUnit() != true) return false
+            for (parent in descriptor.overriddenDescriptors) {
+                if (!bfs(parent)) return false
+            }
+            return true
+        }
+        return bfs(this)
+    }
+
     private fun containingClassInternalNameOrNull() =
-            originalSuspendDescriptor.containingDeclaration.safeAs<ClassDescriptor>()?.let(state.typeMapper::mapClass)?.internalName
+        originalSuspendDescriptor.containingDeclaration.safeAs<ClassDescriptor>()?.let(state.typeMapper::mapClass)?.internalName
 
     override fun doGenerateBody(codegen: ExpressionCodegen, signature: JvmMethodSignature) {
         this.codegen = codegen
@@ -115,6 +165,7 @@ open class SuspendFunctionGenerationStrategy(
                     languageVersionSettings
                 )
                 addFakeContinuationConstructorCallMarker(this, false)
+                pop() // Otherwise stack-transformation breaks
             })
         }
     }

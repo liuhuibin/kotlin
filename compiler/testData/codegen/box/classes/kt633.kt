@@ -1,4 +1,4 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
 class mInt(val i : Int) {
     override fun toString() : String = "mint: $i"
     operator fun plus(i : Int) = mInt(this.i + i)

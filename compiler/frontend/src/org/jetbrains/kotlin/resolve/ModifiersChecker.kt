@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.resolve
@@ -21,6 +21,7 @@ import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtDeclarationWithBody
 import org.jetbrains.kotlin.psi.KtModifierList
 import org.jetbrains.kotlin.psi.KtModifierListOwner
+import org.jetbrains.kotlin.resolve.calls.checkers.checkCoroutinesFeature
 import java.util.*
 
 object ModifierCheckerCore {
@@ -182,11 +183,12 @@ object ModifierCheckerCore {
         result += incompatibilityRegister(PRIVATE_KEYWORD, PROTECTED_KEYWORD, PUBLIC_KEYWORD, INTERNAL_KEYWORD)
         // Abstract + open + final + sealed: incompatible
         result += incompatibilityRegister(ABSTRACT_KEYWORD, OPEN_KEYWORD, FINAL_KEYWORD, SEALED_KEYWORD)
-        // data + open, data + inner, data + abstract, data + sealed
+        // data + open, data + inner, data + abstract, data + sealed, data + inline
         result += incompatibilityRegister(DATA_KEYWORD, OPEN_KEYWORD)
         result += incompatibilityRegister(DATA_KEYWORD, INNER_KEYWORD)
         result += incompatibilityRegister(DATA_KEYWORD, ABSTRACT_KEYWORD)
         result += incompatibilityRegister(DATA_KEYWORD, SEALED_KEYWORD)
+        result += incompatibilityRegister(DATA_KEYWORD, INLINE_KEYWORD)
         // open is redundant to abstract & override
         result += redundantRegister(ABSTRACT_KEYWORD, OPEN_KEYWORD)
         // abstract is redundant to sealed
@@ -345,6 +347,11 @@ object ModifierCheckerCore {
 
             val featureSupport = languageVersionSettings.getFeatureSupport(dependency)
 
+            if (dependency == LanguageFeature.Coroutines) {
+                checkCoroutinesFeature(languageVersionSettings, trace, node.psi)
+                continue
+            }
+
             val diagnosticData = dependency to languageVersionSettings
             when (featureSupport) {
                 LanguageFeature.State.ENABLED_WITH_WARNING -> {
@@ -414,9 +421,12 @@ object ModifierCheckerCore {
         actualTargets: List<KotlinTarget>,
         languageVersionSettings: LanguageVersionSettings
     ) {
+        if (list.stub != null) return
+
         // It's a list of all nodes with error already reported
         // General strategy: report no more than one error but any number of warnings
         val incorrectNodes = hashSetOf<ASTNode>()
+
         val children = list.node.getChildren(MODIFIER_KEYWORD_SET)
         for (second in children) {
             for (first in children) {

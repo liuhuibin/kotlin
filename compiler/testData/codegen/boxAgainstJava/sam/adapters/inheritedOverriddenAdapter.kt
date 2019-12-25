@@ -1,3 +1,4 @@
+// WITH_RUNTIME
 // FILE: Super.java
 
 class Super {

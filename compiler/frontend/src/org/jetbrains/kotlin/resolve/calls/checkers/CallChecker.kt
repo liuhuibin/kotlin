@@ -20,12 +20,13 @@ import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.resolve.BindingTrace
-import org.jetbrains.kotlin.resolve.DeprecationResolver
+import org.jetbrains.kotlin.resolve.MissingSupertypesResolver
 import org.jetbrains.kotlin.resolve.calls.context.ResolutionContext
 import org.jetbrains.kotlin.resolve.calls.model.ResolvedCall
 import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowInfo
 import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowValueFactory
 import org.jetbrains.kotlin.resolve.checkers.CheckerContext
+import org.jetbrains.kotlin.resolve.deprecation.DeprecationResolver
 import org.jetbrains.kotlin.resolve.scopes.LexicalScope
 import org.jetbrains.kotlin.types.DeferredType
 import org.jetbrains.kotlin.types.KotlinType
@@ -42,6 +43,7 @@ class CallCheckerContext @JvmOverloads constructor(
     val resolutionContext: ResolutionContext<*>,
     override val deprecationResolver: DeprecationResolver,
     override val moduleDescriptor: ModuleDescriptor,
+    val missingSupertypesResolver: MissingSupertypesResolver,
     override val trace: BindingTrace = resolutionContext.trace
 ) : CheckerContext {
     val scope: LexicalScope

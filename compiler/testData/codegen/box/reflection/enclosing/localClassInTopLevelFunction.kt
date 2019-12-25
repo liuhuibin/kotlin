@@ -1,6 +1,5 @@
-// IGNORE_BACKEND: JS_IR
-// TODO: muted automatically, investigate should it be ran for JS or not
-// IGNORE_BACKEND: JS, NATIVE
+// IGNORE_BACKEND_FIR: JVM_IR
+// TARGET_BACKEND: JVM
 
 // WITH_REFLECT
 // KT-4234
@@ -9,7 +8,7 @@ fun box(): String {
     class C
 
     val name = C::class.java.getSimpleName()
-    if (name != "box\$C") return "Fail: $name"
+    if (name != "box\$C" && name != "C") return "Fail: $name"
 
     return "OK"
 }

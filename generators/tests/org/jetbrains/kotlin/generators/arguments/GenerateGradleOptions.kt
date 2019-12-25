@@ -37,29 +37,30 @@ interface AdditionalGradleProperties {
 }
 
 fun generateKotlinGradleOptions(withPrinterToFile: (targetFile: File, Printer.()->Unit)->Unit) {
+    val apiSrcDir = File("libraries/tools/kotlin-gradle-plugin-api/src/main/kotlin")
     val srcDir = File("libraries/tools/kotlin-gradle-plugin/src/main/kotlin")
 
     // common interface
     val commonInterfaceFqName = FqName("org.jetbrains.kotlin.gradle.dsl.KotlinCommonToolOptions")
     val commonOptions =  gradleOptions<CommonToolArguments>()
     val additionalOptions = gradleOptions<AdditionalGradleProperties>()
-    withPrinterToFile(File(srcDir, commonInterfaceFqName)) {
+    withPrinterToFile(File(apiSrcDir, commonInterfaceFqName)) {
         generateInterface(commonInterfaceFqName,
                           commonOptions + additionalOptions)
     }
 
-    println("### Attributes common for 'kotlin', 'kotlin2js' and 'kotlin2jsDce\n")
+    println("### Attributes Common for JVM, JS, and JS DCE\n")
     generateMarkdown(commonOptions + additionalOptions)
 
     val commonCompilerInterfaceFqName = FqName("org.jetbrains.kotlin.gradle.dsl.KotlinCommonOptions")
     val commonCompilerOptions = gradleOptions<CommonCompilerArguments>()
-    withPrinterToFile(File(srcDir, commonCompilerInterfaceFqName)) {
+    withPrinterToFile(File(apiSrcDir, commonCompilerInterfaceFqName)) {
         generateInterface(commonCompilerInterfaceFqName,
                           commonCompilerOptions,
                           parentType = commonInterfaceFqName)
     }
 
-    println("\n### Attributes common for 'kotlin' and 'kotlin2js'\n")
+    println("\n### Attributes Common for JVM and JS\n")
     generateMarkdown(commonCompilerOptions)
 
     // generate jvm interface
@@ -81,7 +82,7 @@ fun generateKotlinGradleOptions(withPrinterToFile: (targetFile: File, Printer.()
                      commonOptions + commonCompilerOptions + jvmOptions)
     }
 
-    println("\n### Attributes specific for 'kotlin'\n")
+    println("\n### Attributes Specific for JVM\n")
     generateMarkdown(jvmOptions)
 
     // generate js interface
@@ -102,7 +103,7 @@ fun generateKotlinGradleOptions(withPrinterToFile: (targetFile: File, Printer.()
                      commonOptions + commonCompilerOptions + jsOptions)
     }
 
-    println("\n### Attributes specific for 'kotlin2js'\n")
+    println("\n### Attributes Specific for JS\n")
     generateMarkdown(jsOptions)
 
     // generate JS DCE interface and implementation
@@ -194,7 +195,9 @@ private fun Printer.generateImpl(
             generatePropertyDeclaration(property, modifiers = "override")
             withIndent {
                 println("get() = $backingField ?: ${property.gradleDefaultValue}")
-                println("set(value) { $backingField = value }")
+                println("set(value) {")
+                withIndent { println("$backingField = value") }
+                println("}")
             }
         }
 

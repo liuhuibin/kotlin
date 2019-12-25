@@ -1,4 +1,4 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
 // WITH_RUNTIME
 // WITH_COROUTINES
 // COMMON_COROUTINES_TEST
@@ -24,7 +24,7 @@ class X {
     }
 }
 
-suspend fun suspendThere(v: String): String = suspendCoroutineOrReturn { x ->
+suspend fun suspendThere(v: String): String = suspendCoroutineUninterceptedOrReturn { x ->
     x.resume(v)
     COROUTINE_SUSPENDED
 }

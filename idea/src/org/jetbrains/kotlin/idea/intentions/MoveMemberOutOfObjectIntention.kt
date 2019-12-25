@@ -19,21 +19,22 @@ package org.jetbrains.kotlin.idea.intentions
 import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiElement
 import com.intellij.util.containers.MultiMap
+import org.jetbrains.kotlin.idea.refactoring.CompositeRefactoringRunner
 import org.jetbrains.kotlin.idea.refactoring.checkConflictsInteractively
 import org.jetbrains.kotlin.idea.refactoring.move.moveDeclarations.*
-import org.jetbrains.kotlin.idea.refactoring.runRefactoringWithPostprocessing
 import org.jetbrains.kotlin.idea.util.application.runWriteAction
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
 
-abstract class MoveMemberOutOfObjectIntention(text: String) : SelfTargetingRangeIntention<KtNamedDeclaration>(KtNamedDeclaration::class.java, text) {
+abstract class MoveMemberOutOfObjectIntention(text: String) :
+    SelfTargetingRangeIntention<KtNamedDeclaration>(KtNamedDeclaration::class.java, text) {
     override fun startInWriteAction() = false
 
-    abstract fun getDestination(element: KtNamedDeclaration) : KtElement
+    abstract fun getDestination(element: KtNamedDeclaration): KtElement
 
-    abstract fun addConflicts(element: KtNamedDeclaration,conflicts: MultiMap<PsiElement, String>)
+    abstract fun addConflicts(element: KtNamedDeclaration, conflicts: MultiMap<PsiElement, String>)
 
     override fun applyTo(element: KtNamedDeclaration, editor: Editor?) {
         val project = element.project
@@ -49,17 +50,15 @@ abstract class MoveMemberOutOfObjectIntention(text: String) : SelfTargetingRange
 
         if (element is KtClassOrObject) {
             val moveDescriptor = MoveDeclarationsDescriptor(
-                    project,
-                    listOf(element),
-                    KotlinMoveTargetForExistingElement(destination),
-                    MoveDeclarationsDelegate.NestedClass()
+                project,
+                MoveSource(element),
+                KotlinMoveTargetForExistingElement(destination),
+                MoveDeclarationsDelegate.NestedClass()
             )
-            val refactoring = { MoveKotlinDeclarationsProcessor(moveDescriptor).run() }
-            refactoring.runRefactoringWithPostprocessing(project, MoveKotlinDeclarationsProcessor.REFACTORING_ID) {
-                runWriteAction {
-                    deleteClassOrObjectIfEmpty()
-                }
-            }
+            object : CompositeRefactoringRunner(project, MoveKotlinDeclarationsProcessor.REFACTORING_ID) {
+                override fun runRefactoring() = MoveKotlinDeclarationsProcessor(moveDescriptor).run()
+                override fun onRefactoringDone() = runWriteAction { deleteClassOrObjectIfEmpty() }
+            }.run()
             return
         }
 

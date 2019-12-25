@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.decompiler.stubBuilder;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.idea.decompiler.stubBuilder;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -22,11 +21,11 @@ import java.util.regex.Pattern;
 @RunWith(JUnit3RunnerWithInners.class)
 public class ClsStubBuilderTestGenerated extends AbstractClsStubBuilderTest {
     private void runTest(String testDataFilePath) throws Exception {
-        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
 
     public void testAllFilesPresentInStubBuilder() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/decompiler/stubBuilder"), Pattern.compile("^([^\\.]+)$"), TargetBackend.ANY, false);
+        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/decompiler/stubBuilder"), Pattern.compile("^([^\\.]+)$"), null, false);
     }
 
     @TestMetadata("AnnotatedFlexibleTypes")
@@ -34,9 +33,24 @@ public class ClsStubBuilderTestGenerated extends AbstractClsStubBuilderTest {
         runTest("idea/testData/decompiler/stubBuilder/AnnotatedFlexibleTypes/");
     }
 
+    @TestMetadata("AnnotatedParameterInEnumConstructor")
+    public void testAnnotatedParameterInEnumConstructor() throws Exception {
+        runTest("idea/testData/decompiler/stubBuilder/AnnotatedParameterInEnumConstructor/");
+    }
+
+    @TestMetadata("AnnotatedParameterInInnerClassConstructor")
+    public void testAnnotatedParameterInInnerClassConstructor() throws Exception {
+        runTest("idea/testData/decompiler/stubBuilder/AnnotatedParameterInInnerClassConstructor/");
+    }
+
     @TestMetadata("AnnotationClass")
     public void testAnnotationClass() throws Exception {
         runTest("idea/testData/decompiler/stubBuilder/AnnotationClass/");
+    }
+
+    @TestMetadata("AnnotationValues")
+    public void testAnnotationValues() throws Exception {
+        runTest("idea/testData/decompiler/stubBuilder/AnnotationValues/");
     }
 
     @TestMetadata("Annotations")
@@ -72,6 +86,11 @@ public class ClsStubBuilderTestGenerated extends AbstractClsStubBuilderTest {
     @TestMetadata("Const")
     public void testConst() throws Exception {
         runTest("idea/testData/decompiler/stubBuilder/Const/");
+    }
+
+    @TestMetadata("Contracts")
+    public void testContracts() throws Exception {
+        runTest("idea/testData/decompiler/stubBuilder/Contracts/");
     }
 
     @TestMetadata("DataClass")

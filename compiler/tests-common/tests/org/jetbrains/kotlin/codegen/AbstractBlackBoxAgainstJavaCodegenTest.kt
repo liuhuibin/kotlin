@@ -18,23 +18,23 @@ package org.jetbrains.kotlin.codegen
 
 import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoot
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.test.ConfigurationKind
 import java.io.File
 
 abstract class AbstractBlackBoxAgainstJavaCodegenTest : AbstractBlackBoxCodegenTest() {
-    override fun doMultiFileTest(wholeFile: File, files: MutableList<TestFile>, javaFilesDir: File?) {
-        javaClassesOutputDirectory = javaFilesDir!!.let { directory ->
+    override fun doMultiFileTest(wholeFile: File, files: MutableList<TestFile>) {
+        javaClassesOutputDirectory = writeJavaFiles(files)!!.let { directory ->
             CodegenTestUtil.compileJava(CodegenTestUtil.findJavaSourcesInDirectory(directory), emptyList(), extractJavacOptions(files))
         }
 
-        super.doMultiFileTest(wholeFile, files, null)
+        super.doMultiFileTest(wholeFile, files.map { file ->
+            // This is a hack which allows to avoid compiling Java sources for the second time (which would be incorrect in this test),
+            // while also retaining content of all Java sources so that we could find and use test directives in Java sources
+            // in CodegenTestCase.compile.
+            if (file.name.endsWith(".java")) TestFile("${file.name}.disabled", file.content) else file
+        })
     }
 
     override fun updateConfiguration(configuration: CompilerConfiguration) {
         configuration.addJvmClasspathRoot(javaClassesOutputDirectory)
-    }
-
-    override fun extractConfigurationKind(files: MutableList<TestFile>): ConfigurationKind {
-        return ConfigurationKind.ALL
     }
 }

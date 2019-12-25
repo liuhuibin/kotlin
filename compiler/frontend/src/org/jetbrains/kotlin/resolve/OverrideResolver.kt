@@ -30,21 +30,27 @@ import org.jetbrains.kotlin.descriptors.CallableMemberDescriptor.Kind.FAKE_OVERR
 import org.jetbrains.kotlin.diagnostics.DiagnosticFactory2
 import org.jetbrains.kotlin.diagnostics.DiagnosticFactoryWithPsiElement
 import org.jetbrains.kotlin.diagnostics.Errors.*
+import org.jetbrains.kotlin.diagnostics.rendering.DeclarationWithDiagnosticComponents
 import org.jetbrains.kotlin.incremental.components.NoLookupLocation
 import org.jetbrains.kotlin.lexer.KtTokens
+import org.jetbrains.kotlin.platform.PlatformSpecificDiagnosticComponents
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.DescriptorUtils.classCanHaveAbstractFakeOverride
 import org.jetbrains.kotlin.resolve.OverridingUtil.OverrideCompatibilityInfo.Result.OVERRIDABLE
 import org.jetbrains.kotlin.resolve.calls.callResolverUtil.isOrOverridesSynthesized
 import org.jetbrains.kotlin.types.*
 import org.jetbrains.kotlin.types.checker.KotlinTypeChecker
+import org.jetbrains.kotlin.types.checker.KotlinTypeRefiner
+import org.jetbrains.kotlin.types.refinement.TypeRefinement
 import org.jetbrains.kotlin.utils.addToStdlib.assertedCast
 import java.util.*
 
 class OverrideResolver(
     private val trace: BindingTrace,
     private val overridesBackwardCompatibilityHelper: OverridesBackwardCompatibilityHelper,
-    private val languageVersionSettings: LanguageVersionSettings
+    private val languageVersionSettings: LanguageVersionSettings,
+    private val kotlinTypeRefiner: KotlinTypeRefiner,
+    private val platformSpecificDiagnosticComponents: PlatformSpecificDiagnosticComponents
 ) {
 
     fun check(c: TopDownAnalysisContext) {
@@ -79,6 +85,7 @@ class OverrideResolver(
         fun multipleImplementationsMemberNotImplemented(descriptor: CallableMemberDescriptor)
         fun conflictingInterfaceMemberNotImplemented(descriptor: CallableMemberDescriptor)
         fun typeMismatchOnInheritance(descriptor1: CallableMemberDescriptor, descriptor2: CallableMemberDescriptor)
+        fun abstractInvisibleMember(descriptor: CallableMemberDescriptor)
     }
 
     private class CollectMissingImplementationsStrategy : CheckInheritedSignaturesReportStrategy {
@@ -106,6 +113,10 @@ class OverrideResolver(
             // don't care
         }
 
+        override fun abstractInvisibleMember(descriptor: CallableMemberDescriptor) {
+            // don't care
+        }
+
         override fun abstractMemberWithMoreSpecificType(
             abstractMember: CallableMemberDescriptor,
             concreteMember: CallableMemberDescriptor
@@ -121,6 +132,7 @@ class OverrideResolver(
 
         private val abstractNoImpl = linkedSetOf<CallableMemberDescriptor>()
         private val abstractInBaseClassNoImpl = linkedSetOf<CallableMemberDescriptor>()
+        private val abstractInvisibleSuper = linkedSetOf<CallableMemberDescriptor>()
         private val multipleImplementations = linkedSetOf<CallableMemberDescriptor>()
         private val conflictingInterfaceMembers = linkedSetOf<CallableMemberDescriptor>()
         private val conflictingReturnTypes = linkedSetOf<CallableMemberDescriptor>()
@@ -156,6 +168,10 @@ class OverrideResolver(
             } else {
                 reportInheritanceConflictIfRequired(RETURN_TYPE_MISMATCH_ON_INHERITANCE, descriptor1, descriptor2)
             }
+        }
+
+        override fun abstractInvisibleMember(descriptor: CallableMemberDescriptor) {
+            abstractInvisibleSuper.add(descriptor)
         }
 
         override fun abstractMemberWithMoreSpecificType(
@@ -226,6 +242,14 @@ class OverrideResolver(
                 trace.report(ABSTRACT_MEMBER_NOT_IMPLEMENTED.on(klass, klass, abstractNoImpl.first()))
             }
 
+            if (abstractInvisibleSuper.isNotEmpty() && !canHaveAbstractMembers) {
+                if (languageVersionSettings.supportsFeature(LanguageFeature.ProhibitInvisibleAbstractMethodsInSuperclasses)) {
+                    trace.report(INVISIBLE_ABSTRACT_MEMBER_FROM_SUPER.on(klass, classDescriptor, abstractInvisibleSuper))
+                } else {
+                    trace.report(INVISIBLE_ABSTRACT_MEMBER_FROM_SUPER_WARNING.on(klass, classDescriptor, abstractInvisibleSuper))
+                }
+            }
+
             conflictingInterfaceMembers.removeAll(conflictingReturnTypes)
             multipleImplementations.removeAll(conflictingReturnTypes)
             if (!conflictingInterfaceMembers.isEmpty()) {
@@ -270,7 +294,8 @@ class OverrideResolver(
         val overriddenDescriptors = declared.overriddenDescriptors
 
         if (hasOverrideNode) {
-            checkOverridesForMemberMarkedOverride(declared, object : CheckOverrideReportForDeclaredMemberStrategy {
+            checkOverridesForMemberMarkedOverride(
+                declared, kotlinTypeRefiner, object : CheckOverrideReportForDeclaredMemberStrategy {
                 private var finalOverriddenError = false
                 private var typeMismatchError = false
                 private var kindMismatchError = false
@@ -285,7 +310,9 @@ class OverrideResolver(
                 override fun returnTypeMismatchOnOverride(overriding: CallableMemberDescriptor, overridden: CallableMemberDescriptor) {
                     if (!typeMismatchError) {
                         typeMismatchError = true
-                        trace.report(RETURN_TYPE_MISMATCH_ON_OVERRIDE.on(member, declared, overridden))
+                        trace.report(RETURN_TYPE_MISMATCH_ON_OVERRIDE.on(
+                            member, declared, DeclarationWithDiagnosticComponents(overridden, platformSpecificDiagnosticComponents)
+                        ))
                     }
                 }
 
@@ -557,7 +584,6 @@ class OverrideResolver(
         ) {
             val kind = descriptor.kind
             if (kind != FAKE_OVERRIDE && kind != DELEGATION) return
-            if (descriptor.visibility === Visibilities.INVISIBLE_FAKE) return
 
             val directOverridden = descriptor.overriddenDescriptors
             assert(!directOverridden.isEmpty()) { kind.toString() + " " + descriptor.name.asString() + " must override something" }
@@ -574,6 +600,11 @@ class OverrideResolver(
 
             val relevantDirectlyOverridden =
                 getRelevantDirectlyOverridden(overriddenDeclarationsByDirectParent, allFilteredOverriddenDeclarations)
+
+            if (descriptor.visibility === Visibilities.INVISIBLE_FAKE) {
+                checkInvisibleFakeOverride(descriptor, relevantDirectlyOverridden, reportingStrategy)
+                return
+            }
 
             checkInheritedDescriptorsGroup(descriptor, relevantDirectlyOverridden, reportingStrategy)
 
@@ -609,6 +640,23 @@ class OverrideResolver(
                     concreteOverridden.forEach {
                         reportingStrategy.multipleImplementationsMemberNotImplemented(it)
                     }
+            }
+        }
+
+        private fun checkInvisibleFakeOverride(
+            descriptor: CallableMemberDescriptor,
+            overriddenDescriptors: Collection<CallableMemberDescriptor>,
+            reportingStrategy: CheckInheritedSignaturesReportStrategy
+        ) {
+            // the checks below are only relevant for non-abstract classes or objects
+            if ((descriptor.containingDeclaration as? ClassDescriptor)?.modality === Modality.ABSTRACT) return
+
+            val abstractOverrides = overriddenDescriptors.filter { it.modality === Modality.ABSTRACT }
+
+            if (abstractOverrides.size != overriddenDescriptors.size) return // has non-abstract override
+
+            for (override in abstractOverrides) {
+                reportingStrategy.abstractInvisibleMember(override)
             }
         }
 
@@ -753,6 +801,7 @@ class OverrideResolver(
 
         private fun checkOverridesForMemberMarkedOverride(
             declared: CallableMemberDescriptor,
+            kotlinTypeRefiner: KotlinTypeRefiner,
             reportError: CheckOverrideReportForDeclaredMemberStrategy
         ) {
             val overriddenDescriptors = declared.overriddenDescriptors
@@ -765,7 +814,10 @@ class OverrideResolver(
                     "Overrides may only be resolved in a class, but $declared comes from $containingDeclaration"
                 }
 
-                val invisibleOverriddenDescriptor = findInvisibleOverriddenDescriptor(declared, declaringClass)
+                val invisibleOverriddenDescriptor =
+                    findInvisibleOverriddenDescriptor(
+                        declared, declaringClass, kotlinTypeRefiner
+                    )
                 if (invisibleOverriddenDescriptor != null) {
                     reportError.cannotOverrideInvisibleMember(declared, invisibleOverriddenDescriptor)
                 } else {
@@ -863,9 +915,11 @@ class OverrideResolver(
 
         private fun findInvisibleOverriddenDescriptor(
             declared: CallableMemberDescriptor,
-            declaringClass: ClassDescriptor
+            declaringClass: ClassDescriptor,
+            kotlinTypeRefiner: KotlinTypeRefiner
         ): CallableMemberDescriptor? {
-            for (supertype in declaringClass.typeConstructor.supertypes) {
+            @UseExperimental(TypeRefinement::class)
+            for (supertype in kotlinTypeRefiner.refineSupertypes(declaringClass)) {
                 val all = linkedSetOf<CallableMemberDescriptor>()
                 all.addAll(supertype.memberScope.getContributedFunctions(declared.name, NoLookupLocation.WHEN_CHECK_OVERRIDES))
                 all.addAll(supertype.memberScope.getContributedVariables(declared.name, NoLookupLocation.WHEN_CHECK_OVERRIDES))

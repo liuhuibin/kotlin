@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.formatter
@@ -50,7 +50,7 @@ class KotlinBlock(
 
         override fun getAlignment(): Alignment? = alignment
 
-        override fun isIncompleteInSuper(): Boolean = this@KotlinBlock.isIncomplete
+        override fun isIncompleteInSuper(): Boolean = super@KotlinBlock.isIncomplete()
 
         override fun getSuperChildAttributes(newChildIndex: Int): ChildAttributes = super@KotlinBlock.getChildAttributes(newChildIndex)
 
@@ -96,6 +96,8 @@ class KotlinBlock(
     override fun isLeaf(): Boolean = kotlinDelegationBlock.isLeaf()
 
     override fun getTextRange() = kotlinDelegationBlock.getTextRange()
+
+    override fun isIncomplete(): Boolean = kotlinDelegationBlock.isIncomplete()
 }
 
 object KotlinSpacingBuilderUtilImpl : KotlinSpacingBuilderUtil {

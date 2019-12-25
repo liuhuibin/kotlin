@@ -1,7 +1,6 @@
-// !LANGUAGE: +InlineClasses
-// !SKIP_METADATA_VERSION_CHECK
-// WITH_UNSIGNED
-// IGNORE_BACKEND: JS, JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
+// WITH_RUNTIME
+// KJS_WITH_FULL_RUNTIME
 
 fun uint(vararg us: UInt): UIntArray = us
 
@@ -27,6 +26,10 @@ fun box(): String {
 
     val complexInlinedUInts = inlinedUInt(*inlinedUInts, 3u, *inlinedUInts)
     if (sum(*complexInlinedUInts) != 11u) return "Fail 5"
+
+    if (nullableUInts !is UIntArray) return "Fail 6"
+
+    if (inlinedUInts !is UIntArray) return "Fail 7"
 
     return "OK"
 }

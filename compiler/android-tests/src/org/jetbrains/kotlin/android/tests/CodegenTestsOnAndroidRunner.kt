@@ -30,14 +30,20 @@ import java.io.File
 import java.io.IOException
 import javax.xml.parsers.DocumentBuilderFactory
 import javax.xml.parsers.ParserConfigurationException
+import kotlin.test.assertTrue
 
 class CodegenTestsOnAndroidRunner private constructor(private val pathManager: PathManager) {
+
+    private val isTeamcity = System.getProperty("kotlin.test.android.teamcity") != null || System.getenv("TEAMCITY_VERSION") != null
 
     private fun runTestsInEmulator(): TestSuite {
         val rootSuite = TestSuite("Root")
 
         downloadDependencies()
-        val emulator = Emulator(pathManager, Emulator.ARM)
+
+        val emulatorType = if (isTeamcity) Emulator.ARM else Emulator.X86
+        println("Using $emulatorType emulator!")
+        val emulator = Emulator(pathManager, emulatorType)
         emulator.createEmulator()
 
         val gradleRunner = GradleRunner(pathManager)
@@ -54,6 +60,7 @@ class CodegenTestsOnAndroidRunner private constructor(private val pathManager: P
                     rootSuite.addTest(this)
                 }
 
+                renameFlavorFolder()
                 enableD8(true)
                 runTestsOnEmulator(gradleRunner, TestSuite("D8")).apply {
                     (0 until this.countTestCases()).forEach {
@@ -62,20 +69,16 @@ class CodegenTestsOnAndroidRunner private constructor(private val pathManager: P
                     }
                     rootSuite.addTest(this)
                 }
-            }
-            catch (e: RuntimeException) {
+            } catch (e: RuntimeException) {
                 e.printStackTrace()
                 throw e
-            }
-            finally {
+            } finally {
                 emulator.stopEmulator()
             }
-        }
-        catch (e: RuntimeException) {
+        } catch (e: RuntimeException) {
             e.printStackTrace()
             throw e
-        }
-        finally {
+        } finally {
             emulator.finishEmulatorProcesses()
         }
 
@@ -87,24 +90,33 @@ class CodegenTestsOnAndroidRunner private constructor(private val pathManager: P
         val lines = file.readLines().map {
             if (it.startsWith("android.enableD8=")) {
                 "android.enableD8=$enable"
-            }
-            else it
+            } else it
         }
         file.writeText(lines.joinToString("\n"))
     }
 
     private fun processReport(suite: TestSuite, resultOutput: String) {
-        val reportFolder = pathManager.tmpFolder + "/build/outputs/androidTest-results/connected"
+        val reportFolder = File(flavorFolder())
         try {
-            val testCases = parseSingleReportInFolder(reportFolder)
-            testCases.forEach { aCase -> suite.addTest(aCase) }
-            Assert.assertNotEquals("There is no test results in report", 0, testCases.size.toLong())
+            val folders = reportFolder.listFiles()
+            assertTrue(folders != null && folders.isNotEmpty(), "No folders in ${reportFolder.path}")
+            folders.forEach {
+                assertTrue("${it.path} is not directory") { it.isDirectory }
+                val testCases = parseSingleReportInFolder(it)
+                testCases.forEach { aCase -> suite.addTest(aCase) }
+                Assert.assertNotEquals("There is no test results in report", 0, testCases.size.toLong())
+            }
+        } catch (e: Exception) {
+            throw RuntimeException("Can't parse test results in $reportFolder\n$resultOutput", e)
         }
-        catch (e: Exception) {
-            throw RuntimeException("Can't parse test results in " + reportFolder + "\n" + resultOutput)
-        }
-
     }
+
+    private fun renameFlavorFolder() {
+        val reportFolder = File(flavorFolder())
+        reportFolder.renameTo(File(reportFolder.parentFile, reportFolder.name + "_dex"))
+    }
+
+    private fun flavorFolder() = pathManager.tmpFolder + "/build/test/results/connected/flavors"
 
     private fun runTestsOnEmulator(gradleRunner: GradleRunner, suite: TestSuite): TestSuite {
         val platformPrefixProperty = System.setProperty(PlatformUtils.PLATFORM_PREFIX_KEY, "Idea")
@@ -112,12 +124,10 @@ class CodegenTestsOnAndroidRunner private constructor(private val pathManager: P
             val resultOutput = gradleRunner.connectedDebugAndroidTest()
             processReport(suite, resultOutput)
             return suite
-        }
-        finally {
+        } finally {
             if (platformPrefixProperty != null) {
                 System.setProperty(PlatformUtils.PLATFORM_PREFIX_KEY, platformPrefixProperty)
-            }
-            else {
+            } else {
                 System.clearProperty(PlatformUtils.PLATFORM_PREFIX_KEY)
             }
         }
@@ -149,11 +159,10 @@ class CodegenTestsOnAndroidRunner private constructor(private val pathManager: P
         }
 
         @Throws(IOException::class, SAXException::class, ParserConfigurationException::class)
-        private fun parseSingleReportInFolder(reportFolder: String): List<TestCase> {
-            val folder = File(reportFolder)
+        private fun parseSingleReportInFolder(folder: File): List<TestCase> {
             val files = folder.listFiles()!!
             assert(files.size == 1) {
-                "Expecting one file but ${files.size}: ${files.joinToString { it.name }}"
+                "Expecting one file but ${files.size}: ${files.joinToString { it.name }} in ${folder.path}"
             }
             val reportFile = files[0]
 
@@ -176,8 +185,7 @@ class CodegenTestsOnAndroidRunner private constructor(private val pathManager: P
 
                         }
                     }
-                }
-                else {
+                } else {
                     object : TestCase(name) {
                         @Throws(Throwable::class)
                         override fun runTest() {

@@ -19,10 +19,13 @@ package org.jetbrains.kotlin.resolve.calls.components
 import org.jetbrains.kotlin.builtins.*
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.resolve.calls.inference.ConstraintSystemBuilder
+import org.jetbrains.kotlin.resolve.calls.inference.components.NewTypeSubstitutor
 import org.jetbrains.kotlin.resolve.calls.inference.model.ArgumentConstraintPosition
+import org.jetbrains.kotlin.resolve.calls.inference.model.LHSArgumentConstraintPosition
 import org.jetbrains.kotlin.resolve.calls.inference.model.TypeVariableForLambdaReturnType
 import org.jetbrains.kotlin.resolve.calls.model.*
 import org.jetbrains.kotlin.types.UnwrappedType
+import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.types.typeUtil.builtIns
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 
@@ -33,10 +36,18 @@ fun resolveKtPrimitive(
     diagnosticsHolder: KotlinDiagnosticsHolder,
     isReceiver: Boolean
 ): ResolvedAtom = when (argument) {
-    is SimpleKotlinCallArgument -> checkSimpleArgument(csBuilder, argument, expectedType, diagnosticsHolder, isReceiver)
-    is LambdaKotlinCallArgument -> preprocessLambdaArgument(csBuilder, argument, expectedType)
-    is CallableReferenceKotlinCallArgument -> preprocessCallableReference(csBuilder, argument, expectedType, diagnosticsHolder)
-    is CollectionLiteralKotlinCallArgument -> preprocessCollectionLiteralArgument(argument, expectedType)
+    is SimpleKotlinCallArgument ->
+        checkSimpleArgument(csBuilder, argument, expectedType, diagnosticsHolder, isReceiver)
+
+    is LambdaKotlinCallArgument ->
+        preprocessLambdaArgument(csBuilder, argument, expectedType)
+
+    is CallableReferenceKotlinCallArgument ->
+        preprocessCallableReference(csBuilder, argument, expectedType, diagnosticsHolder)
+
+    is CollectionLiteralKotlinCallArgument ->
+        preprocessCollectionLiteralArgument(argument, expectedType)
+
     else -> unexpectedArgument(argument)
 }
 
@@ -88,7 +99,15 @@ private fun extraLambdaInfo(
     val newTypeVariableUsed = returnType == typeVariable.defaultType
     if (newTypeVariableUsed) csBuilder.registerVariable(typeVariable)
 
-    return ResolvedLambdaAtom(argument, isSuspend, receiverType, parameters, returnType, typeVariable.takeIf { newTypeVariableUsed })
+    return ResolvedLambdaAtom(
+        argument,
+        isSuspend,
+        receiverType,
+        parameters,
+        returnType,
+        typeVariable.takeIf { newTypeVariableUsed },
+        expectedType
+    )
 }
 
 private fun extractLambdaInfoFromFunctionalType(expectedType: UnwrappedType?, argument: LambdaKotlinCallArgument): ResolvedLambdaAtom? {
@@ -105,7 +124,8 @@ private fun extractLambdaInfoFromFunctionalType(expectedType: UnwrappedType?, ar
         receiverType,
         parameters,
         returnType,
-        typeVariableForLambdaReturnType = null
+        typeVariableForLambdaReturnType = null,
+        expectedType = expectedType
     )
 }
 
@@ -122,7 +142,7 @@ private fun extractLambdaParameters(expectedType: UnwrappedType, argument: Lambd
 }
 
 fun LambdaWithTypeVariableAsExpectedTypeAtom.transformToResolvedLambda(csBuilder: ConstraintSystemBuilder): ResolvedLambdaAtom {
-    val fixedExpectedType = csBuilder.buildCurrentSubstitutor().safeSubstitute(expectedType)
+    val fixedExpectedType = (csBuilder.buildCurrentSubstitutor() as NewTypeSubstitutor).safeSubstitute(expectedType)
     val resolvedLambdaAtom = preprocessLambdaArgument(csBuilder, atom, fixedExpectedType, forceResolution = true) as ResolvedLambdaAtom
 
     setAnalyzed(resolvedLambdaAtom)
@@ -136,15 +156,48 @@ private fun preprocessCallableReference(
     expectedType: UnwrappedType?,
     diagnosticsHolder: KotlinDiagnosticsHolder
 ): ResolvedAtom {
-    val result = ResolvedCallableReferenceAtom(argument, expectedType)
+    val result = EagerCallableReferenceAtom(argument, expectedType)
+
     if (expectedType == null) return result
 
+    val lhsResult = argument.lhsResult
+    if (lhsResult is LHSResult.Type) {
+        csBuilder.addConstraintFromLHS(argument, lhsResult, expectedType)
+    }
+
     val notCallableTypeConstructor =
-        csBuilder.getProperSuperTypeConstructors(expectedType).firstOrNull { !ReflectionTypes.isPossibleExpectedCallableType(it) }
+        csBuilder.getProperSuperTypeConstructors(expectedType)
+            .firstOrNull { !ReflectionTypes.isPossibleExpectedCallableType(it.requireIs()) }
+
     if (notCallableTypeConstructor != null) {
-        diagnosticsHolder.addDiagnostic(NotCallableExpectedType(argument, expectedType, notCallableTypeConstructor))
+        diagnosticsHolder.addDiagnostic(
+            NotCallableExpectedType(
+                argument,
+                expectedType,
+                notCallableTypeConstructor.requireIs()
+            )
+        )
     }
     return result
+}
+
+private fun ConstraintSystemBuilder.addConstraintFromLHS(
+    argument: CallableReferenceKotlinCallArgument,
+    lhsResult: LHSResult.Type,
+    expectedType: UnwrappedType
+) {
+    if (!ReflectionTypes.isNumberedTypeWithOneOrMoreNumber(expectedType)) return
+
+    val lhsType = lhsResult.unboundDetailedReceiver.stableType
+    val expectedTypeProjectionForLHS = expectedType.arguments.first()
+    val expectedTypeForLHS = expectedTypeProjectionForLHS.type
+    val constraintPosition = LHSArgumentConstraintPosition(argument, lhsResult.qualifier ?: lhsResult.unboundDetailedReceiver)
+
+    when (expectedTypeProjectionForLHS.projectionKind) {
+        Variance.INVARIANT -> addEqualityConstraint(lhsType, expectedTypeForLHS, constraintPosition)
+        Variance.IN_VARIANCE -> addSubtypeConstraint(expectedTypeForLHS, lhsType, constraintPosition)
+        Variance.OUT_VARIANCE -> addSubtypeConstraint(lhsType, expectedTypeForLHS, constraintPosition)
+    }
 }
 
 private fun preprocessCollectionLiteralArgument(
@@ -153,4 +206,9 @@ private fun preprocessCollectionLiteralArgument(
 ): ResolvedAtom {
     // todo add some checks about expected type
     return ResolvedCollectionLiteralAtom(collectionLiteralArgument, expectedType)
+}
+
+internal inline fun <reified T : Any> Any.requireIs(): T {
+    require(this is T)
+    return this
 }

@@ -3,7 +3,8 @@
 
 package test
 
-@Target(AnnotationTarget.EXPRESSION, AnnotationTarget.CLASS, AnnotationTarget.CONSTRUCTOR, AnnotationTarget.LOCAL_VARIABLE, AnnotationTarget.FUNCTION, AnnotationTarget.VALUE_PARAMETER)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.LOCAL_VARIABLE, AnnotationTarget.VALUE_PARAMETER, AnnotationTarget.CONSTRUCTOR, AnnotationTarget.FUNCTION, AnnotationTarget.EXPRESSION)
+@Retention(AnnotationRetention.SOURCE)
 annotation class AnnTarget
 
 fun println(v: Int) {}

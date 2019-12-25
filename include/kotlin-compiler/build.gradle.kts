@@ -9,14 +9,13 @@ val fatJarContentsStripMetadata by configurations.creating
 val fatJarContentsStripServices by configurations.creating
 
 val compilerModules: Array<String> by rootProject.extra
-val compilerManifestClassPath = "kotlin-stdlib.jar kotlin-reflect.jar kotlin-script-runtime.jar"
 
 dependencies {
     compilerModules.forEach { module ->
         compile(project(module)) { isTransitive = false }
     }
 
-    fatJarContents(project(":core:builtins", configuration = "builtins"))
+    fatJarContents(kotlinBuiltins())
     fatJarContents(commonDep("javax.inject"))
     fatJarContents(commonDep("org.jline", "jline"))
     fatJarContents(commonDep("org.fusesource.jansi", "jansi"))
@@ -28,17 +27,17 @@ dependencies {
     fatJarContents(intellijCoreDep()) { includeJars("intellij-core") }
     fatJarContents(intellijDep()) { includeIntellijCoreJarDependencies(project, { !(it.startsWith("jdom") || it.startsWith("log4j")) }) }
     fatJarContents(intellijDep()) { includeJars("jna-platform") }
-    fatJarContentsStripServices(intellijDep("jps-standalone")) { includeJars("jps-model") }
+    fatJarContentsStripServices(jpsStandalone()) { includeJars("jps-model") }
     fatJarContentsStripMetadata(intellijDep()) { includeJars("oro", "jdom", "log4j", rootProject = rootProject) }
 }
 
 val jar: Jar by tasks
 jar.apply {
     dependsOn(fatJarContents)
-    from(compile.filter { it.extension == "jar" }.map { zipTree(it) })
-    from(fatJarContents.map { zipTree(it) })
-    from(fatJarContentsStripServices.map { zipTree(it) }) { exclude("META-INF/services/**") }
-    from(fatJarContentsStripMetadata.map { zipTree(it) }) { exclude("META-INF/jb/** META-INF/LICENSE") }
+    from { compile.filter { it.extension == "jar" }.map { zipTree(it) } }
+    from { fatJarContents.map { zipTree(it) } }
+    from { fatJarContentsStripServices.map { zipTree(it).matching { exclude("META-INF/services/**") } } }
+    from { fatJarContentsStripMetadata.map { zipTree(it).matching { exclude("META-INF/jb/** META-INF/LICENSE") } } }
 
     manifest.attributes["Class-Path"] = compilerManifestClassPath
     manifest.attributes["Main-Class"] = "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler"

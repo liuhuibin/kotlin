@@ -24,6 +24,7 @@ import com.intellij.psi.search.SearchRequestCollector
 import com.intellij.psi.search.SearchScope
 import com.intellij.psi.search.UsageSearchContext
 import com.intellij.psi.search.searches.ReferencesSearch
+import com.intellij.util.Processor
 import com.intellij.util.containers.nullize
 import org.jetbrains.kotlin.asJava.LightClassUtil
 import org.jetbrains.kotlin.asJava.elements.KtLightField
@@ -33,12 +34,12 @@ import org.jetbrains.kotlin.asJava.elements.KtLightParameter
 import org.jetbrains.kotlin.asJava.namedUnwrappedElement
 import org.jetbrains.kotlin.asJava.toLightClass
 import org.jetbrains.kotlin.asJava.toLightElements
-import org.jetbrains.kotlin.compatibility.ExecutorProcessor
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.idea.references.KtSimpleNameReference
 import org.jetbrains.kotlin.idea.search.*
 import org.jetbrains.kotlin.idea.search.ideaExtensions.KotlinReferencesSearchOptions.Companion.Empty
 import org.jetbrains.kotlin.idea.search.usagesSearch.dataClassComponentFunction
+import org.jetbrains.kotlin.idea.search.usagesSearch.filterDataClassComponentsIfDisabled
 import org.jetbrains.kotlin.idea.search.usagesSearch.getClassNameForCompanionObject
 import org.jetbrains.kotlin.idea.search.usagesSearch.operators.OperatorReferenceSearcher
 import org.jetbrains.kotlin.idea.stubindex.KotlinSourceFilterScope
@@ -77,13 +78,14 @@ class KotlinReferencesSearchParameters(
 ) : ReferencesSearch.SearchParameters(elementToSearch, scope, ignoreAccessScope, optimizer)
 
 class KotlinReferencesSearcher : QueryExecutorBase<PsiReference, ReferencesSearch.SearchParameters>() {
-    override fun processQuery(queryParameters: ReferencesSearch.SearchParameters, consumer: ExecutorProcessor<PsiReference>) {
+
+    override fun processQuery(queryParameters: ReferencesSearch.SearchParameters, consumer: Processor<in PsiReference>) {
         val processor = QueryProcessor(queryParameters, consumer)
         runReadAction { processor.processInReadAction() }
         processor.executeLongRunningTasks()
     }
 
-    private class QueryProcessor(val queryParameters: ReferencesSearch.SearchParameters, val consumer: ExecutorProcessor<PsiReference>) {
+    private class QueryProcessor(val queryParameters: ReferencesSearch.SearchParameters, val consumer: Processor<in PsiReference>) {
 
         private val kotlinOptions = (queryParameters as? KotlinReferencesSearchParameters)?.kotlinOptions ?: Empty
 
@@ -108,7 +110,7 @@ class KotlinReferencesSearcher : QueryExecutorBase<PsiReference, ReferencesSearc
 
             val effectiveSearchScope = run {
                 val elements = if (elementToSearch is KtDeclaration && !isOnlyKotlinSearch(queryParameters.scopeDeterminedByUser)) {
-                    elementToSearch.toLightElements().nullize()
+                    elementToSearch.toLightElements().filterDataClassComponentsIfDisabled(kotlinOptions).nullize()
                 } else {
                     null
                 } ?: listOf(elementToSearch)
@@ -233,6 +235,11 @@ class KotlinReferencesSearcher : QueryExecutorBase<PsiReference, ReferencesSearc
 
                 is KtParameter -> {
                     searchPropertyAccessorMethods(element)
+                    if (element.getStrictParentOfType<KtPrimaryConstructor>() != null) {
+                        // Simple parameters without val and var shouldn't be processed here because of local search scope
+                        val methods = LightClassUtil.getLightClassPropertyMethods(element)
+                        methods.allDeclarations.filterDataClassComponentsIfDisabled(kotlinOptions).forEach { searchNamedElement(it) }
+                    }
                 }
 
                 is KtLightMethod -> {
@@ -259,7 +266,7 @@ class KotlinReferencesSearcher : QueryExecutorBase<PsiReference, ReferencesSearc
         }
 
         private fun searchPropertyAccessorMethods(origin: KtParameter) {
-            origin.toLightElements().forEach { searchNamedElement(it) }
+            origin.toLightElements().filterDataClassComponentsIfDisabled(kotlinOptions).forEach { searchNamedElement(it) }
         }
 
         private fun processKtClassOrObject(element: KtClassOrObject) {

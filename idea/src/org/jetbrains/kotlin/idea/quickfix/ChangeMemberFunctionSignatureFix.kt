@@ -31,17 +31,14 @@ import org.jetbrains.kotlin.descriptors.impl.SimpleFunctionDescriptorImpl
 import org.jetbrains.kotlin.descriptors.impl.ValueParameterDescriptorImpl
 import org.jetbrains.kotlin.diagnostics.Diagnostic
 import org.jetbrains.kotlin.idea.caches.resolve.resolveToDescriptorIfAny
-import org.jetbrains.kotlin.idea.util.IdeDescriptorRenderers
 import org.jetbrains.kotlin.idea.core.ShortenReferences
+import org.jetbrains.kotlin.idea.util.IdeDescriptorRenderers
 import org.jetbrains.kotlin.idea.util.application.executeWriteCommand
 import org.jetbrains.kotlin.incremental.components.NoLookupLocation
 import org.jetbrains.kotlin.load.java.NOT_NULL_ANNOTATIONS
 import org.jetbrains.kotlin.load.java.NULLABLE_ANNOTATIONS
 import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.psi.KtNamedFunction
-import org.jetbrains.kotlin.psi.KtParameterList
-import org.jetbrains.kotlin.psi.KtPsiFactory
+import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.typeRefHelpers.setReceiverTypeReference
 import org.jetbrains.kotlin.renderer.ClassifierNamePolicy
 import org.jetbrains.kotlin.renderer.DescriptorRenderer
@@ -57,7 +54,7 @@ import java.util.*
  */
 class ChangeMemberFunctionSignatureFix private constructor(
     element: KtNamedFunction,
-    private val signatures: List<ChangeMemberFunctionSignatureFix.Signature>
+    private val signatures: List<Signature>
 ) : KotlinQuickFixAction<KtNamedFunction>(element) {
 
     init {
@@ -105,10 +102,12 @@ class ChangeMemberFunctionSignatureFix private constructor(
             val superFunctions = getPossibleSuperFunctionsDescriptors(functionDescriptor)
 
             return superFunctions
+                .asSequence()
                 .filter { it.kind.isReal }
                 .map { signatureToMatch(functionDescriptor, it) }
                 .distinctBy { it.sourceCode }
                 .sortedBy { it.preview }
+                .toList()
         }
 
         /**
@@ -207,17 +206,17 @@ class ChangeMemberFunctionSignatureFix private constructor(
                 SourceElement.NO_SOURCE
             )
 
-            val parameters = newParameters.withIndex().map { (index, parameter) ->
+            val parameters = newParameters.asSequence().withIndex().map { (index, parameter) ->
                 ValueParameterDescriptorImpl(
                     descriptor, null, index,
                     parameter.annotations, parameter.name, parameter.returnType!!, parameter.declaresDefaultValue(),
                     parameter.isCrossinline, parameter.isNoinline, parameter.varargElementType, SourceElement.NO_SOURCE
                 )
-            }
+            }.toList()
 
             return descriptor.apply {
                 initialize(
-                    function.extensionReceiverParameter?.type, function.dispatchReceiverParameter,
+                    function.extensionReceiverParameter?.copy(this), function.dispatchReceiverParameter,
                     function.typeParameters, parameters, function.returnType, function.modality, function.visibility
                 )
                 isOperator = function.isOperator
@@ -231,10 +230,8 @@ class ChangeMemberFunctionSignatureFix private constructor(
 
     override fun getText(): String {
         val single = signatures.singleOrNull()
-        return if (single != null)
-            "Change function signature to '${single.preview}'"
-        else
-            "Change function signature..."
+        return if (single != null) "Change function signature to '${single.preview}'"
+        else "Change function signature..."
     }
 
     override fun getFamilyName() = "Change function signature"
@@ -330,11 +327,22 @@ class ChangeMemberFunctionSignatureFix private constructor(
                     }
                 }
 
-                val newParameterList = function.valueParameterList!!.replace(patternFunction.valueParameterList!!) as KtParameterList
+                val newParameterList = patternFunction.valueParameterList?.let {
+                    function.valueParameterList?.replace(it)
+                } as KtParameterList
+                ShortenReferences.DEFAULT.process(newParameterList)
+
                 if (patternFunction.receiverTypeReference == null && function.receiverTypeReference != null) {
                     function.setReceiverTypeReference(null)
                 }
-                ShortenReferences.DEFAULT.process(newParameterList)
+
+                val patternTypeParameterList = patternFunction.typeParameterList
+                if (patternTypeParameterList != null) {
+                    ShortenReferences.DEFAULT.process(
+                        (if (function.typeParameterList != null) function.typeParameterList?.replace(patternTypeParameterList)
+                        else function.addAfter(patternTypeParameterList, function.funKeyword)) as KtTypeParameterList
+                    )
+                } else function.typeParameterList?.delete()
             }
         }
 

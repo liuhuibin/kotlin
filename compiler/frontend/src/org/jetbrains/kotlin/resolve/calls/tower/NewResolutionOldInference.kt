@@ -19,6 +19,7 @@ package org.jetbrains.kotlin.resolve.calls.tower
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.descriptors.synthetic.SyntheticMemberDescriptor
 import org.jetbrains.kotlin.diagnostics.Errors
 import org.jetbrains.kotlin.incremental.components.LookupLocation
 import org.jetbrains.kotlin.name.Name
@@ -26,8 +27,9 @@ import org.jetbrains.kotlin.psi.Call
 import org.jetbrains.kotlin.psi.KtReferenceExpression
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.BindingTrace
-import org.jetbrains.kotlin.resolve.DeprecationResolver
+import org.jetbrains.kotlin.extensions.internal.CandidateInterceptor
 import org.jetbrains.kotlin.resolve.TemporaryBindingTrace
+import org.jetbrains.kotlin.resolve.calls.CallResolver
 import org.jetbrains.kotlin.resolve.calls.CallTransformer
 import org.jetbrains.kotlin.resolve.calls.CandidateResolver
 import org.jetbrains.kotlin.resolve.calls.callResolverUtil.isBinaryRemOperator
@@ -47,21 +49,19 @@ import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowInfo
 import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowValueFactory
 import org.jetbrains.kotlin.resolve.calls.tasks.*
 import org.jetbrains.kotlin.resolve.calls.util.FakeCallableDescriptorForObject
+import org.jetbrains.kotlin.resolve.deprecation.DeprecationResolver
 import org.jetbrains.kotlin.resolve.descriptorUtil.hasDynamicExtensionAnnotation
-import org.jetbrains.kotlin.resolve.scopes.HierarchicalScope
-import org.jetbrains.kotlin.resolve.scopes.LexicalScope
-import org.jetbrains.kotlin.resolve.scopes.MemberScope
-import org.jetbrains.kotlin.resolve.scopes.SyntheticScopes
+import org.jetbrains.kotlin.resolve.scopes.*
 import org.jetbrains.kotlin.resolve.scopes.receivers.*
 import org.jetbrains.kotlin.resolve.scopes.utils.canBeResolvedWithoutDeprecation
 import org.jetbrains.kotlin.types.DeferredType
 import org.jetbrains.kotlin.types.ErrorUtils
+import org.jetbrains.kotlin.types.TypeApproximator
 import org.jetbrains.kotlin.types.expressions.OperatorConventions
 import org.jetbrains.kotlin.types.isDynamic
 import org.jetbrains.kotlin.util.OperatorNameConventions
 import org.jetbrains.kotlin.utils.addIfNotNull
 import org.jetbrains.kotlin.utils.sure
-import java.lang.IllegalStateException
 import java.util.*
 
 class NewResolutionOldInference(
@@ -72,7 +72,10 @@ class NewResolutionOldInference(
     private val syntheticScopes: SyntheticScopes,
     private val languageVersionSettings: LanguageVersionSettings,
     private val coroutineInferenceSupport: CoroutineInferenceSupport,
-    private val deprecationResolver: DeprecationResolver
+    private val deprecationResolver: DeprecationResolver,
+    private val typeApproximator: TypeApproximator,
+    private val callResolver: CallResolver,
+    private val candidateInterceptor: CandidateInterceptor
 ) {
     sealed class ResolutionKind {
         abstract internal fun createTowerProcessor(
@@ -170,7 +173,9 @@ class NewResolutionOldInference(
         }
 
         val dynamicScope = dynamicCallableDescriptors.createDynamicDescriptorScope(context.call, context.scope.ownerDescriptor)
-        val scopeTower = ImplicitScopeTowerImpl(context, dynamicScope, syntheticScopes, context.call.createLookupLocation())
+        val scopeTower = ImplicitScopeTowerImpl(
+            context, dynamicScope, syntheticScopes, context.call.createLookupLocation(), typeApproximator, callResolver, candidateInterceptor
+        )
 
         val shouldUseOperatorRem = languageVersionSettings.supportsFeature(LanguageFeature.OperatorRem)
         val isBinaryRemOperator = isBinaryRemOperator(context.call)
@@ -203,13 +208,15 @@ class NewResolutionOldInference(
             )
         }
 
+        candidates = candidateInterceptor.interceptResolvedCandidates(candidates, context, candidateResolver, callResolver, name, kind, tracing)
+
         if (candidates.isEmpty()) {
             if (reportAdditionalDiagnosticIfNoCandidates(context, nameToResolve, kind, scopeTower, detailedReceiver)) {
                 return OverloadResolutionResultsImpl.nameNotFound()
             }
         }
 
-        val overloadResults = convertToOverloadResults<D>(candidates, tracing, context, languageVersionSettings)
+        val overloadResults = convertToOverloadResults<D>(candidates, tracing, context)
         coroutineInferenceSupport.checkCoroutineCalls(context, tracing, overloadResults)
         return overloadResults
     }
@@ -255,19 +262,21 @@ class NewResolutionOldInference(
             TowerResolver.SuccessfulResultCollector(), useOrder = true
         )
 
-        return convertToOverloadResults(processedCandidates, tracing, basicCallContext, languageVersionSettings)
+        return convertToOverloadResults(processedCandidates, tracing, basicCallContext)
     }
 
     private fun <D : CallableDescriptor> allCandidatesResult(allCandidates: Collection<MyCandidate>) =
         OverloadResolutionResultsImpl.nameNotFound<D>().apply {
-            this.allCandidates = allCandidates.map { it.resolvedCall as MutableResolvedCall<D> }
+            this.allCandidates = allCandidates.map {
+                @Suppress("UNCHECKED_CAST")
+                it.resolvedCall as MutableResolvedCall<D>
+            }
         }
 
     private fun <D : CallableDescriptor> convertToOverloadResults(
         candidates: Collection<MyCandidate>,
         tracing: TracingStrategy,
-        basicCallContext: BasicCallResolutionContext,
-        languageVersionSettings: LanguageVersionSettings
+        basicCallContext: BasicCallResolutionContext
     ): OverloadResolutionResultsImpl<D> {
         val resolvedCalls = candidates.map {
             val (diagnostics, resolvedCall) = it
@@ -316,6 +325,7 @@ class NewResolutionOldInference(
                 }
             }
 
+            @Suppress("UNCHECKED_CAST")
             resolvedCall as MutableResolvedCall<D>
         }
 
@@ -346,11 +356,14 @@ class NewResolutionOldInference(
         return true
     }
 
-    private class ImplicitScopeTowerImpl(
-        val resolutionContext: ResolutionContext<*>,
+    public class ImplicitScopeTowerImpl(
+        val resolutionContext: BasicCallResolutionContext,
         override val dynamicScope: MemberScope,
         override val syntheticScopes: SyntheticScopes,
-        override val location: LookupLocation
+        override val location: LookupLocation,
+        override val typeApproximator: TypeApproximator,
+        val callResolver: CallResolver,
+        val candidateInterceptor: CandidateInterceptor
     ) : ImplicitScopeTower {
         private val cache = HashMap<ReceiverValue, ReceiverValueWithSmartCastInfo>()
 
@@ -365,9 +378,18 @@ class NewResolutionOldInference(
 
         override val isNewInferenceEnabled: Boolean
             get() = resolutionContext.languageVersionSettings.supportsFeature(LanguageFeature.NewInference)
+
+        override fun interceptCandidates(
+            resolutionScope: ResolutionScope,
+            name: Name,
+            initialResults: Collection<FunctionDescriptor>,
+            location: LookupLocation
+        ): Collection<FunctionDescriptor> {
+            return candidateInterceptor.interceptCandidates(initialResults, this, resolutionContext, resolutionScope, callResolver, name, location)
+        }
     }
 
-    internal class MyCandidate(
+    class MyCandidate(
         // Diagnostics that are already computed
         // if resultingApplicability is successful they must be the same as `diagnostics`,
         // otherwise they might be a bit different but result remains unsuccessful
@@ -476,7 +498,7 @@ class NewResolutionOldInference(
             variable: MyCandidate,
             invoke: MyCandidate
         ): MyCandidate {
-            val resolvedCallImpl = VariableAsFunctionResolvedCallImpl(
+            @Suppress("UNCHECKED_CAST") val resolvedCallImpl = VariableAsFunctionResolvedCallImpl(
                 invoke.resolvedCall as MutableResolvedCall<FunctionDescriptor>,
                 variable.resolvedCall as MutableResolvedCall<VariableDescriptor>
             )
@@ -596,6 +618,8 @@ internal fun reportResolvedUsingDeprecatedVisibility(
     val descriptorToLookup: DeclarationDescriptor = when (candidateDescriptor) {
         is ClassConstructorDescriptor -> candidateDescriptor.containingDeclaration
         is FakeCallableDescriptorForObject -> candidateDescriptor.classDescriptor
+        is SyntheticMemberDescriptor<*> -> candidateDescriptor.baseDescriptorForSynthetic
+        is PropertyDescriptor, is FunctionDescriptor -> candidateDescriptor
         else -> error(
             "Unexpected candidate descriptor of resolved call with " +
                     "ResolvedUsingDeprecatedVisibility-diagnostic: $candidateDescriptor\n" +

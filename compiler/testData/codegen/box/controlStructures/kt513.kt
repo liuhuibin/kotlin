@@ -1,5 +1,7 @@
+// IGNORE_BACKEND_FIR: JVM_IR
 // IGNORE_BACKEND: JS_IR
 // WITH_RUNTIME
+// KJS_WITH_FULL_RUNTIME
 
 class A() {
     infix fun <T> ArrayList<T>.add3(el: T) = add(el)

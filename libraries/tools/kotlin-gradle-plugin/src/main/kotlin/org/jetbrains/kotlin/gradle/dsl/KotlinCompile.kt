@@ -20,22 +20,6 @@ import groovy.lang.Closure
 import org.gradle.api.Task
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.Internal
-import org.jetbrains.kotlin.cli.common.arguments.CommonToolArguments
-import org.jetbrains.kotlin.compilerRunner.ArgumentUtils
-
-interface KotlinCompile<T : KotlinCommonOptions> : Task {
-    @get:Internal
-    val kotlinOptions: T
-
-    fun kotlinOptions(fn: T.() -> Unit) {
-        kotlinOptions.fn()
-    }
-
-    fun kotlinOptions(fn: Closure<*>) {
-        fn.delegate = kotlinOptions
-        fn.call()
-    }
-}
 
 interface KotlinJsCompile : KotlinCompile<KotlinJsOptions>
 
@@ -44,8 +28,10 @@ interface KotlinJvmCompile : KotlinCompile<KotlinJvmOptions>
 interface KotlinCommonCompile : KotlinCompile<KotlinMultiplatformCommonOptions>
 
 interface KotlinJsDce : Task {
+    @get:Internal
     val dceOptions: KotlinJsDceOptions
 
+    @get:Input
     val keep: MutableList<String>
 
     fun dceOptions(fn: KotlinJsDceOptions.() -> Unit) {

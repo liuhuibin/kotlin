@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.builtins
@@ -16,13 +16,12 @@ import org.jetbrains.kotlin.descriptors.impl.TypeParameterDescriptorImpl
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.DescriptorUtils
-import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
 import org.jetbrains.kotlin.storage.LockBasedStorageManager
 import org.jetbrains.kotlin.types.*
 import org.jetbrains.kotlin.types.typeUtil.asTypeProjection
 import org.jetbrains.kotlin.types.typeUtil.builtIns
 
-val FAKE_CONTINUATION_CLASS_DESCRIPTOR_EXPERIMENTAL =
+private val FAKE_CONTINUATION_CLASS_DESCRIPTOR_EXPERIMENTAL =
     MutableClassDescriptor(
         EmptyPackageFragmentDescriptor(ErrorUtils.getErrorModule(), DescriptorUtils.COROUTINES_PACKAGE_FQ_NAME_EXPERIMENTAL),
         ClassKind.INTERFACE, /* isInner = */ false, /* isExternal = */ false,
@@ -32,13 +31,13 @@ val FAKE_CONTINUATION_CLASS_DESCRIPTOR_EXPERIMENTAL =
         visibility = Visibilities.PUBLIC
         setTypeParameterDescriptors(
             TypeParameterDescriptorImpl.createWithDefaultBound(
-                this, Annotations.EMPTY, false, Variance.IN_VARIANCE, Name.identifier("T"), 0
+                this, Annotations.EMPTY, false, Variance.IN_VARIANCE, Name.identifier("T"), 0, LockBasedStorageManager.NO_LOCKS
             ).let(::listOf)
         )
         createTypeConstructor()
     }
 
-val FAKE_CONTINUATION_CLASS_DESCRIPTOR_RELEASE =
+private val FAKE_CONTINUATION_CLASS_DESCRIPTOR_RELEASE =
     MutableClassDescriptor(
         EmptyPackageFragmentDescriptor(ErrorUtils.getErrorModule(), DescriptorUtils.COROUTINES_PACKAGE_FQ_NAME_RELEASE),
         ClassKind.INTERFACE, /* isInner = */ false, /* isExternal = */ false,
@@ -48,12 +47,11 @@ val FAKE_CONTINUATION_CLASS_DESCRIPTOR_RELEASE =
         visibility = Visibilities.PUBLIC
         setTypeParameterDescriptors(
             TypeParameterDescriptorImpl.createWithDefaultBound(
-                this, Annotations.EMPTY, false, Variance.IN_VARIANCE, Name.identifier("T"), 0
+                this, Annotations.EMPTY, false, Variance.IN_VARIANCE, Name.identifier("T"), 0, LockBasedStorageManager.NO_LOCKS
             ).let(::listOf)
         )
         createTypeConstructor()
     }
-
 
 fun transformSuspendFunctionToRuntimeFunctionType(suspendFunType: KotlinType, isReleaseCoroutines: Boolean): SimpleType {
     assert(suspendFunType.isSuspendFunctionType) {
@@ -80,33 +78,7 @@ fun transformSuspendFunctionToRuntimeFunctionType(suspendFunType: KotlinType, is
     ).makeNullableAsSpecified(suspendFunType.isMarkedNullable)
 }
 
-fun transformRuntimeFunctionTypeToSuspendFunction(funType: KotlinType, isReleaseCoroutines: Boolean): SimpleType? {
-    assert(funType.isFunctionType) {
-        "This type should be function type: $funType"
-    }
-
-    val continuationArgumentType = funType.getValueParameterTypesFromFunctionType().lastOrNull()?.type ?: return null
-    if (!isContinuation(continuationArgumentType.constructor.declarationDescriptor?.fqNameSafe, isReleaseCoroutines) ||
-        continuationArgumentType.arguments.size != 1
-    ) {
-        return null
-    }
-
-    val suspendReturnType = continuationArgumentType.arguments.single().type
-
-    return createFunctionType(
-            funType.builtIns,
-            funType.annotations,
-            funType.getReceiverTypeFromFunctionType(),
-            funType.getValueParameterTypesFromFunctionType().dropLast(1).map(TypeProjection::getType),
-            // TODO: names
-            null,
-            suspendReturnType,
-            suspendFunction = true
-    ).makeNullableAsSpecified(funType.isMarkedNullable)
-}
-
-private fun isContinuation(name: FqName?, isReleaseCoroutines: Boolean): Boolean {
+fun isContinuation(name: FqName?, isReleaseCoroutines: Boolean): Boolean {
     return if (isReleaseCoroutines) name == DescriptorUtils.CONTINUATION_INTERFACE_FQ_NAME_RELEASE
     else name == DescriptorUtils.CONTINUATION_INTERFACE_FQ_NAME_EXPERIMENTAL
 }

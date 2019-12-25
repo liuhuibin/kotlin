@@ -16,12 +16,9 @@
 
 package org.jetbrains.kotlin.config;
 
-import org.jetbrains.kotlin.descriptors.impl.ModuleDescriptorImpl;
 import org.jetbrains.kotlin.load.java.JavaClassesTracker;
 import org.jetbrains.kotlin.load.kotlin.incremental.components.IncrementalCompilationComponents;
 import org.jetbrains.kotlin.modules.Module;
-import org.jetbrains.kotlin.script.KotlinScriptDefinition;
-import org.jetbrains.kotlin.script.ScriptDefinitionsSource;
 
 import java.io.File;
 import java.util.List;
@@ -29,10 +26,6 @@ import java.util.List;
 public class JVMConfigurationKeys {
     private JVMConfigurationKeys() {
     }
-
-    // roots, including dependencies and own source
-    public static final CompilerConfigurationKey<List<ContentRoot>> CONTENT_ROOTS =
-            CompilerConfigurationKey.create("content roots");
 
     public static final CompilerConfigurationKey<File> OUTPUT_DIRECTORY =
             CompilerConfigurationKey.create("output directory");
@@ -46,12 +39,6 @@ public class JVMConfigurationKeys {
 
     public static final CompilerConfigurationKey<Boolean> NO_JDK =
             CompilerConfigurationKey.create("no jdk");
-
-    public static final CompilerConfigurationKey<List<KotlinScriptDefinition>> SCRIPT_DEFINITIONS =
-            CompilerConfigurationKey.create("script definitions");
-
-    public static final CompilerConfigurationKey<List<ScriptDefinitionsSource>> SCRIPT_DEFINITIONS_SOURCES =
-            CompilerConfigurationKey.create("script definitions sources");
 
     public static final CompilerConfigurationKey<Boolean> DISABLE_STANDARD_SCRIPT_DEFINITION =
             CompilerConfigurationKey.create("Disable standard kotlin script support");
@@ -73,29 +60,11 @@ public class JVMConfigurationKeys {
             CompilerConfigurationKey.create("do not throw NPE on explicit 'equals' call for null receiver of platform boxed primitive type");
     public static final CompilerConfigurationKey<Boolean> DISABLE_OPTIMIZATION =
             CompilerConfigurationKey.create("disable optimization");
-    public static final CompilerConfigurationKey<Boolean> INHERIT_MULTIFILE_PARTS =
-            CompilerConfigurationKey.create("compile multifile classes to a hierarchy of parts and facade");
     public static final CompilerConfigurationKey<Boolean> USE_TYPE_TABLE =
             CompilerConfigurationKey.create("use type table in serializer");
 
     public static final CompilerConfigurationKey<Boolean> USE_SINGLE_MODULE =
             CompilerConfigurationKey.create("combine modules for source files and binary dependencies into a single module");
-
-    /**
-     * Controls whether the module depends on an additional "built-ins" module, which contains binary metadata of built-in definitions.
-     * By default, that metadata is loaded from kotlin-compiler.jar.
-     * However, it can be also loaded directly from the module, see {@link CREATE_BUILT_INS_FROM_MODULE_DEPENDENCIES}
-     */
-    public static final CompilerConfigurationKey<Boolean> ADD_BUILT_INS_FROM_COMPILER_TO_DEPENDENCIES =
-            CompilerConfigurationKey.create("add built-ins from the compiler jar to the dependencies of the module being resolved");
-
-    /**
-     * Controls whether an instance of KotlinBuiltIns which is passed to {@link ModuleDescriptorImpl}'s constructor and ends up being used
-     * everywhere in the compiler front-end is loaded directly from the module (from its sources and/or its binaries), as opposed to
-     * from kotlin-compiler.jar
-     */
-    public static final CompilerConfigurationKey<Boolean> CREATE_BUILT_INS_FROM_MODULE_DEPENDENCIES =
-            CompilerConfigurationKey.create("create built-ins from resources found in the module dependencies");
 
     public static final CompilerConfigurationKey<Boolean> SKIP_RUNTIME_VERSION_CHECK =
             CompilerConfigurationKey.create("do not perform checks on runtime versions consistency");
@@ -127,8 +96,8 @@ public class JVMConfigurationKeys {
     public static final CompilerConfigurationKey<Boolean> IR =
             CompilerConfigurationKey.create("IR");
 
-    public static final CompilerConfigurationKey<Boolean> USE_FAST_CLASS_FILES_READING =
-            CompilerConfigurationKey.create("use fast class files reading implementation [experimental]");
+    public static final CompilerConfigurationKey<Boolean> USE_PSI_CLASS_FILES_READING =
+            CompilerConfigurationKey.create("use a slower (PSI-based) class files reading implementation");
 
     public static final CompilerConfigurationKey<Boolean> USE_JAVAC =
             CompilerConfigurationKey.create("use javac [experimental]");

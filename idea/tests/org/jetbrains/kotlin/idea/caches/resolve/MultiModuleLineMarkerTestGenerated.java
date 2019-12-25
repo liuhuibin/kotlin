@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.caches.resolve;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.idea.caches.resolve;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -22,7 +21,12 @@ import java.util.regex.Pattern;
 @RunWith(JUnit3RunnerWithInners.class)
 public class MultiModuleLineMarkerTestGenerated extends AbstractMultiModuleLineMarkerTest {
     private void runTest(String testDataFilePath) throws Exception {
-        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+    }
+
+    @TestMetadata("actualConstructorWithProperties")
+    public void testActualConstructorWithProperties() throws Exception {
+        runTest("idea/testData/multiModuleLineMarker/actualConstructorWithProperties/");
     }
 
     @TestMetadata("actualDerived")
@@ -35,8 +39,23 @@ public class MultiModuleLineMarkerTestGenerated extends AbstractMultiModuleLineM
         runTest("idea/testData/multiModuleLineMarker/actualEnumEntries/");
     }
 
+    @TestMetadata("actualEnumEntriesInOneLine")
+    public void testActualEnumEntriesInOneLine() throws Exception {
+        runTest("idea/testData/multiModuleLineMarker/actualEnumEntriesInOneLine/");
+    }
+
+    @TestMetadata("actualWithOverload")
+    public void testActualWithOverload() throws Exception {
+        runTest("idea/testData/multiModuleLineMarker/actualWithOverload/");
+    }
+
     public void testAllFilesPresentInMultiModuleLineMarker() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/multiModuleLineMarker"), Pattern.compile("^([^\\.]+)$"), TargetBackend.ANY, false);
+        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/multiModuleLineMarker"), Pattern.compile("^([^\\.]+)$"), null, false);
+    }
+
+    @TestMetadata("expectConstructorWithProperties")
+    public void testExpectConstructorWithProperties() throws Exception {
+        runTest("idea/testData/multiModuleLineMarker/expectConstructorWithProperties/");
     }
 
     @TestMetadata("expectEnumEntries")
@@ -44,9 +63,29 @@ public class MultiModuleLineMarkerTestGenerated extends AbstractMultiModuleLineM
         runTest("idea/testData/multiModuleLineMarker/expectEnumEntries/");
     }
 
+    @TestMetadata("expectEnumEntriesInOneLine")
+    public void testExpectEnumEntriesInOneLine() throws Exception {
+        runTest("idea/testData/multiModuleLineMarker/expectEnumEntriesInOneLine/");
+    }
+
+    @TestMetadata("expectEnumWithEnumEntriesInOneLine")
+    public void testExpectEnumWithEnumEntriesInOneLine() throws Exception {
+        runTest("idea/testData/multiModuleLineMarker/expectEnumWithEnumEntriesInOneLine/");
+    }
+
+    @TestMetadata("expectWithOverload")
+    public void testExpectWithOverload() throws Exception {
+        runTest("idea/testData/multiModuleLineMarker/expectWithOverload/");
+    }
+
     @TestMetadata("fromActualAnnotation")
     public void testFromActualAnnotation() throws Exception {
         runTest("idea/testData/multiModuleLineMarker/fromActualAnnotation/");
+    }
+
+    @TestMetadata("fromActualAnnotationWithParametersInOneLine")
+    public void testFromActualAnnotationWithParametersInOneLine() throws Exception {
+        runTest("idea/testData/multiModuleLineMarker/fromActualAnnotationWithParametersInOneLine/");
     }
 
     @TestMetadata("fromActualCompanion")

@@ -1,13 +1,13 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.codegen.context;
 
+import kotlin.annotations.jvm.ReadOnly;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.ReadOnly;
 import org.jetbrains.kotlin.codegen.*;
 import org.jetbrains.kotlin.codegen.binding.MutableClosure;
 import org.jetbrains.kotlin.codegen.state.GenerationState;
@@ -27,9 +27,9 @@ import java.util.*;
 
 import static org.jetbrains.kotlin.codegen.AsmUtil.getVisibilityAccessFlag;
 import static org.jetbrains.kotlin.codegen.JvmCodegenUtil.isNonDefaultInterfaceMember;
-import static org.jetbrains.kotlin.descriptors.annotations.AnnotationUtilKt.isEffectivelyInlineOnly;
-import static org.jetbrains.kotlin.resolve.annotations.AnnotationUtilKt.hasJvmDefaultAnnotation;
-import static org.jetbrains.kotlin.resolve.jvm.annotations.AnnotationUtilKt.isCallableMemberWithJvmDefaultAnnotation;
+import static org.jetbrains.kotlin.resolve.inline.InlineOnlyKt.isInlineOnlyPrivateInBytecode;
+import static org.jetbrains.kotlin.resolve.jvm.annotations.JvmAnnotationUtilKt.hasJvmDefaultAnnotation;
+import static org.jetbrains.kotlin.resolve.jvm.annotations.JvmAnnotationUtilKt.isCallableMemberWithJvmDefaultAnnotation;
 import static org.jetbrains.org.objectweb.asm.Opcodes.ACC_PRIVATE;
 import static org.jetbrains.org.objectweb.asm.Opcodes.ACC_PROTECTED;
 
@@ -224,7 +224,7 @@ public abstract class CodegenContext<T extends DeclarationDescriptor> {
             if (closure == null) {
                 throw new IllegalStateException("Can't capture this for context without closure: " + this);
             }
-            closure.setCaptureThis();
+            closure.setNeedsCaptureOuterClass();
         }
         return StackValue.changeReceiverForFieldAndSharedVar(outerExpression.invoke(), prefix);
     }
@@ -309,8 +309,8 @@ public abstract class CodegenContext<T extends DeclarationDescriptor> {
     }
 
     @NotNull
-    public ConstructorContext intoConstructor(@NotNull ConstructorDescriptor descriptor) {
-        return new ConstructorContext(descriptor, getContextKind(), this, closure);
+    public ConstructorContext intoConstructor(@NotNull ConstructorDescriptor descriptor, @NotNull KotlinTypeMapper typeMapper) {
+        return new ConstructorContext(descriptor, getContextKind(), this, closure, typeMapper);
     }
 
     @NotNull
@@ -393,10 +393,14 @@ public abstract class CodegenContext<T extends DeclarationDescriptor> {
     public CodegenContext findParentContextWithDescriptor(DeclarationDescriptor descriptor) {
         CodegenContext c = this;
         while (c != null) {
-            if (c.getContextDescriptor() == descriptor) break;
+            if (!c.isShadowedByParentContext() && c.getContextDescriptor() == descriptor) break;
             c = c.getParentContext();
         }
         return c;
+    }
+
+    private boolean isShadowedByParentContext() {
+        return getContextKind() == OwnerKind.ERASED_INLINE_CLASS;
     }
 
     @NotNull
@@ -409,7 +413,7 @@ public abstract class CodegenContext<T extends DeclarationDescriptor> {
         return getAccessor(propertyDescriptor, AccessorKind.NORMAL, null, superCallTarget, getterAccessorRequired, setterAccessorRequired);
     }
 
-
+    @SuppressWarnings("unchecked")
     public  <D extends CallableMemberDescriptor> D getAccessorForJvmDefaultCompatibility(@NotNull D descriptor) {
         if (descriptor instanceof PropertyAccessorDescriptor) {
             PropertyDescriptor propertyAccessor = getAccessor(((PropertyAccessorDescriptor) descriptor).getCorrespondingProperty(),
@@ -567,7 +571,7 @@ public abstract class CodegenContext<T extends DeclarationDescriptor> {
         }
 
         if (myOuter != null && resultValue != null && !isStaticField(resultValue)) {
-            closure.setCaptureThis();
+            closure.setNeedsCaptureOuterClass();
         }
         return resultValue;
     }
@@ -689,7 +693,7 @@ public abstract class CodegenContext<T extends DeclarationDescriptor> {
             boolean withinInline,
             boolean isSuperCall
     ) {
-        if (isEffectivelyInlineOnly(unwrappedDescriptor)) return false;
+        if (isInlineOnlyPrivateInBytecode(unwrappedDescriptor)) return false;
 
         return isSuperCall && withinInline ||
                (accessFlag & ACC_PRIVATE) != 0 ||

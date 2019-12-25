@@ -17,8 +17,10 @@
 package org.jetbrains.kotlin.resolve.calls
 
 import com.intellij.lang.ASTNode
+import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.util.AstLoadingFilter
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersionSettings
@@ -58,12 +60,14 @@ import org.jetbrains.kotlin.types.ErrorUtils
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.TypeUtils
 import org.jetbrains.kotlin.types.TypeUtils.NO_EXPECTED_TYPE
+import org.jetbrains.kotlin.types.checker.KotlinTypeRefiner
 import org.jetbrains.kotlin.types.expressions.DataFlowAnalyzer
 import org.jetbrains.kotlin.types.expressions.ExpressionTypingContext
 import org.jetbrains.kotlin.types.expressions.ExpressionTypingServices
 import org.jetbrains.kotlin.types.expressions.KotlinTypeInfo
 import org.jetbrains.kotlin.types.expressions.typeInfoFactory.createTypeInfo
 import org.jetbrains.kotlin.types.expressions.typeInfoFactory.noTypeInfo
+import org.jetbrains.kotlin.types.refinement.TypeRefinement
 import javax.inject.Inject
 
 class CallExpressionResolver(
@@ -74,7 +78,8 @@ class CallExpressionResolver(
     private val builtIns: KotlinBuiltIns,
     private val qualifiedExpressionResolver: QualifiedExpressionResolver,
     private val languageVersionSettings: LanguageVersionSettings,
-    private val dataFlowValueFactory: DataFlowValueFactory
+    private val dataFlowValueFactory: DataFlowValueFactory,
+    private val kotlinTypeRefiner: KotlinTypeRefiner
 ) {
     private lateinit var expressionTypingServices: ExpressionTypingServices
 
@@ -347,19 +352,31 @@ class CallExpressionResolver(
         val receiverDataFlowValue = (receiver as? ReceiverValue)?.let { dataFlowValueFactory.createDataFlowValue(it, context) }
         val receiverCanBeNull = receiverDataFlowValue != null &&
                 initialDataFlowInfoForArguments.getStableNullability(receiverDataFlowValue).canBeNull()
+
+        val callOperationNode = AstLoadingFilter.forceAllowTreeLoading(element.qualified.containingFile, ThrowableComputable {
+            element.node
+        })
+
         if (receiverDataFlowValue != null && element.safe) {
             // Additional "receiver != null" information should be applied if we consider a safe call
             if (receiverCanBeNull) {
                 initialDataFlowInfoForArguments = initialDataFlowInfoForArguments.disequate(
                     receiverDataFlowValue, DataFlowValue.nullValue(builtIns), languageVersionSettings
                 )
-            } else if (receiver is ReceiverValue) {
-                reportUnnecessarySafeCall(context.trace, receiver.type, element.node, receiver)
+            } else {
+                reportUnnecessarySafeCall(context.trace, receiver.type, callOperationNode, receiver)
             }
         }
 
         val selector = element.selector
-        var selectorTypeInfo = getUnsafeSelectorTypeInfo(receiver, element.node, selector, context, initialDataFlowInfoForArguments)
+
+        @UseExperimental(TypeRefinement::class)
+        var selectorTypeInfo =
+            getUnsafeSelectorTypeInfo(receiver, callOperationNode, selector, context, initialDataFlowInfoForArguments)
+                .run {
+                    val type = type ?: return@run this
+                    replaceType(kotlinTypeRefiner.refineType(type))
+                }
 
         if (receiver is Qualifier) {
             resolveDeferredReceiverInQualifiedExpression(receiver, selector, context)
@@ -428,7 +445,13 @@ class CallExpressionResolver(
         var branchPointDataFlowInfo = receiverTypeInfo.dataFlowInfo
 
         for (element in elementChain) {
-            val receiverType = receiverTypeInfo.type ?: ErrorUtils.createErrorType("Type for " + element.receiver.text)
+            val receiverType = receiverTypeInfo.type
+                ?: ErrorUtils.createErrorType(
+                    "Type for " + when (val receiver = element.receiver) {
+                        is KtNameReferenceExpression -> receiver.getReferencedName()
+                        else -> receiver.text
+                    }
+                )
 
             val receiver = trace.get(BindingContext.QUALIFIER, element.receiver)
                     ?: ExpressionReceiver.create(element.receiver, receiverType, trace.bindingContext)

@@ -1,39 +1,48 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.kapt3.base
 
+import org.jetbrains.kotlin.base.kapt3.KaptFlag
+import org.jetbrains.kotlin.base.kapt3.KaptOptions
+import org.jetbrains.kotlin.kapt3.base.incremental.DeclaredProcType
+import org.jetbrains.kotlin.kapt3.base.incremental.IncrementalProcessor
+import org.jetbrains.kotlin.kapt3.base.incremental.getIncrementalProcessorsFromClasspath
 import org.jetbrains.kotlin.kapt3.base.util.KaptLogger
 import org.jetbrains.kotlin.kapt3.base.util.info
 import java.io.Closeable
+import java.io.File
 import java.lang.reflect.Field
 import java.lang.reflect.Modifier
 import java.net.URLClassLoader
 import java.util.*
 import javax.annotation.processing.Processor
 
-class ProcessorLoader(
-    private val paths: KaptPaths,
-    private val annotationProcessorFqNames: List<String>,
-    private val logger: KaptLogger
-) : Closeable {
+class LoadedProcessors(val processors: List<IncrementalProcessor>, val classLoader: ClassLoader)
+
+open class ProcessorLoader(private val options: KaptOptions, private val logger: KaptLogger) : Closeable {
     private var annotationProcessingClassLoader: URLClassLoader? = null
 
-    fun loadProcessors(parentClassLoader: ClassLoader = ClassLoader.getSystemClassLoader()): List<Processor> {
+    fun loadProcessors(parentClassLoader: ClassLoader = ClassLoader.getSystemClassLoader()): LoadedProcessors {
         clearJarURLCache()
 
-        val classpath = (paths.annotationProcessingClasspath + paths.compileClasspath).distinct()
+        val classpath = LinkedHashSet<File>().apply {
+            addAll(options.processingClasspath)
+            if (options[KaptFlag.INCLUDE_COMPILE_CLASSPATH]) {
+                addAll(options.compileClasspath)
+            }
+        }
         val classLoader = URLClassLoader(classpath.map { it.toURI().toURL() }.toTypedArray(), parentClassLoader)
         this.annotationProcessingClassLoader = classLoader
 
-        val processors = if (annotationProcessorFqNames.isNotEmpty()) {
+        val processors = if (options.processors.isNotEmpty()) {
             logger.info("Annotation processor class names are set, skip AP discovery")
-            annotationProcessorFqNames.mapNotNull { tryLoadProcessor(it, classLoader) }
+            options.processors.mapNotNull { tryLoadProcessor(it, classLoader) }
         } else {
             logger.info("Need to discovery annotation processors in the AP classpath")
-            ServiceLoader.load(Processor::class.java, classLoader).toList()
+            doLoadProcessors(classLoader)
         }
 
         if (processors.isEmpty()) {
@@ -42,9 +51,34 @@ class ProcessorLoader(
             logger.info { "Annotation processors: " + processors.joinToString { it::class.java.canonicalName } }
         }
 
-        return processors
+        return LoadedProcessors(wrapInIncrementalProcessor(processors, classpath), classLoader)
     }
 
+    private fun wrapInIncrementalProcessor(processors: List<Processor>, classpath: Iterable<File>): List<IncrementalProcessor> {
+        if (options.incrementalCache == null) {
+            return processors.map { IncrementalProcessor(it, DeclaredProcType.NON_INCREMENTAL, logger) }
+        }
+
+        val processorNames = processors.map {it.javaClass.name}.toSet()
+
+        val processorsInfo: Map<String, DeclaredProcType> = getIncrementalProcessorsFromClasspath(processorNames, classpath)
+
+        val nonIncremental = processorNames.filter { !processorsInfo.containsKey(it) }
+        return processors.map {
+            val procType = processorsInfo[it.javaClass.name]?.let {
+                if (nonIncremental.isEmpty()) {
+                    it
+                } else {
+                    DeclaredProcType.INCREMENTAL_BUT_OTHER_APS_ARE_NOT
+                }
+            } ?: DeclaredProcType.NON_INCREMENTAL
+            IncrementalProcessor(it, procType, logger)
+        }
+    }
+
+    open fun doLoadProcessors(classLoader: URLClassLoader): List<Processor> {
+        return ServiceLoader.load(Processor::class.java, classLoader).toList()
+    }
 
     private fun tryLoadProcessor(fqName: String, classLoader: ClassLoader): Processor? {
         val annotationProcessorClass = try {
@@ -92,5 +126,6 @@ private fun clearJarURLCache() {
 
         clearMap(jarFileFactory.getDeclaredField("fileCache"))
         clearMap(jarFileFactory.getDeclaredField("urlCache"))
-    } catch (ignore: Exception) {}
+    } catch (ignore: Exception) {
+    }
 }

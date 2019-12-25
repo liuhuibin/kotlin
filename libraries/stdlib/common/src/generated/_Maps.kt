@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license 
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 @file:kotlin.jvm.JvmMultifileClass
@@ -13,9 +13,9 @@ package kotlin.collections
 // See: https://github.com/JetBrains/kotlin/tree/master/libraries/stdlib
 //
 
-import kotlin.*
-import kotlin.text.*
-import kotlin.comparisons.*
+import kotlin.random.*
+import kotlin.ranges.contains
+import kotlin.ranges.reversed
 
 /**
  * Returns a [List] containing all key-value pairs.
@@ -39,6 +39,8 @@ public fun <K, V> Map<out K, V>.toList(): List<Pair<K, V>> {
 
 /**
  * Returns a single list of all elements yielded from results of [transform] function being invoked on each entry of original map.
+ * 
+ * @sample samples.collections.Collections.Transformations.flatMap
  */
 public inline fun <K, V, R> Map<out K, V>.flatMap(transform: (Map.Entry<K, V>) -> Iterable<R>): List<R> {
     return flatMapTo(ArrayList<R>(), transform)
@@ -58,6 +60,8 @@ public inline fun <K, V, R, C : MutableCollection<in R>> Map<out K, V>.flatMapTo
 /**
  * Returns a list containing the results of applying the given [transform] function
  * to each entry in the original map.
+ * 
+ * @sample samples.collections.Maps.Transformations.mapToList
  */
 public inline fun <K, V, R> Map<out K, V>.map(transform: (Map.Entry<K, V>) -> R): List<R> {
     return mapTo(ArrayList<R>(size), transform)
@@ -135,7 +139,7 @@ public inline fun <K, V> Map<out K, V>.count(): Int {
 public inline fun <K, V> Map<out K, V>.count(predicate: (Map.Entry<K, V>) -> Boolean): Int {
     if (isEmpty()) return 0
     var count = 0
-    for (element in this) if (predicate(element)) count++
+    for (element in this) if (predicate(element)) ++count
     return count
 }
 
@@ -149,6 +153,8 @@ public inline fun <K, V> Map<out K, V>.forEach(action: (Map.Entry<K, V>) -> Unit
 
 /**
  * Returns the first entry yielding the largest value of the given function or `null` if there are no entries.
+ * 
+ * @sample samples.collections.Collections.Aggregates.maxBy
  */
 @kotlin.internal.InlineOnly
 public inline fun <K, V, R : Comparable<R>> Map<out K, V>.maxBy(selector: (Map.Entry<K, V>) -> R): Map.Entry<K, V>? {
@@ -165,6 +171,8 @@ public inline fun <K, V> Map<out K, V>.maxWith(comparator: Comparator<in Map.Ent
 
 /**
  * Returns the first entry yielding the smallest value of the given function or `null` if there are no entries.
+ * 
+ * @sample samples.collections.Collections.Aggregates.minBy
  */
 public inline fun <K, V, R : Comparable<R>> Map<out K, V>.minBy(selector: (Map.Entry<K, V>) -> R): Map.Entry<K, V>? {
     return entries.minBy(selector)

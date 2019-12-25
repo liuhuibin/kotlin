@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 /**
@@ -12,8 +12,10 @@
 
 package kotlin.test
 
+import kotlin.contracts.*
 import kotlin.internal.*
-import kotlin.internal.contracts.*
+import kotlin.jvm.JvmName
+import kotlin.native.concurrent.ThreadLocal
 import kotlin.reflect.KClass
 
 /**
@@ -23,6 +25,7 @@ val asserter: Asserter
     get() = _asserter ?: lookupAsserter()
 
 /** Used to override current asserter internally */
+@ThreadLocal
 internal var _asserter: Asserter? = null
 
 /** Asserts that the given [block] returns `true`. */
@@ -99,30 +102,76 @@ fun <@OnlyInputTypes T> expect(expected: T, message: String?, block: () -> T) {
     assertEquals(expected, block(), message)
 }
 
-/** Asserts that given function [block] fails by throwing an exception. */
-fun assertFails(block: () -> Unit): Throwable = assertFails(null, block)
+/**
+ * Asserts that given function [block] fails by throwing an exception.
+ *
+ * @return An exception that was expected to be thrown and was successfully caught.
+ * The returned exception can be inspected further, for example by asserting its property values.
+ */
+@InlineOnly
+@JvmName("assertFailsInline")
+inline fun assertFails(block: () -> Unit): Throwable =
+    checkResultIsFailure(null, runCatching(block))
 
-/** Asserts that given function [block] fails by throwing an exception. */
+/**
+ * Asserts that given function [block] fails by throwing an exception.
+ *
+ * If the assertion fails, the specified [message] is used unless it is null as a prefix for the failure message.
+ *
+ * @return An exception that was expected to be thrown and was successfully caught.
+ * The returned exception can be inspected further, for example by asserting its property values.
+ */
 @SinceKotlin("1.1")
-fun assertFails(message: String?, block: () -> Unit): Throwable {
-    try {
-        block()
-    } catch (e: Throwable) {
-        assertEquals(e.message, e.message) // success path assertion for qunit
-        return e
-    }
-    asserter.fail(messagePrefix(message) + "Expected an exception to be thrown, but was completed successfully.")
+@InlineOnly
+@JvmName("assertFailsInline")
+inline fun assertFails(message: String?, block: () -> Unit): Throwable =
+    checkResultIsFailure(message, runCatching(block))
+
+@PublishedApi
+internal fun checkResultIsFailure(message: String?, blockResult: Result<Unit>): Throwable {
+    blockResult.fold(
+        onSuccess = {
+            asserter.fail(messagePrefix(message) + "Expected an exception to be thrown, but was completed successfully.")
+        },
+        onFailure = { e ->
+            return e
+        }
+    )
 }
 
 /** Asserts that a [block] fails with a specific exception of type [T] being thrown.
- *  Since inline method doesn't allow to trace where it was invoked, it is required to pass a [message] to distinguish this method call from others.
+ *
+ * If the assertion fails, the specified [message] is used unless it is null as a prefix for the failure message.
+ *
+ * @return An exception of the expected exception type [T] that successfully caught.
+ * The returned exception can be inspected further, for example by asserting its property values.
  */
 @InlineOnly
-inline fun <reified T : Throwable> assertFailsWith(message: String? = null, noinline block: () -> Unit): T =
+inline fun <reified T : Throwable> assertFailsWith(message: String? = null, block: () -> Unit): T =
     assertFailsWith(T::class, message, block)
 
-/** Asserts that a [block] fails with a specific exception of type [exceptionClass] being thrown. */
-fun <T : Throwable> assertFailsWith(exceptionClass: KClass<T>, block: () -> Unit): T = assertFailsWith(exceptionClass, null, block)
+/**
+ * Asserts that a [block] fails with a specific exception of type [exceptionClass] being thrown.
+ *
+ * @return An exception of the expected exception type [T] that successfully caught.
+ * The returned exception can be inspected further, for example by asserting its property values.
+ */
+@InlineOnly
+@JvmName("assertFailsWithInline")
+inline fun <T : Throwable> assertFailsWith(exceptionClass: KClass<T>, block: () -> Unit): T = assertFailsWith(exceptionClass, null, block)
+
+/**
+ * Asserts that a [block] fails with a specific exception of type [exceptionClass] being thrown.
+ *
+ * If the assertion fails, the specified [message] is used unless it is null as a prefix for the failure message.
+ *
+ * @return An exception of the expected exception type [T] that successfully caught.
+ * The returned exception can be inspected further, for example by asserting its property values.
+ */
+@InlineOnly
+@JvmName("assertFailsWithInline")
+inline fun <T : Throwable> assertFailsWith(exceptionClass: KClass<T>, message: String?, block: () -> Unit): T =
+    checkResultIsFailure(exceptionClass, message, runCatching(block))
 
 
 /**

@@ -1,4 +1,4 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
 fun Any.foo1() : ()-> String {
   return { "239" + this }
 }

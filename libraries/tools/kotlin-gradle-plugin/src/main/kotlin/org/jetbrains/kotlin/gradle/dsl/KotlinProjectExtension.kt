@@ -16,26 +16,100 @@
 
 package org.jetbrains.kotlin.gradle.dsl
 
+import groovy.lang.Closure
+import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Project
 import org.gradle.api.internal.plugins.DslObject
+import org.gradle.util.ConfigureUtil
+import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
+import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSetContainer
+import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
+import org.jetbrains.kotlin.gradle.plugin.mpp.*
+import org.jetbrains.kotlin.gradle.targets.js.KotlinJsTarget
+import org.jetbrains.kotlin.konan.target.CompilerOutputKind
 import kotlin.reflect.KClass
 
-internal fun Project.createKotlinExtension(extensionClass: KClass<out KotlinProjectExtension>) {
-    val kotlinExt = extensions.create("kotlin", extensionClass.java)
+private const val KOTLIN_PROJECT_EXTENSION_NAME = "kotlin"
+
+internal fun Project.createKotlinExtension(extensionClass: KClass<out KotlinProjectExtension>): KotlinProjectExtension {
+    val kotlinExt = extensions.create(KOTLIN_PROJECT_EXTENSION_NAME, extensionClass.java)
     DslObject(kotlinExt).extensions.create("experimental", ExperimentalExtension::class.java)
+    return kotlinExtension
 }
 
-open class KotlinProjectExtension {
+internal val Project.kotlinExtensionOrNull: KotlinProjectExtension?
+    get() = extensions.findByName(KOTLIN_PROJECT_EXTENSION_NAME) as? KotlinProjectExtension
+
+internal val Project.kotlinExtension: KotlinProjectExtension
+    get() = extensions.getByName(KOTLIN_PROJECT_EXTENSION_NAME) as KotlinProjectExtension
+
+internal val Project.multiplatformExtensionOrNull: KotlinMultiplatformExtension?
+    get() = extensions.findByName(KOTLIN_PROJECT_EXTENSION_NAME) as? KotlinMultiplatformExtension
+
+internal val Project.multiplatformExtension: KotlinMultiplatformExtension
+    get() = extensions.getByName(KOTLIN_PROJECT_EXTENSION_NAME) as KotlinMultiplatformExtension
+
+open class KotlinProjectExtension: KotlinSourceSetContainer {
     val experimental: ExperimentalExtension
-            get() = DslObject(this).extensions.getByType(ExperimentalExtension::class.java)!!
+        get() = DslObject(this).extensions.getByType(ExperimentalExtension::class.java)
+
+    override var sourceSets: NamedDomainObjectContainer<KotlinSourceSet>
+        @Suppress("UNCHECKED_CAST")
+        get() = DslObject(this).extensions.getByName("sourceSets") as NamedDomainObjectContainer<KotlinSourceSet>
+        internal set(value) {
+            DslObject(this).extensions.add("sourceSets", value)
+        }
 }
 
-open class KotlinJvmProjectExtension : KotlinProjectExtension() {
-    /**
-     * With Gradle 4.0+, disables the separate output directory for Kotlin, falling back to sharing the deprecated
-     * single classes directory per source set. With Gradle < 4.0, has no effect.
-     * */
-    var copyClassesToJavaOutput = false
+abstract class KotlinSingleTargetExtension : KotlinProjectExtension() {
+    abstract val target: KotlinTarget
+
+    open fun target(body: Closure<out KotlinTarget>) = ConfigureUtil.configure(body, target)
+}
+
+abstract class KotlinSingleJavaTargetExtension : KotlinSingleTargetExtension() {
+    override abstract val target: KotlinWithJavaTarget<*>
+}
+
+open class KotlinJvmProjectExtension : KotlinSingleJavaTargetExtension() {
+    override lateinit var target: KotlinWithJavaTarget<KotlinJvmOptions>
+        internal set
+
+    open fun target(body: KotlinWithJavaTarget<KotlinJvmOptions>.() -> Unit) = target.run(body)
+}
+
+open class Kotlin2JsProjectExtension : KotlinSingleJavaTargetExtension() {
+    override lateinit var target: KotlinWithJavaTarget<KotlinJsOptions>
+        internal set
+
+    open fun target(body: KotlinWithJavaTarget<KotlinJsOptions>.() -> Unit) = target.run(body)
+}
+
+open class KotlinJsProjectExtension : KotlinSingleTargetExtension() {
+    override lateinit var target: KotlinJsTarget
+
+    open fun target(body: KotlinJsTarget.() -> Unit) = target.run(body)
+
+    @Deprecated(
+        "Needed for IDE import using the MPP import mechanism",
+        level = DeprecationLevel.HIDDEN
+    )
+    fun getTargets() =
+        target.project.container(KotlinTarget::class.java).apply { add(target) }
+}
+
+open class KotlinCommonProjectExtension : KotlinSingleJavaTargetExtension() {
+    override lateinit var target: KotlinWithJavaTarget<KotlinMultiplatformCommonOptions>
+        internal set
+
+    open fun target(body: KotlinWithJavaTarget<KotlinMultiplatformCommonOptions>.() -> Unit) = target.run(body)
+}
+
+open class KotlinAndroidProjectExtension : KotlinSingleTargetExtension() {
+    override lateinit var target: KotlinAndroidTarget
+        internal set
+
+    open fun target(body: KotlinAndroidTarget.() -> Unit) = target.run(body)
 }
 
 open class ExperimentalExtension {
@@ -45,12 +119,22 @@ open class ExperimentalExtension {
 enum class Coroutines {
     ENABLE,
     WARN,
-    ERROR;
+    ERROR,
+    DEFAULT;
 
     companion object {
-        val DEFAULT = WARN
-
         fun byCompilerArgument(argument: String): Coroutines? =
-                Coroutines.values().firstOrNull { it.name.equals(argument, ignoreCase = true) }
+            Coroutines.values().firstOrNull { it.name.equals(argument, ignoreCase = true) }
+    }
+}
+
+enum class NativeCacheKind(val produce: String?, val outputKind: CompilerOutputKind?) {
+    NONE(null, null),
+    DYNAMIC("dynamic_cache", CompilerOutputKind.DYNAMIC_CACHE),
+    STATIC("static_cache", CompilerOutputKind.STATIC_CACHE);
+
+    companion object {
+        fun byCompilerArgument(argument: String): NativeCacheKind? =
+            NativeCacheKind.values().firstOrNull { it.name.equals(argument, ignoreCase = true) }
     }
 }

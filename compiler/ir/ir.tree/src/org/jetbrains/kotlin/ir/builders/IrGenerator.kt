@@ -27,6 +27,12 @@ interface IrGeneratorWithScope : IrGenerator {
     val scope: Scope
 }
 
-open class IrGeneratorContext(val irBuiltIns: IrBuiltIns) {
+interface IrGeneratorContextInterface {
+    val irBuiltIns: IrBuiltIns
+}
+
+abstract class IrGeneratorContext : IrGeneratorContextInterface {
     val builtIns: KotlinBuiltIns get() = irBuiltIns.builtIns
 }
+
+open class IrGeneratorContextBase(override val irBuiltIns: IrBuiltIns) : IrGeneratorContext()

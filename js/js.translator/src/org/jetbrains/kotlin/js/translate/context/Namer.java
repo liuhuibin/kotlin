@@ -34,7 +34,7 @@ import org.jetbrains.kotlin.js.backend.ast.metadata.TypeCheck;
 import org.jetbrains.kotlin.js.config.JsConfig;
 import org.jetbrains.kotlin.js.naming.NameSuggestion;
 import org.jetbrains.kotlin.js.naming.SuggestedName;
-import org.jetbrains.kotlin.js.resolve.JsPlatform;
+import org.jetbrains.kotlin.js.resolve.JsPlatformAnalyzerServices;
 import org.jetbrains.kotlin.js.translate.intrinsic.functions.factories.ArrayFIF;
 import org.jetbrains.kotlin.js.translate.utils.JsAstUtils;
 import org.jetbrains.kotlin.js.translate.utils.JsDescriptorUtils;
@@ -57,11 +57,12 @@ public final class Namer {
     public static final String KOTLIN_NAME = KotlinLanguage.NAME;
     public static final String KOTLIN_LOWER_NAME = KOTLIN_NAME.toLowerCase();
 
-    public static final String EQUALS_METHOD_NAME = getStableMangledNameForDescriptor(JsPlatform.INSTANCE.getBuiltIns().getAny(), "equals");
-    public static final String COMPARE_TO_METHOD_NAME = getStableMangledNameForDescriptor(JsPlatform.INSTANCE.getBuiltIns().getComparable(), "compareTo");
+    public static final String EQUALS_METHOD_NAME = getStableMangledNameForDescriptor(JsPlatformAnalyzerServices.INSTANCE.getBuiltIns().getAny(), "equals");
+    public static final String COMPARE_TO_METHOD_NAME = getStableMangledNameForDescriptor(JsPlatformAnalyzerServices.INSTANCE.getBuiltIns().getComparable(), "compareTo");
     public static final String LONG_FROM_NUMBER = "fromNumber";
     public static final String LONG_TO_NUMBER = "toNumber";
     public static final String LONG_FROM_INT = "fromInt";
+    public static final String UINT_FROM_INT = "toUInt";
     public static final String LONG_ZERO = "ZERO";
     public static final String LONG_ONE = "ONE";
     public static final String LONG_NEG_ONE = "NEG_ONE";
@@ -73,6 +74,16 @@ public final class Namer {
     private static final String IS_CHAR_SEQUENCE = "isCharSequence";
     public static final String GET_KCLASS = "getKClass";
     public static final String GET_KCLASS_FROM_EXPRESSION = "getKClassFromExpression";
+
+    public static final String CREATE_KTYPE = "createKType";
+    public static final String CREATE_DYNAMIC_KTYPE = "createDynamicKType";
+    public static final String MARK_KTYPE_NULLABLE = "markKTypeNullable";
+    public static final String CREATE_KTYPE_PARAMETER = "createKTypeParameter";
+    public static final String CREATE_REIFIED_KTYPE_PARAMETER = "getReifiedTypeParameterKType";
+    public static final String GET_START_KTYPE_PROJECTION = "getStarKTypeProjection";
+    public static final String CREATE_COVARIANT_KTYPE_PROJECTION = "createCovariantKTypeProjection";
+    public static final String CREATE_INVARIANT_KTYPE_PROJECTION = "createInvariantKTypeProjection";
+    public static final String CREATE_CONTRAVARIANT_KTYPE_PROJECTION = "createContravariantKTypeProjection";
 
     public static final String CALLEE_NAME = "$fun";
 
@@ -162,7 +173,9 @@ public final class Namer {
 
     @NotNull
     public static JsNameRef getFunctionCallRef(@NotNull JsExpression functionExpression) {
-        return pureFqn(CALL_FUNCTION, functionExpression);
+        JsNameRef result = pureFqn(CALL_FUNCTION, functionExpression);
+        MetadataProperties.setJsCall(result, true);
+        return result;
     }
 
     @NotNull
@@ -213,8 +226,9 @@ public final class Namer {
     // TODO: get rid of this function
     @NotNull
     private static String getStableMangledNameForDescriptor(@NotNull ClassDescriptor descriptor, @NotNull String functionName) {
-        Collection<SimpleFunctionDescriptor> functions = descriptor.getDefaultType().getMemberScope().getContributedFunctions(
-                Name.identifier(functionName), NoLookupLocation.FROM_BACKEND);
+        Collection<? extends SimpleFunctionDescriptor> functions = descriptor.getDefaultType().getMemberScope().getContributedFunctions(
+                Name.identifier(functionName), NoLookupLocation.FROM_BACKEND
+        );
         assert functions.size() == 1 : "Can't select a single function: " + functionName + " in " + descriptor;
         SuggestedName suggested = new NameSuggestion().suggest(functions.iterator().next());
         assert suggested != null : "Suggested name for class members is always non-null: " + functions.iterator().next();

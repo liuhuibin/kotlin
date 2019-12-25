@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2016 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.refactoring.rename
@@ -21,7 +10,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Pass
 import com.intellij.psi.*
 import com.intellij.psi.search.SearchScope
-import com.intellij.refactoring.JavaRefactoringSettings
 import com.intellij.refactoring.listeners.RefactoringElementListener
 import com.intellij.refactoring.rename.RenameDialog
 import com.intellij.refactoring.rename.RenameJavaMethodProcessor
@@ -35,13 +23,12 @@ import org.jetbrains.kotlin.asJava.elements.KtLightElement
 import org.jetbrains.kotlin.asJava.elements.KtLightMethod
 import org.jetbrains.kotlin.asJava.namedUnwrappedElement
 import org.jetbrains.kotlin.asJava.unwrapped
-import org.jetbrains.kotlin.codegen.state.KotlinTypeMapper.InternalNameMapper.*
+import org.jetbrains.kotlin.codegen.state.KotlinTypeMapper.InternalNameMapper.demangleInternalName
+import org.jetbrains.kotlin.codegen.state.KotlinTypeMapper.InternalNameMapper.getModuleNameSuffix
+import org.jetbrains.kotlin.codegen.state.KotlinTypeMapper.InternalNameMapper.mangleInternalName
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.idea.caches.resolve.unsafeResolveToDescriptor
-import org.jetbrains.kotlin.idea.refactoring.Pass
-import org.jetbrains.kotlin.idea.refactoring.checkSuperMethods
-import org.jetbrains.kotlin.idea.refactoring.checkSuperMethodsWithPopup
-import org.jetbrains.kotlin.idea.refactoring.dropOverrideKeywordIfNecessary
+import org.jetbrains.kotlin.idea.refactoring.*
 import org.jetbrains.kotlin.idea.references.KtReference
 import org.jetbrains.kotlin.idea.search.declarationsSearch.findDeepestSuperMethodsKotlinAware
 import org.jetbrains.kotlin.idea.search.declarationsSearch.findDeepestSuperMethodsNoWrapping
@@ -50,7 +37,6 @@ import org.jetbrains.kotlin.idea.util.application.runReadAction
 import org.jetbrains.kotlin.idea.util.liftToExpected
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.DescriptorUtils
-import java.lang.IllegalStateException
 import java.util.*
 
 class RenameKotlinFunctionProcessor : RenameKotlinPsiProcessor() {
@@ -60,16 +46,16 @@ class RenameKotlinFunctionProcessor : RenameKotlinPsiProcessor() {
         return element is KtNamedFunction || (element is KtLightMethod && element.kotlinOrigin is KtNamedFunction) || element is FunctionWithSupersWrapper
     }
 
-    override fun isToSearchInComments(psiElement: PsiElement) = JavaRefactoringSettings.getInstance().RENAME_SEARCH_IN_COMMENTS_FOR_METHOD
+    override fun isToSearchInComments(psiElement: PsiElement) = KotlinRefactoringSettings.instance.RENAME_SEARCH_IN_COMMENTS_FOR_METHOD
 
     override fun setToSearchInComments(element: PsiElement, enabled: Boolean) {
-        JavaRefactoringSettings.getInstance().RENAME_SEARCH_IN_COMMENTS_FOR_METHOD = enabled
+        KotlinRefactoringSettings.instance.RENAME_SEARCH_IN_COMMENTS_FOR_METHOD = enabled
     }
 
-    override fun isToSearchForTextOccurrences(element: PsiElement) = JavaRefactoringSettings.getInstance().RENAME_SEARCH_FOR_TEXT_FOR_METHOD
+    override fun isToSearchForTextOccurrences(element: PsiElement) = KotlinRefactoringSettings.instance.RENAME_SEARCH_FOR_TEXT_FOR_METHOD
 
     override fun setToSearchForTextOccurrences(element: PsiElement, enabled: Boolean) {
-        JavaRefactoringSettings.getInstance().RENAME_SEARCH_FOR_TEXT_FOR_METHOD = enabled
+        KotlinRefactoringSettings.instance.RENAME_SEARCH_FOR_TEXT_FOR_METHOD = enabled
     }
 
     private fun getJvmName(element: PsiElement): String? {
@@ -81,31 +67,30 @@ class RenameKotlinFunctionProcessor : RenameKotlinPsiProcessor() {
         val allReferences = super.findReferences(element)
         return when {
             getJvmName(element) == null -> allReferences
-            element is KtElement -> allReferences.filter { it is KtReference }
+            element is KtElement -> allReferences.filterIsInstance<KtReference>()
             element is KtLightElement<*, *> -> allReferences.filterNot { it is KtReference }
             else -> emptyList()
         }
     }
 
     override fun findCollisions(
-            element: PsiElement,
-            newName: String,
-            allRenames: Map<out PsiElement, String>,
-            result: MutableList<UsageInfo>
+        element: PsiElement,
+        newName: String,
+        allRenames: Map<out PsiElement, String>,
+        result: MutableList<UsageInfo>
     ) {
         val declaration = element.unwrapped as? KtNamedFunction ?: return
-        val descriptor = declaration.unsafeResolveToDescriptor()
         checkConflictsAndReplaceUsageInfos(element, allRenames, result)
         result += SmartList<UsageInfo>().also { collisions ->
-            checkRedeclarations(descriptor, newName, collisions)
+            checkRedeclarations(declaration, newName, collisions)
             checkOriginalUsagesRetargeting(declaration, newName, result, collisions)
             checkNewNameUsagesRetargeting(declaration, newName, collisions)
         }
     }
 
     class FunctionWithSupersWrapper(
-            val originalDeclaration: KtNamedFunction,
-            val supers: List<PsiElement>
+        val originalDeclaration: KtNamedFunction,
+        val supers: List<PsiElement>
     ) : KtLightElement<KtNamedFunction, KtNamedFunction>, PsiNamedElement by originalDeclaration {
         override val kotlinOrigin: KtNamedFunction?
             get() = originalDeclaration
@@ -113,9 +98,10 @@ class RenameKotlinFunctionProcessor : RenameKotlinPsiProcessor() {
             get() = originalDeclaration
     }
 
-    private fun substituteForExpectOrActual(element: PsiElement?) = (element?.namedUnwrappedElement as? KtNamedDeclaration)?.liftToExpected()
+    private fun substituteForExpectOrActual(element: PsiElement?) =
+        (element?.namedUnwrappedElement as? KtNamedDeclaration)?.liftToExpected()
 
-    override fun substituteElementToRename(element: PsiElement, editor: Editor?): PsiElement?  {
+    override fun substituteElementToRename(element: PsiElement, editor: Editor?): PsiElement? {
         substituteForExpectOrActual(element)?.let { return it }
 
         val wrappedMethod = wrapPsiMethod(element) ?: return element
@@ -143,8 +129,7 @@ class RenameKotlinFunctionProcessor : RenameKotlinPsiProcessor() {
         fun preprocessAndPass(substitutedJavaElement: PsiElement) {
             val elementToProcess = if (substitutedJavaElement is KtLightMethod && element is KtDeclaration) {
                 substitutedJavaElement.kotlinOrigin as? KtNamedFunction
-            }
-            else {
+            } else {
                 substitutedJavaElement
             }
             renameCallback.pass(elementToProcess)
@@ -172,10 +157,16 @@ class RenameKotlinFunctionProcessor : RenameKotlinPsiProcessor() {
         }
     }
 
-    override fun createRenameDialog(project: Project, element: PsiElement, nameSuggestionContext: PsiElement?, editor: Editor?): RenameDialog {
+    override fun createRenameDialog(
+        project: Project,
+        element: PsiElement,
+        nameSuggestionContext: PsiElement?,
+        editor: Editor?
+    ): RenameDialog {
         val elementForDialog = (element as? FunctionWithSupersWrapper)?.originalDeclaration ?: element
         return object : RenameDialog(project, elementForDialog, nameSuggestionContext, editor) {
-            override fun createRenameProcessor(newName: String) = RenameProcessor(getProject(), element, newName, isSearchInComments, isSearchInNonJavaFiles)
+            override fun createRenameProcessor(newName: String) =
+                RenameProcessor(getProject(), element, newName, isSearchInComments, isSearchInNonJavaFiles)
         }
     }
 
@@ -197,7 +188,7 @@ class RenameKotlinFunctionProcessor : RenameKotlinPsiProcessor() {
                 mangleInternalName(newName, getModuleNameSuffix(baseName)!!)
             } else newName
             if (psiMethod.containingClass != null) {
-                psiMethod.forEachOverridingMethod(scope) { it ->
+                psiMethod.forEachOverridingMethod(scope) {
                     val overrider = (it as? PsiMirrorElement)?.prototype as? PsiMethod ?: it
 
                     if (overrider is SyntheticElement) return@forEachOverridingMethod true
@@ -206,7 +197,7 @@ class RenameKotlinFunctionProcessor : RenameKotlinPsiProcessor() {
                     val newOverriderName = RefactoringUtil.suggestNewOverriderName(overriderName, baseName, newBaseName)
                     if (newOverriderName != null) {
                         RenameProcessor.assertNonCompileElement(overrider)
-                        allRenames.put(overrider, newOverriderName)
+                        allRenames[overrider] = newOverriderName
                     }
                     return@forEachOverridingMethod true
                 }
@@ -225,8 +216,7 @@ class RenameKotlinFunctionProcessor : RenameKotlinPsiProcessor() {
 
             if (usage.isAmbiguousImportUsage()) {
                 ambiguousImportUsages += usage
-            }
-            else {
+            } else {
                 if (!renameMangledUsageIfPossible(usage, element, newName)) {
                     simpleUsages += usage
                 }

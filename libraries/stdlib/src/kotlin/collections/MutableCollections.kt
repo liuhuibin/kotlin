@@ -1,12 +1,14 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 @file:kotlin.jvm.JvmMultifileClass
 @file:kotlin.jvm.JvmName("CollectionsKt")
 
 package kotlin.collections
+
+import kotlin.random.Random
 
 /**
  * Removes a single instance of the specified element from this
@@ -149,11 +151,15 @@ public fun <T> MutableCollection<in T>.addAll(elements: Array<out T>): Boolean {
 
 /**
  * Removes all elements from this [MutableIterable] that match the given [predicate].
+ *
+ * @return `true` if any element was removed from this collection, or `false` when no elements were removed and collection was not modified.
  */
 public fun <T> MutableIterable<T>.removeAll(predicate: (T) -> Boolean): Boolean = filterInPlace(predicate, true)
 
 /**
  * Retains only elements of this [MutableIterable] that match the given [predicate].
+ *
+ * @return `true` if any element was removed from this collection, or `false` when all elements were retained and collection was not modified.
  */
 public fun <T> MutableIterable<T>.retainAll(predicate: (T) -> Boolean): Boolean = filterInPlace(predicate, false)
 
@@ -171,11 +177,15 @@ private fun <T> MutableIterable<T>.filterInPlace(predicate: (T) -> Boolean, pred
 
 /**
  * Removes all elements from this [MutableList] that match the given [predicate].
+ *
+ * @return `true` if any element was removed from this collection, or `false` when no elements were removed and collection was not modified.
  */
 public fun <T> MutableList<T>.removeAll(predicate: (T) -> Boolean): Boolean = filterInPlace(predicate, true)
 
 /**
  * Retains only elements of this [MutableList] that match the given [predicate].
+ *
+ * @return `true` if any element was removed from this collection, or `false` when all elements were retained and collection was not modified.
  */
 public fun <T> MutableList<T>.retainAll(predicate: (T) -> Boolean): Boolean = filterInPlace(predicate, false)
 
@@ -259,3 +269,26 @@ private fun MutableCollection<*>.retainNothing(): Boolean {
     clear()
     return result
 }
+
+/**
+ * Randomly shuffles elements in this mutable list using the specified [random] instance as the source of randomness.
+ *
+ * See: https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle#The_modern_algorithm
+ */
+@SinceKotlin("1.3")
+public fun <T> MutableList<T>.shuffle(random: Random): Unit {
+    for (i in lastIndex downTo 1) {
+        val j = random.nextInt(i + 1)
+        val copy = this[i]
+        this[i] = this[j]
+        this[j] = copy
+    }
+}
+
+/**
+ * Returns a new list with the elements of this list randomly shuffled
+ * using the specified [random] instance as the source of randomness.
+ */
+@SinceKotlin("1.3")
+public fun <T> Iterable<T>.shuffled(random: Random): List<T> = toMutableList().apply { shuffle(random) }
+

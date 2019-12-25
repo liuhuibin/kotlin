@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.stubs
@@ -23,15 +23,13 @@ import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess
 import com.intellij.psi.PsiFile
 import com.intellij.testFramework.PsiTestUtil
-import org.jetbrains.kotlin.config.CompilerSettings
-import org.jetbrains.kotlin.config.KotlinFacetSettingsProvider
-import org.jetbrains.kotlin.config.LanguageFeature
-import org.jetbrains.kotlin.config.TargetPlatformKind
+import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.idea.facet.getOrCreateFacet
 import org.jetbrains.kotlin.idea.facet.initializeIfNeeded
 import org.jetbrains.kotlin.idea.test.ConfigLibraryUtil
 import org.jetbrains.kotlin.idea.test.KotlinJdkAndLibraryProjectDescriptor
 import org.jetbrains.kotlin.idea.test.PluginTestCaseBase
+import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.test.KotlinTestUtils
 import org.jetbrains.kotlin.test.TestJdkKind
 import org.junit.Assert
@@ -48,7 +46,7 @@ abstract class AbstractMultiModuleTest : DaemonAnalyzerTestCase() {
 
     fun module(name: String, jdk: TestJdkKind = TestJdkKind.MOCK_JDK, hasTestRoot: Boolean = false): Module {
         val srcDir = testDataPath + "${getTestName(true)}/$name"
-        val moduleWithSrcRootSet = createModuleFromTestData(srcDir, name, StdModuleTypes.JAVA, true)!!
+        val moduleWithSrcRootSet = createModuleFromTestData(srcDir, name, StdModuleTypes.JAVA, true)
         if (hasTestRoot) {
             addRoot(
                 moduleWithSrcRootSet,
@@ -62,13 +60,27 @@ abstract class AbstractMultiModuleTest : DaemonAnalyzerTestCase() {
         return moduleWithSrcRootSet
     }
 
+    override fun tearDown() {
+        VfsRootAccess.disallowRootAccess(KotlinTestUtils.getHomeDirectory())
+        super.tearDown()
+    }
+
     public override fun createModule(path: String, moduleType: ModuleType<*>): Module {
         return super.createModule(path, moduleType)
     }
 
-    fun addRoot(module: Module, sourceDirInTestData: File, isTestRoot: Boolean) {
-        val tmpRootDir = createTempDirectory()
+    fun addRoot(module: Module, sourceDirInTestData: File, isTestRoot: Boolean, transformContainedFiles: ((File) -> Unit)? = null) {
+        val tmpDir = createTempDirectory()
+
+        // Preserve original root name. This might be useful for later matching of copied files to original ones
+        val tmpRootDir = File(tmpDir, sourceDirInTestData.name).also { it.mkdir() }
+
         FileUtil.copyDir(sourceDirInTestData, tmpRootDir)
+
+        if (transformContainedFiles != null) {
+            tmpRootDir.listFiles().forEach(transformContainedFiles)
+        }
+
         val virtualTempDir = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tmpRootDir)!!
         object : WriteCommandAction.Simple<Unit>(project) {
             override fun run() {
@@ -95,18 +107,22 @@ abstract class AbstractMultiModuleTest : DaemonAnalyzerTestCase() {
         }, this, kind)
     }
 
-    fun Module.enableMultiPlatform() {
+    fun Module.enableMultiPlatform(additionalCompilerArguments: String = "") {
         createFacet()
-        val facetSettings = KotlinFacetSettingsProvider.getInstance(project).getInitializedSettings(this)
+        val facetSettings = KotlinFacetSettingsProvider.getInstance(project)?.getInitializedSettings(this)
+            ?: error("Facet settings are not found")
+
         facetSettings.useProjectSettings = false
         facetSettings.compilerSettings = CompilerSettings().apply {
-            additionalArguments += " -Xmulti-platform"
+            additionalArguments += " -Xmulti-platform $additionalCompilerArguments"
         }
     }
 
     fun Module.enableCoroutines() {
         createFacet()
-        val facetSettings = KotlinFacetSettingsProvider.getInstance(project).getInitializedSettings(this)
+        val facetSettings = KotlinFacetSettingsProvider.getInstance(project)?.getInitializedSettings(this)
+            ?: error("Facet settings are not found")
+
         facetSettings.useProjectSettings = false
         facetSettings.coroutineSupport = LanguageFeature.State.ENABLED
     }
@@ -126,21 +142,47 @@ abstract class AbstractMultiModuleTest : DaemonAnalyzerTestCase() {
 }
 
 fun Module.createFacet(
-        platformKind: TargetPlatformKind<*>? = null,
-        useProjectSettings: Boolean = true,
-        implementedModuleName: String? = null
+    platformKind: TargetPlatform? = null,
+    useProjectSettings: Boolean = true
+) {
+    createFacetWithAdditionalSetup(platformKind, useProjectSettings) { }
+}
+
+fun Module.createMultiplatformFacetM1(
+    platformKind: TargetPlatform? = null,
+    useProjectSettings: Boolean = true,
+    implementedModuleNames: List<String>
+) {
+    createFacetWithAdditionalSetup(platformKind, useProjectSettings) {
+        this.implementedModuleNames = implementedModuleNames
+    }
+}
+
+fun Module.createMultiplatformFacetM3(
+    platformKind: TargetPlatform? = null,
+    useProjectSettings: Boolean = true,
+    dependsOnModuleNames: List<String>
+) {
+    createFacetWithAdditionalSetup(platformKind, useProjectSettings) {
+        this.dependsOnModuleNames = dependsOnModuleNames
+        this.isHmppEnabled = true
+    }
+}
+
+private fun Module.createFacetWithAdditionalSetup(
+    platformKind: TargetPlatform?,
+    useProjectSettings: Boolean,
+    additionalSetup: KotlinFacetSettings.() -> Unit
 ) {
     WriteAction.run<Throwable> {
         val modelsProvider = IdeModifiableModelsProviderImpl(project)
-        with (getOrCreateFacet(modelsProvider, useProjectSettings).configuration.settings)  {
+        with(getOrCreateFacet(modelsProvider, useProjectSettings).configuration.settings) {
             initializeIfNeeded(
-                    this@createFacet,
-                    modelsProvider.getModifiableRootModel(this@createFacet),
-                    platformKind
+                this@createFacetWithAdditionalSetup,
+                modelsProvider.getModifiableRootModel(this@createFacetWithAdditionalSetup),
+                platformKind
             )
-            if (implementedModuleName != null) {
-                this.implementedModuleNames = listOf(implementedModuleName)
-            }
+            additionalSetup()
         }
         modelsProvider.commit()
     }

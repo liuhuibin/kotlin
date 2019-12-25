@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.refactoring.rename;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.idea.refactoring.rename;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -22,11 +21,11 @@ import java.util.regex.Pattern;
 @RunWith(JUnit3RunnerWithInners.class)
 public class RenameTestGenerated extends AbstractRenameTest {
     private void runTest(String testDataFilePath) throws Exception {
-        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
 
     public void testAllFilesPresentInRename() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentInSingleGeneratedClass(this.getClass(), new File("idea/testData/refactoring/rename"), Pattern.compile("^(.+)\\.test$"), TargetBackend.ANY);
+        KotlinTestUtils.assertAllTestsPresentInSingleGeneratedClassWithExcluded(this.getClass(), new File("idea/testData/refactoring/rename"), Pattern.compile("^(.+)\\.test$"), null);
     }
 
     @TestMetadata("ambiguousClassFunImportRenameClass/ambiguousClassFunImportRenameClass.test")
@@ -289,9 +288,19 @@ public class RenameTestGenerated extends AbstractRenameTest {
         runTest("idea/testData/refactoring/rename/labeledLoopByLabel/labeledLoopByLabel.test");
     }
 
+    @TestMetadata("labeledLoopByLabelRefInBreak2/labeledLoopByLabelRefInBreak.test")
+    public void testLabeledLoopByLabelRefInBreak2_LabeledLoopByLabelRefInBreak() throws Exception {
+        runTest("idea/testData/refactoring/rename/labeledLoopByLabelRefInBreak2/labeledLoopByLabelRefInBreak.test");
+    }
+
     @TestMetadata("labeledLoopByLabelRefInBreak/labeledLoopByLabelRefInBreak.test")
     public void testLabeledLoopByLabelRefInBreak_LabeledLoopByLabelRefInBreak() throws Exception {
         runTest("idea/testData/refactoring/rename/labeledLoopByLabelRefInBreak/labeledLoopByLabelRefInBreak.test");
+    }
+
+    @TestMetadata("labeledLoopByLabelRefInContinue2/labeledLoopByLabelRefInContinue.test")
+    public void testLabeledLoopByLabelRefInContinue2_LabeledLoopByLabelRefInContinue() throws Exception {
+        runTest("idea/testData/refactoring/rename/labeledLoopByLabelRefInContinue2/labeledLoopByLabelRefInContinue.test");
     }
 
     @TestMetadata("labeledLoopByLabelRefInContinue/labeledLoopByLabelRefInContinue.test")

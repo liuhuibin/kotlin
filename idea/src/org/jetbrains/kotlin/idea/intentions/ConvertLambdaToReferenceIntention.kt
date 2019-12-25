@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2016 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.intentions
@@ -32,10 +21,14 @@ import org.jetbrains.kotlin.idea.util.IdeDescriptorRenderers
 import org.jetbrains.kotlin.idea.util.approximateFlexibleTypes
 import org.jetbrains.kotlin.idea.util.getResolutionScope
 import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.renderer.render
 import org.jetbrains.kotlin.resolve.BindingContext.FUNCTION
 import org.jetbrains.kotlin.resolve.BindingContext.REFERENCE_TARGET
 import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall
 import org.jetbrains.kotlin.resolve.calls.components.hasDefaultValue
+import org.jetbrains.kotlin.resolve.calls.model.VarargValueArgument
+import org.jetbrains.kotlin.resolve.descriptorUtil.isCompanionObject
+import org.jetbrains.kotlin.resolve.scopes.receivers.ExtensionReceiver
 import org.jetbrains.kotlin.resolve.scopes.utils.getImplicitReceiversHierarchy
 import org.jetbrains.kotlin.synthetic.SyntheticJavaPropertyDescriptor
 import org.jetbrains.kotlin.types.isDynamic
@@ -43,6 +36,7 @@ import org.jetbrains.kotlin.types.isError
 import org.jetbrains.kotlin.types.typeUtil.isTypeParameter
 import org.jetbrains.kotlin.types.typeUtil.isUnit
 
+@Suppress("DEPRECATION")
 class ConvertLambdaToReferenceInspection : IntentionBasedInspection<KtLambdaExpression>(ConvertLambdaToReferenceIntention::class)
 
 open class ConvertLambdaToReferenceIntention(text: String) :
@@ -84,7 +78,7 @@ open class ConvertLambdaToReferenceIntention(text: String) :
             dispatchReceiverParameter != null || extensionReceiverParameter != null
         }
 
-        if (!descriptorHasReceiver && explicitReceiver != null) return false
+        if (!descriptorHasReceiver && explicitReceiver != null && calleeDescriptor !is ClassConstructorDescriptor) return false
         val noBoundReferences = !callableExpression.languageVersionSettings.supportsFeature(LanguageFeature.BoundCallableReferences)
         if (noBoundReferences && descriptorHasReceiver && explicitReceiver == null) return false
 
@@ -126,8 +120,9 @@ open class ConvertLambdaToReferenceIntention(text: String) :
             if (lambdaValueParameterDescriptors.size < explicitReceiverShift + callableExpression.valueArguments.size) return false
             val resolvedCall = callableExpression.getResolvedCall(context) ?: return false
             resolvedCall.valueArguments.entries.forEach { (valueParameter, resolvedArgument) ->
-                val argumentExpression =
-                    resolvedArgument.arguments.singleOrNull()?.getArgumentExpression() as? KtNameReferenceExpression ?: return false
+                val argument = resolvedArgument.arguments.singleOrNull() ?: return false
+                if (resolvedArgument is VarargValueArgument && argument.getSpreadElement() == null) return false
+                val argumentExpression = argument.getArgumentExpression() as? KtNameReferenceExpression ?: return false
                 val argumentTarget = context[REFERENCE_TARGET, argumentExpression] as? ValueParameterDescriptor ?: return false
                 if (argumentTarget != lambdaValueParameterDescriptors[valueParameter.index + explicitReceiverShift]) return false
             }
@@ -189,7 +184,7 @@ open class ConvertLambdaToReferenceIntention(text: String) :
             val arguments = outerCallExpression.valueArguments.filter { it !is KtLambdaArgument }
             val hadDefaultValues = valueParameters.size - 1 > arguments.size
             val useNamedArguments = valueParameters.any { it.hasDefaultValue() } && hadDefaultValues
-                    || arguments.any { it.getArgumentName() != null }
+                    || arguments.any { it.isNamed() }
 
             val newArgumentList = factory.buildValueArgumentList {
                 appendFixedText("(")
@@ -224,24 +219,24 @@ open class ConvertLambdaToReferenceIntention(text: String) :
     companion object {
 
         private fun buildReferenceText(lambdaExpression: KtLambdaExpression, shortTypes: Boolean): String? {
-            val singleStatement = lambdaExpression.singleStatementOrNull()
-            return when (singleStatement) {
+            return when (val singleStatement = lambdaExpression.singleStatementOrNull()) {
                 is KtCallExpression -> {
                     val calleeReferenceExpression = singleStatement.calleeExpression as? KtNameReferenceExpression ?: return null
                     val resolvedCall = calleeReferenceExpression.resolveToCall() ?: return null
                     val receiver = resolvedCall.dispatchReceiver ?: resolvedCall.extensionReceiver
+                    val descriptor by lazy { receiver?.type?.constructor?.declarationDescriptor }
                     val receiverText = when {
-                        receiver == null -> ""
-                        lambdaExpression.getResolutionScope().getImplicitReceiversHierarchy().size == 1 -> "this"
-                        else -> receiver.type.constructor.declarationDescriptor?.name?.let { "this@$it" } ?: return null
+                        receiver == null || descriptor?.isCompanionObject() == true -> ""
+                        receiver is ExtensionReceiver ||
+                                lambdaExpression.getResolutionScope().getImplicitReceiversHierarchy().size == 1 -> "this"
+                        else -> descriptor?.name?.let { "this@$it" } ?: return null
                     }
                     "$receiverText::${singleStatement.getCallReferencedName()}"
                 }
                 is KtDotQualifiedExpression -> {
-                    val selector = singleStatement.selectorExpression
-                    val selectorReferenceName = when (selector) {
+                    val selectorReferenceName = when (val selector = singleStatement.selectorExpression) {
                         is KtCallExpression -> selector.getCallReferencedName() ?: return null
-                        is KtNameReferenceExpression -> selector.getReferencedName()
+                        is KtNameReferenceExpression -> selector.getSafeReferencedName()
                         else -> return null
                     }
                     val receiver = singleStatement.receiverExpression
@@ -254,7 +249,8 @@ open class ConvertLambdaToReferenceIntention(text: String) :
                                 val originalReceiverType = receiverDescriptor.type
                                 val receiverType = originalReceiverType.approximateFlexibleTypes(preferNotNull = true)
                                 if (shortTypes) {
-                                    "${IdeDescriptorRenderers.SOURCE_CODE_SHORT_NAMES_NO_ANNOTATIONS.renderType(receiverType)}::$selectorReferenceName"
+                                    "${IdeDescriptorRenderers.SOURCE_CODE_SHORT_NAMES_NO_ANNOTATIONS
+                                        .renderType(receiverType)}::$selectorReferenceName"
                                 } else {
                                     "${IdeDescriptorRenderers.SOURCE_CODE.renderType(receiverType)}::$selectorReferenceName"
                                 }
@@ -272,7 +268,9 @@ open class ConvertLambdaToReferenceIntention(text: String) :
             }
         }
 
-        private fun KtCallExpression.getCallReferencedName() = (calleeExpression as? KtNameReferenceExpression)?.getReferencedName()
+        private fun KtCallExpression.getCallReferencedName() = (calleeExpression as? KtNameReferenceExpression)?.getSafeReferencedName()
+
+        private fun KtNameReferenceExpression.getSafeReferencedName() = getReferencedNameAsName().render()
 
         private fun KtLambdaExpression.singleStatementOrNull() = bodyExpression?.statements?.singleOrNull()
     }

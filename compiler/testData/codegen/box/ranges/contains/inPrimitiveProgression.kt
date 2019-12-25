@@ -1,4 +1,5 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
+// KJS_WITH_FULL_RUNTIME
 // WITH_RUNTIME
 
 val progression = 1 .. 3 step 2

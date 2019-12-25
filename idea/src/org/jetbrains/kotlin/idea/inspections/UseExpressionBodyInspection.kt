@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.inspections
@@ -60,7 +60,7 @@ class UseExpressionBodyInspection(private val convertEmptyToUnit: Boolean) : Abs
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean) =
         declarationVisitor(fun(declaration) {
-            declaration as? KtDeclarationWithBody ?: return
+            if (declaration !is KtDeclarationWithBody) return
             val (toHighlightElement, suffix, highlightType) = statusFor(declaration) ?: return
             // Change range to start with left brace
             val hasHighlighting = highlightType != INFORMATION
@@ -100,7 +100,7 @@ class UseExpressionBodyInspection(private val convertEmptyToUnit: Boolean) : Abs
 
     private fun KtDeclarationWithBody.blockExpression() = when (this) {
         is KtFunctionLiteral -> null
-        else -> if (!hasBlockBody()) null else bodyExpression as? KtBlockExpression
+        else -> if (!hasBlockBody()) null else bodyBlockExpression
     }
 
     private fun KtBlockExpression.findValueStatement(): KtExpression? {
@@ -114,7 +114,7 @@ class UseExpressionBodyInspection(private val convertEmptyToUnit: Boolean) : Abs
                 return statement
             }
 
-        //TODO: IMO this is not good code, there should be a way to detect that KtExpression does not have value
+            //TODO: IMO this is not good code, there should be a way to detect that KtExpression does not have value
             is KtDeclaration, is KtLoopExpression -> return null
 
             else -> {

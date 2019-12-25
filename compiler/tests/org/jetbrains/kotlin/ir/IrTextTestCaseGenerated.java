@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.ir;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.ir;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -22,11 +21,11 @@ import java.util.regex.Pattern;
 @RunWith(JUnit3RunnerWithInners.class)
 public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
     private void runTest(String testDataFilePath) throws Exception {
-        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
 
     public void testAllFilesPresentInIrText() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/ir/irText"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText"), Pattern.compile("^(.+)\\.kt$"), null, true);
     }
 
     @TestMetadata("compiler/testData/ir/irText/classes")
@@ -34,7 +33,7 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Classes extends AbstractIrTextTestCase {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         @TestMetadata("abstractMembers.kt")
@@ -43,7 +42,7 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
         }
 
         public void testAllFilesPresentInClasses() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/ir/irText/classes"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText/classes"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("annotationClasses.kt")
@@ -86,6 +85,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
             runTest("compiler/testData/ir/irText/classes/dataClassesGeneric.kt");
         }
 
+        @TestMetadata("delegatedGenericImplementation.kt")
+        public void testDelegatedGenericImplementation() throws Exception {
+            runTest("compiler/testData/ir/irText/classes/delegatedGenericImplementation.kt");
+        }
+
         @TestMetadata("delegatedImplementation.kt")
         public void testDelegatedImplementation() throws Exception {
             runTest("compiler/testData/ir/irText/classes/delegatedImplementation.kt");
@@ -111,6 +115,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
             runTest("compiler/testData/ir/irText/classes/enum.kt");
         }
 
+        @TestMetadata("enumClassModality.kt")
+        public void testEnumClassModality() throws Exception {
+            runTest("compiler/testData/ir/irText/classes/enumClassModality.kt");
+        }
+
         @TestMetadata("enumWithSecondaryCtor.kt")
         public void testEnumWithSecondaryCtor() throws Exception {
             runTest("compiler/testData/ir/irText/classes/enumWithSecondaryCtor.kt");
@@ -126,9 +135,19 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
             runTest("compiler/testData/ir/irText/classes/initVal.kt");
         }
 
+        @TestMetadata("initValInLambda.kt")
+        public void testInitValInLambda() throws Exception {
+            runTest("compiler/testData/ir/irText/classes/initValInLambda.kt");
+        }
+
         @TestMetadata("initVar.kt")
         public void testInitVar() throws Exception {
             runTest("compiler/testData/ir/irText/classes/initVar.kt");
+        }
+
+        @TestMetadata("inlineClass.kt")
+        public void testInlineClass() throws Exception {
+            runTest("compiler/testData/ir/irText/classes/inlineClass.kt");
         }
 
         @TestMetadata("innerClass.kt")
@@ -207,11 +226,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Declarations extends AbstractIrTextTestCase {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInDeclarations() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/ir/irText/declarations"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText/declarations"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("catchParameterInTopLevelProperty.kt")
@@ -222,6 +241,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
         @TestMetadata("classLevelProperties.kt")
         public void testClassLevelProperties() throws Exception {
             runTest("compiler/testData/ir/irText/declarations/classLevelProperties.kt");
+        }
+
+        @TestMetadata("constValInitializers.kt")
+        public void testConstValInitializers() throws Exception {
+            runTest("compiler/testData/ir/irText/declarations/constValInitializers.kt");
         }
 
         @TestMetadata("defaultArguments.kt")
@@ -249,9 +273,29 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
             runTest("compiler/testData/ir/irText/declarations/fileWithAnnotations.kt");
         }
 
+        @TestMetadata("fileWithTypeAliasesOnly.kt")
+        public void testFileWithTypeAliasesOnly() throws Exception {
+            runTest("compiler/testData/ir/irText/declarations/fileWithTypeAliasesOnly.kt");
+        }
+
         @TestMetadata("interfaceProperties.kt")
         public void testInterfaceProperties() throws Exception {
             runTest("compiler/testData/ir/irText/declarations/interfaceProperties.kt");
+        }
+
+        @TestMetadata("kt27005.kt")
+        public void testKt27005() throws Exception {
+            runTest("compiler/testData/ir/irText/declarations/kt27005.kt");
+        }
+
+        @TestMetadata("kt29833.kt")
+        public void testKt29833() throws Exception {
+            runTest("compiler/testData/ir/irText/declarations/kt29833.kt");
+        }
+
+        @TestMetadata("kt35550.kt")
+        public void testKt35550() throws Exception {
+            runTest("compiler/testData/ir/irText/declarations/kt35550.kt");
         }
 
         @TestMetadata("localClassWithOverrides.kt")
@@ -262,11 +306,6 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
         @TestMetadata("localDelegatedProperties.kt")
         public void testLocalDelegatedProperties() throws Exception {
             runTest("compiler/testData/ir/irText/declarations/localDelegatedProperties.kt");
-        }
-
-        @TestMetadata("localDelegatedPropertyWithSuspendOperators.kt")
-        public void testLocalDelegatedPropertyWithSuspendOperators() throws Exception {
-            runTest("compiler/testData/ir/irText/declarations/localDelegatedPropertyWithSuspendOperators.kt");
         }
 
         @TestMetadata("localVarInDoWhile.kt")
@@ -299,11 +338,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
         @RunWith(JUnit3RunnerWithInners.class)
         public static class Annotations extends AbstractIrTextTestCase {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInAnnotations() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/ir/irText/declarations/annotations"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText/declarations/annotations"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("annotationsInAnnotationArguments.kt")
@@ -462,11 +501,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
         @RunWith(JUnit3RunnerWithInners.class)
         public static class Multiplatform extends AbstractIrTextTestCase {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInMultiplatform() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/ir/irText/declarations/multiplatform"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText/declarations/multiplatform"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("expectClassInherited.kt")
@@ -490,11 +529,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
         @RunWith(JUnit3RunnerWithInners.class)
         public static class Parameters extends AbstractIrTextTestCase {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInParameters() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/ir/irText/declarations/parameters"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText/declarations/parameters"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("class.kt")
@@ -556,6 +595,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
             public void testTypeParameterBoundedBySubclass() throws Exception {
                 runTest("compiler/testData/ir/irText/declarations/parameters/typeParameterBoundedBySubclass.kt");
             }
+
+            @TestMetadata("useNextParamInLambda.kt")
+            public void testUseNextParamInLambda() throws Exception {
+                runTest("compiler/testData/ir/irText/declarations/parameters/useNextParamInLambda.kt");
+            }
         }
 
         @TestMetadata("compiler/testData/ir/irText/declarations/provideDelegate")
@@ -563,11 +607,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
         @RunWith(JUnit3RunnerWithInners.class)
         public static class ProvideDelegate extends AbstractIrTextTestCase {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInProvideDelegate() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/ir/irText/declarations/provideDelegate"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText/declarations/provideDelegate"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("differentReceivers.kt")
@@ -607,11 +651,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Errors extends AbstractIrTextTestCase {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInErrors() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/ir/irText/errors"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText/errors"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("suppressedNonPublicCall.kt")
@@ -630,11 +674,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Expressions extends AbstractIrTextTestCase {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInExpressions() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/ir/irText/expressions"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText/expressions"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("argumentMappedWithError.kt")
@@ -722,6 +766,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
             runTest("compiler/testData/ir/irText/expressions/breakContinueInLoopHeader.kt");
         }
 
+        @TestMetadata("breakContinueInWhen.kt")
+        public void testBreakContinueInWhen() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/breakContinueInWhen.kt");
+        }
+
         @TestMetadata("callWithReorderedArguments.kt")
         public void testCallWithReorderedArguments() throws Exception {
             runTest("compiler/testData/ir/irText/expressions/callWithReorderedArguments.kt");
@@ -777,6 +826,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
             runTest("compiler/testData/ir/irText/expressions/complexAugmentedAssignment.kt");
         }
 
+        @TestMetadata("constructorWithOwnTypeParametersCall.kt")
+        public void testConstructorWithOwnTypeParametersCall() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/constructorWithOwnTypeParametersCall.kt");
+        }
+
         @TestMetadata("contructorCall.kt")
         public void testContructorCall() throws Exception {
             runTest("compiler/testData/ir/irText/expressions/contructorCall.kt");
@@ -812,9 +866,19 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
             runTest("compiler/testData/ir/irText/expressions/enumEntryAsReceiver.kt");
         }
 
+        @TestMetadata("enumEntryReferenceFromEnumEntryClass.kt")
+        public void testEnumEntryReferenceFromEnumEntryClass() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/enumEntryReferenceFromEnumEntryClass.kt");
+        }
+
         @TestMetadata("equality.kt")
         public void testEquality() throws Exception {
             runTest("compiler/testData/ir/irText/expressions/equality.kt");
+        }
+
+        @TestMetadata("equals.kt")
+        public void testEquals() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/equals.kt");
         }
 
         @TestMetadata("extFunInvokeAsFun.kt")
@@ -857,9 +921,19 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
             runTest("compiler/testData/ir/irText/expressions/funImportedFromObject.kt");
         }
 
+        @TestMetadata("genericConstructorCallWithTypeArguments.kt")
+        public void testGenericConstructorCallWithTypeArguments() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/genericConstructorCallWithTypeArguments.kt");
+        }
+
         @TestMetadata("genericPropertyCall.kt")
         public void testGenericPropertyCall() throws Exception {
             runTest("compiler/testData/ir/irText/expressions/genericPropertyCall.kt");
+        }
+
+        @TestMetadata("genericPropertyRef.kt")
+        public void testGenericPropertyRef() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/genericPropertyRef.kt");
         }
 
         @TestMetadata("identity.kt")
@@ -870,6 +944,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
         @TestMetadata("ifElseIf.kt")
         public void testIfElseIf() throws Exception {
             runTest("compiler/testData/ir/irText/expressions/ifElseIf.kt");
+        }
+
+        @TestMetadata("implicitCastInReturnFromConstructor.kt")
+        public void testImplicitCastInReturnFromConstructor() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/implicitCastInReturnFromConstructor.kt");
         }
 
         @TestMetadata("implicitCastOnPlatformType.kt")
@@ -887,6 +966,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
             runTest("compiler/testData/ir/irText/expressions/implicitCastToTypeParameter.kt");
         }
 
+        @TestMetadata("implicitNotNullInDestructuringAssignment.kt")
+        public void testImplicitNotNullInDestructuringAssignment() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/implicitNotNullInDestructuringAssignment.kt");
+        }
+
         @TestMetadata("in.kt")
         public void testIn() throws Exception {
             runTest("compiler/testData/ir/irText/expressions/in.kt");
@@ -900,6 +984,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
         @TestMetadata("interfaceThisRef.kt")
         public void testInterfaceThisRef() throws Exception {
             runTest("compiler/testData/ir/irText/expressions/interfaceThisRef.kt");
+        }
+
+        @TestMetadata("javaSyntheticPropertyAccess.kt")
+        public void testJavaSyntheticPropertyAccess() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/javaSyntheticPropertyAccess.kt");
         }
 
         @TestMetadata("jvmInstanceFieldReference.kt")
@@ -925,6 +1014,46 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
         @TestMetadata("kt23030.kt")
         public void testKt23030() throws Exception {
             runTest("compiler/testData/ir/irText/expressions/kt23030.kt");
+        }
+
+        @TestMetadata("kt24804.kt")
+        public void testKt24804() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/kt24804.kt");
+        }
+
+        @TestMetadata("kt27933.kt")
+        public void testKt27933() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/kt27933.kt");
+        }
+
+        @TestMetadata("kt28006.kt")
+        public void testKt28006() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/kt28006.kt");
+        }
+
+        @TestMetadata("kt28456.kt")
+        public void testKt28456() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/kt28456.kt");
+        }
+
+        @TestMetadata("kt28456a.kt")
+        public void testKt28456a() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/kt28456a.kt");
+        }
+
+        @TestMetadata("kt28456b.kt")
+        public void testKt28456b() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/kt28456b.kt");
+        }
+
+        @TestMetadata("kt30020.kt")
+        public void testKt30020() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/kt30020.kt");
+        }
+
+        @TestMetadata("kt30796.kt")
+        public void testKt30796() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/kt30796.kt");
         }
 
         @TestMetadata("lambdaInCAO.kt")
@@ -962,6 +1091,21 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
             runTest("compiler/testData/ir/irText/expressions/objectClassReference.kt");
         }
 
+        @TestMetadata("objectReference.kt")
+        public void testObjectReference() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/objectReference.kt");
+        }
+
+        @TestMetadata("objectReferenceInClosureInSuperConstructorCall.kt")
+        public void testObjectReferenceInClosureInSuperConstructorCall() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/objectReferenceInClosureInSuperConstructorCall.kt");
+        }
+
+        @TestMetadata("objectReferenceInFieldInitializer.kt")
+        public void testObjectReferenceInFieldInitializer() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/objectReferenceInFieldInitializer.kt");
+        }
+
         @TestMetadata("outerClassInstanceReference.kt")
         public void testOuterClassInstanceReference() throws Exception {
             runTest("compiler/testData/ir/irText/expressions/outerClassInstanceReference.kt");
@@ -975,6 +1119,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
         @TestMetadata("primitivesImplicitConversions.kt")
         public void testPrimitivesImplicitConversions() throws Exception {
             runTest("compiler/testData/ir/irText/expressions/primitivesImplicitConversions.kt");
+        }
+
+        @TestMetadata("propertyReferences.kt")
+        public void testPropertyReferences() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/propertyReferences.kt");
         }
 
         @TestMetadata("references.kt")
@@ -1005,6 +1154,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
         @TestMetadata("setFieldWithImplicitCast.kt")
         public void testSetFieldWithImplicitCast() throws Exception {
             runTest("compiler/testData/ir/irText/expressions/setFieldWithImplicitCast.kt");
+        }
+
+        @TestMetadata("signedToUnsignedConversions.kt")
+        public void testSignedToUnsignedConversions() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/signedToUnsignedConversions.kt");
         }
 
         @TestMetadata("simpleOperators.kt")
@@ -1047,9 +1201,24 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
             runTest("compiler/testData/ir/irText/expressions/stringTemplates.kt");
         }
 
+        @TestMetadata("temporaryInEnumEntryInitializer.kt")
+        public void testTemporaryInEnumEntryInitializer() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/temporaryInEnumEntryInitializer.kt");
+        }
+
+        @TestMetadata("temporaryInInitBlock.kt")
+        public void testTemporaryInInitBlock() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/temporaryInInitBlock.kt");
+        }
+
         @TestMetadata("thisOfGenericOuterClass.kt")
         public void testThisOfGenericOuterClass() throws Exception {
             runTest("compiler/testData/ir/irText/expressions/thisOfGenericOuterClass.kt");
+        }
+
+        @TestMetadata("thisReferenceBeforeClassDeclared.kt")
+        public void testThisReferenceBeforeClassDeclared() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/thisReferenceBeforeClassDeclared.kt");
         }
 
         @TestMetadata("throw.kt")
@@ -1065,6 +1234,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
         @TestMetadata("tryCatchWithImplicitCast.kt")
         public void testTryCatchWithImplicitCast() throws Exception {
             runTest("compiler/testData/ir/irText/expressions/tryCatchWithImplicitCast.kt");
+        }
+
+        @TestMetadata("typeAliasConstructorReference.kt")
+        public void testTypeAliasConstructorReference() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/typeAliasConstructorReference.kt");
         }
 
         @TestMetadata("typeArguments.kt")
@@ -1112,6 +1286,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
             runTest("compiler/testData/ir/irText/expressions/variableAsFunctionCall.kt");
         }
 
+        @TestMetadata("variableAsFunctionCallWithGenerics.kt")
+        public void testVariableAsFunctionCallWithGenerics() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/variableAsFunctionCallWithGenerics.kt");
+        }
+
         @TestMetadata("when.kt")
         public void testWhen() throws Exception {
             runTest("compiler/testData/ir/irText/expressions/when.kt");
@@ -1132,6 +1311,16 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
             runTest("compiler/testData/ir/irText/expressions/whenReturn.kt");
         }
 
+        @TestMetadata("whenReturnUnit.kt")
+        public void testWhenReturnUnit() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/whenReturnUnit.kt");
+        }
+
+        @TestMetadata("whenUnusedExpression.kt")
+        public void testWhenUnusedExpression() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/whenUnusedExpression.kt");
+        }
+
         @TestMetadata("whenWithSubjectVariable.kt")
         public void testWhenWithSubjectVariable() throws Exception {
             runTest("compiler/testData/ir/irText/expressions/whenWithSubjectVariable.kt");
@@ -1147,11 +1336,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
         @RunWith(JUnit3RunnerWithInners.class)
         public static class FloatingPointComparisons extends AbstractIrTextTestCase {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInFloatingPointComparisons() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/ir/irText/expressions/floatingPointComparisons"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText/expressions/floatingPointComparisons"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("comparableWithDoubleOrFloat.kt")
@@ -1209,6 +1398,59 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
                 runTest("compiler/testData/ir/irText/expressions/floatingPointComparisons/whenByFloatingPoint.kt");
             }
         }
+
+        @TestMetadata("compiler/testData/ir/irText/expressions/sam")
+        @TestDataPath("$PROJECT_ROOT")
+        @RunWith(JUnit3RunnerWithInners.class)
+        public static class Sam extends AbstractIrTextTestCase {
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            public void testAllFilesPresentInSam() throws Exception {
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText/expressions/sam"), Pattern.compile("^(.+)\\.kt$"), null, true);
+            }
+
+            @TestMetadata("samByProjectedType.kt")
+            public void testSamByProjectedType() throws Exception {
+                runTest("compiler/testData/ir/irText/expressions/sam/samByProjectedType.kt");
+            }
+
+            @TestMetadata("samConstructors.kt")
+            public void testSamConstructors() throws Exception {
+                runTest("compiler/testData/ir/irText/expressions/sam/samConstructors.kt");
+            }
+
+            @TestMetadata("samConversionInGenericConstructorCall.kt")
+            public void testSamConversionInGenericConstructorCall() throws Exception {
+                runTest("compiler/testData/ir/irText/expressions/sam/samConversionInGenericConstructorCall.kt");
+            }
+
+            @TestMetadata("samConversionInGenericConstructorCall_NI.kt")
+            public void testSamConversionInGenericConstructorCall_NI() throws Exception {
+                runTest("compiler/testData/ir/irText/expressions/sam/samConversionInGenericConstructorCall_NI.kt");
+            }
+
+            @TestMetadata("samConversionToGeneric.kt")
+            public void testSamConversionToGeneric() throws Exception {
+                runTest("compiler/testData/ir/irText/expressions/sam/samConversionToGeneric.kt");
+            }
+
+            @TestMetadata("samConversions.kt")
+            public void testSamConversions() throws Exception {
+                runTest("compiler/testData/ir/irText/expressions/sam/samConversions.kt");
+            }
+
+            @TestMetadata("samConversionsWithSmartCasts.kt")
+            public void testSamConversionsWithSmartCasts() throws Exception {
+                runTest("compiler/testData/ir/irText/expressions/sam/samConversionsWithSmartCasts.kt");
+            }
+
+            @TestMetadata("samOperators.kt")
+            public void testSamOperators() throws Exception {
+                runTest("compiler/testData/ir/irText/expressions/sam/samOperators.kt");
+            }
+        }
     }
 
     @TestMetadata("compiler/testData/ir/irText/lambdas")
@@ -1216,11 +1458,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Lambdas extends AbstractIrTextTestCase {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInLambdas() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/ir/irText/lambdas"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText/lambdas"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("anonymousFunction.kt")
@@ -1269,11 +1511,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Regressions extends AbstractIrTextTestCase {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInRegressions() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/ir/irText/regressions"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText/regressions"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("coercionInLoop.kt")
@@ -1301,11 +1543,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
         @RunWith(JUnit3RunnerWithInners.class)
         public static class NewInference extends AbstractIrTextTestCase {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInNewInference() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/ir/irText/regressions/newInference"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText/regressions/newInference"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("fixationOrder1.kt")
@@ -1320,11 +1562,11 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Singletons extends AbstractIrTextTestCase {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInSingletons() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/ir/irText/singletons"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText/singletons"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("companion.kt")
@@ -1348,16 +1590,31 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Stubs extends AbstractIrTextTestCase {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInStubs() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/ir/irText/stubs"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText/stubs"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("builtinMap.kt")
         public void testBuiltinMap() throws Exception {
             runTest("compiler/testData/ir/irText/stubs/builtinMap.kt");
+        }
+
+        @TestMetadata("constFromBuiltins.kt")
+        public void testConstFromBuiltins() throws Exception {
+            runTest("compiler/testData/ir/irText/stubs/constFromBuiltins.kt");
+        }
+
+        @TestMetadata("genericClassInDifferentModule.kt")
+        public void testGenericClassInDifferentModule() throws Exception {
+            runTest("compiler/testData/ir/irText/stubs/genericClassInDifferentModule.kt");
+        }
+
+        @TestMetadata("javaConstructorWithTypeParameters.kt")
+        public void testJavaConstructorWithTypeParameters() throws Exception {
+            runTest("compiler/testData/ir/irText/stubs/javaConstructorWithTypeParameters.kt");
         }
 
         @TestMetadata("javaEnum.kt")
@@ -1385,6 +1642,16 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
             runTest("compiler/testData/ir/irText/stubs/javaStaticMethod.kt");
         }
 
+        @TestMetadata("javaSyntheticProperty.kt")
+        public void testJavaSyntheticProperty() throws Exception {
+            runTest("compiler/testData/ir/irText/stubs/javaSyntheticProperty.kt");
+        }
+
+        @TestMetadata("jdkClassSyntheticProperty.kt")
+        public void testJdkClassSyntheticProperty() throws Exception {
+            runTest("compiler/testData/ir/irText/stubs/jdkClassSyntheticProperty.kt");
+        }
+
         @TestMetadata("kotlinInnerClass.kt")
         public void testKotlinInnerClass() throws Exception {
             runTest("compiler/testData/ir/irText/stubs/kotlinInnerClass.kt");
@@ -1393,6 +1660,109 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
         @TestMetadata("simple.kt")
         public void testSimple() throws Exception {
             runTest("compiler/testData/ir/irText/stubs/simple.kt");
+        }
+    }
+
+    @TestMetadata("compiler/testData/ir/irText/types")
+    @TestDataPath("$PROJECT_ROOT")
+    @RunWith(JUnit3RunnerWithInners.class)
+    public static class Types extends AbstractIrTextTestCase {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("abbreviatedTypes.kt")
+        public void testAbbreviatedTypes() throws Exception {
+            runTest("compiler/testData/ir/irText/types/abbreviatedTypes.kt");
+        }
+
+        public void testAllFilesPresentInTypes() throws Exception {
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText/types"), Pattern.compile("^(.+)\\.kt$"), null, true);
+        }
+
+        @TestMetadata("asOnPlatformType.kt")
+        public void testAsOnPlatformType() throws Exception {
+            runTest("compiler/testData/ir/irText/types/asOnPlatformType.kt");
+        }
+
+        @TestMetadata("enhancedNullability.kt")
+        public void testEnhancedNullability() throws Exception {
+            runTest("compiler/testData/ir/irText/types/enhancedNullability.kt");
+        }
+
+        @TestMetadata("explicitEqualsAndCompareToCallsOnPlatformTypeReceiver.kt")
+        public void testExplicitEqualsAndCompareToCallsOnPlatformTypeReceiver() throws Exception {
+            runTest("compiler/testData/ir/irText/types/explicitEqualsAndCompareToCallsOnPlatformTypeReceiver.kt");
+        }
+
+        @TestMetadata("genericPropertyReferenceType.kt")
+        public void testGenericPropertyReferenceType() throws Exception {
+            runTest("compiler/testData/ir/irText/types/genericPropertyReferenceType.kt");
+        }
+
+        @TestMetadata("implicitNotNullOnPlatformType.kt")
+        public void testImplicitNotNullOnPlatformType() throws Exception {
+            runTest("compiler/testData/ir/irText/types/implicitNotNullOnPlatformType.kt");
+        }
+
+        @TestMetadata("intersectionType1_NI.kt")
+        public void testIntersectionType1_NI() throws Exception {
+            runTest("compiler/testData/ir/irText/types/intersectionType1_NI.kt");
+        }
+
+        @TestMetadata("intersectionType1_OI.kt")
+        public void testIntersectionType1_OI() throws Exception {
+            runTest("compiler/testData/ir/irText/types/intersectionType1_OI.kt");
+        }
+
+        @TestMetadata("intersectionType2_NI.kt")
+        public void testIntersectionType2_NI() throws Exception {
+            runTest("compiler/testData/ir/irText/types/intersectionType2_NI.kt");
+        }
+
+        @TestMetadata("intersectionType2_OI.kt")
+        public void testIntersectionType2_OI() throws Exception {
+            runTest("compiler/testData/ir/irText/types/intersectionType2_OI.kt");
+        }
+
+        @TestMetadata("intersectionType3_NI.kt")
+        public void testIntersectionType3_NI() throws Exception {
+            runTest("compiler/testData/ir/irText/types/intersectionType3_NI.kt");
+        }
+
+        @TestMetadata("intersectionType3_OI.kt")
+        public void testIntersectionType3_OI() throws Exception {
+            runTest("compiler/testData/ir/irText/types/intersectionType3_OI.kt");
+        }
+
+        @TestMetadata("localVariableOfIntersectionType_NI.kt")
+        public void testLocalVariableOfIntersectionType_NI() throws Exception {
+            runTest("compiler/testData/ir/irText/types/localVariableOfIntersectionType_NI.kt");
+        }
+
+        @TestMetadata("nullabilityAssertionOnExtensionReceiver.kt")
+        public void testNullabilityAssertionOnExtensionReceiver() throws Exception {
+            runTest("compiler/testData/ir/irText/types/nullabilityAssertionOnExtensionReceiver.kt");
+        }
+
+        @TestMetadata("platformTypeReceiver.kt")
+        public void testPlatformTypeReceiver() throws Exception {
+            runTest("compiler/testData/ir/irText/types/platformTypeReceiver.kt");
+        }
+
+        @TestMetadata("smartCastOnFakeOverrideReceiver.kt")
+        public void testSmartCastOnFakeOverrideReceiver() throws Exception {
+            runTest("compiler/testData/ir/irText/types/smartCastOnFakeOverrideReceiver.kt");
+        }
+
+        @TestMetadata("smartCastOnFieldReceiverOfGenericType.kt")
+        public void testSmartCastOnFieldReceiverOfGenericType() throws Exception {
+            runTest("compiler/testData/ir/irText/types/smartCastOnFieldReceiverOfGenericType.kt");
+        }
+
+        @TestMetadata("smartCastOnReceiverOfGenericType.kt")
+        public void testSmartCastOnReceiverOfGenericType() throws Exception {
+            runTest("compiler/testData/ir/irText/types/smartCastOnReceiverOfGenericType.kt");
         }
     }
 }

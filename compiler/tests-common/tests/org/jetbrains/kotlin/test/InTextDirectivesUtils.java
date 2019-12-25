@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.test;
@@ -100,11 +100,11 @@ public final class InTextDirectivesUtils {
 
     @NotNull
     public static List<String> findLinesWithPrefixesRemoved(String fileText, String... prefixes) {
-        return findLinesWithPrefixesRemoved(fileText, true, prefixes);
+        return findLinesWithPrefixesRemoved(fileText, true, true, prefixes);
     }
 
     @NotNull
-    public static List<String> findLinesWithPrefixesRemoved(String fileText, boolean trim, String... prefixes) {
+    public static List<String> findLinesWithPrefixesRemoved(String fileText, boolean trim, boolean strict, String... prefixes) {
         if (prefixes.length == 0) {
             throw new IllegalArgumentException("Please specify the prefixes to check");
         }
@@ -121,7 +121,7 @@ public final class InTextDirectivesUtils {
                             Character.isWhitespace(prefix.charAt(prefix.length() - 1))) {
                         result.add(trim ? noPrefixLine.trim() : StringUtil.trimTrailing(StringsKt.drop(noPrefixLine, 1)));
                         break;
-                    } else {
+                    } else if (strict) {
                         throw new AssertionError(
                                 "Line starts with prefix \"" + prefix + "\", but doesn't have space symbol after it: " + line);
                     }
@@ -221,15 +221,21 @@ public final class InTextDirectivesUtils {
     public static boolean isCompatibleTarget(TargetBackend targetBackend, File file) {
         if (targetBackend == TargetBackend.ANY) return true;
 
+        List<String> doNotTarget = findLinesWithPrefixesRemoved(textWithDirectives(file), "// DONT_TARGET_EXACT_BACKEND: ");
+        if (doNotTarget.contains(targetBackend.name()))
+            return false;
+
         List<String> backends = findLinesWithPrefixesRemoved(textWithDirectives(file), "// TARGET_BACKEND: ");
         return backends.isEmpty() || backends.contains(targetBackend.name()) || backends.contains(targetBackend.getCompatibleWith().name());
     }
 
-    public static boolean isIgnoredTarget(TargetBackend targetBackend, File file) {
-        if (targetBackend == TargetBackend.ANY) return false;
-
-        List<String> ignoredBackends = findListWithPrefixes(textWithDirectives(file), IGNORE_BACKEND_DIRECTIVE_PREFIX);
+    public static boolean isIgnoredTarget(TargetBackend targetBackend, File file, String ignoreBackendDirectivePrefix) {
+        List<String> ignoredBackends = findListWithPrefixes(textWithDirectives(file), ignoreBackendDirectivePrefix);
         return ignoredBackends.contains(targetBackend.name());
+    }
+
+    public static boolean isIgnoredTarget(TargetBackend targetBackend, File file) {
+        return isIgnoredTarget(targetBackend, file, IGNORE_BACKEND_DIRECTIVE_PREFIX);
     }
 
     public static boolean dontRunGeneratedCode(TargetBackend targetBackend, File file) {

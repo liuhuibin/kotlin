@@ -17,6 +17,7 @@
 package org.jetbrains.kotlin.codegen
 
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
+import org.jetbrains.kotlin.builtins.jvm.JavaToKotlinClassMap
 import org.jetbrains.kotlin.codegen.state.KotlinTypeMapper
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.CallableMemberDescriptor.Kind.DECLARATION
@@ -27,7 +28,6 @@ import org.jetbrains.kotlin.load.java.BuiltinMethodsWithSpecialGenericSignature.
 import org.jetbrains.kotlin.load.java.BuiltinMethodsWithSpecialGenericSignature.isBuiltinWithSpecialDescriptorInJvm
 import org.jetbrains.kotlin.load.java.descriptors.JavaClassDescriptor
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.platform.JavaToKotlinClassMap
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.NonReportingOverrideStrategy
 import org.jetbrains.kotlin.resolve.OverridingStrategy
@@ -305,7 +305,7 @@ class CollectionStubMethodGenerator(
                 }.groupBy { it.name }
 
         for ((name, fromSupertypes) in membersFromSupertypesByName) {
-            OverridingUtil.generateOverridesInFunctionGroup(name, fromSupertypes, emptyList(), classDescriptor, strategy)
+            OverridingUtil.DEFAULT.generateOverridesInFunctionGroup(name, fromSupertypes, emptyList(), classDescriptor, strategy)
         }
     }
 

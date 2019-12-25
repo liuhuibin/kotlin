@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 @file:kotlin.jvm.JvmMultifileClass
@@ -8,8 +8,7 @@
 
 package kotlin.collections
 
-import kotlin.*
-import kotlin.comparisons.compareValues
+import kotlin.contracts.*
 
 internal object EmptyIterator : ListIterator<Nothing> {
     override fun hasNext(): Boolean = false
@@ -126,7 +125,11 @@ public fun <T : Any> listOfNotNull(vararg elements: T?): List<T> = elements.filt
 
 /**
  * Creates a new read-only list with the specified [size], where each element is calculated by calling the specified
- * [init] function. The [init] function returns a list element given its index.
+ * [init] function.
+ *
+ * The function [init] is called for each list element sequentially starting from the first one.
+ * It should return the value for a list element given its index.
+ *
  * @sample samples.collections.Collections.Lists.readOnlyListFromInitializer
  */
 @SinceKotlin("1.1")
@@ -135,7 +138,11 @@ public inline fun <T> List(size: Int, init: (index: Int) -> T): List<T> = Mutabl
 
 /**
  * Creates a new mutable list with the specified [size], where each element is calculated by calling the specified
- * [init] function. The [init] function returns a list element given its index.
+ * [init] function.
+ *
+ * The function [init] is called for each list element sequentially starting from the first one.
+ * It should return the value for a list element given its index.
+ *
  * @sample samples.collections.Collections.Lists.mutableListFromInitializer
  */
 @SinceKotlin("1.1")
@@ -169,6 +176,20 @@ public val <T> List<T>.lastIndex: Int
 public inline fun <T> Collection<T>.isNotEmpty(): Boolean = !isEmpty()
 
 /**
+ * Returns `true` if this nullable collection is either null or empty.
+ * @sample samples.collections.Collections.Collections.collectionIsNullOrEmpty
+ */
+@SinceKotlin("1.3")
+@kotlin.internal.InlineOnly
+public inline fun <T> Collection<T>?.isNullOrEmpty(): Boolean {
+    contract {
+        returns(false) implies (this@isNullOrEmpty != null)
+    }
+
+    return this == null || this.isEmpty()
+}
+
+/**
  * Returns this Collection if it's not `null` and the empty list otherwise.
  * @sample samples.collections.Collections.Collections.collectionOrEmpty
  */
@@ -181,6 +202,18 @@ public inline fun <T> Collection<T>?.orEmpty(): Collection<T> = this ?: emptyLis
  */
 @kotlin.internal.InlineOnly
 public inline fun <T> List<T>?.orEmpty(): List<T> = this ?: emptyList()
+
+/**
+ * Returns this collection if it's not empty
+ * or the result of calling [defaultValue] function if the collection is empty.
+ *
+ * @sample samples.collections.Collections.Collections.collectionIfEmpty
+ */
+@SinceKotlin("1.3")
+@kotlin.internal.InlineOnly
+public inline fun <C, R> C.ifEmpty(defaultValue: () -> R): R where C : Collection<*>, C : R =
+    if (isEmpty()) defaultValue() else this
+
 
 /**
  * Checks if all elements in the specified collection are contained in this collection.
@@ -301,13 +334,17 @@ public inline fun <T, K : Comparable<K>> List<T>.binarySearchBy(
 
 
 /**
- * Searches this list or its range for an element for which [comparison] function returns zero using the binary search algorithm.
- * The list is expected to be sorted into ascending order according to the provided [comparison],
- * otherwise the result is undefined.
+ * Searches this list or its range for an element for which the given [comparison] function returns zero using the binary search algorithm.
+ *
+ * The list is expected to be sorted so that the signs of the [comparison] function's return values ascend on the list elements,
+ * i.e. negative values come before zero and zeroes come before positive values.
+ * Otherwise, the result is undefined.
  *
  * If the list contains multiple elements for which [comparison] returns zero, there is no guarantee which one will be found.
  *
- * @param comparison function that compares an element of the list with the element being searched.
+ * @param comparison function that returns zero when called on the list element being searched.
+ * On the elements coming before the target element, the function must return negative values;
+ * on the elements coming after the target element, the function must return positive values.
  *
  * @return the index of the found element, if it is contained in the list within the specified range;
  * otherwise, the inverted insertion point `(-insertion point - 1)`.
@@ -348,4 +385,21 @@ private fun rangeCheck(size: Int, fromIndex: Int, toIndex: Int) {
     }
 }
 
+
+@PublishedApi
+@SinceKotlin("1.3")
+internal expect fun checkIndexOverflow(index: Int): Int
+
+@PublishedApi
+@SinceKotlin("1.3")
+internal expect fun checkCountOverflow(count: Int): Int
+
+
+@PublishedApi
+@SinceKotlin("1.3")
+internal fun throwIndexOverflow() { throw ArithmeticException("Index overflow has happened.") }
+
+@PublishedApi
+@SinceKotlin("1.3")
+internal fun throwCountOverflow() { throw ArithmeticException("Count overflow has happened.") }
 

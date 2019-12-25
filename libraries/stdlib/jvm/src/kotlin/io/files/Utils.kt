@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 @file:JvmMultifileClass
@@ -8,11 +8,8 @@
 
 package kotlin.io
 
-import java.io.*
-import java.util.*
-import kotlin.*
-import kotlin.text.*
-import kotlin.comparisons.*
+import java.io.File
+import java.io.IOException
 
 /**
  * Creates an empty directory in the specified [directory], using the given [prefix] and [suffix] to generate its name.
@@ -187,15 +184,10 @@ public fun File.copyTo(target: File, overwrite: Boolean = false, bufferSize: Int
     }
 
     if (target.exists()) {
-        val stillExists = if (!overwrite) true else !target.delete()
-
-        if (stillExists) {
-            throw FileAlreadyExistsException(
-                file = this,
-                other = target,
-                reason = "The destination file already exists."
-            )
-        }
+        if (!overwrite)
+            throw FileAlreadyExistsException(file = this, other = target, reason = "The destination file already exists.")
+        else if (!target.delete())
+            throw FileAlreadyExistsException(file = this, other = target, reason = "Tried to overwrite the destination, but failed to delete it.")
     }
 
     if (this.isDirectory) {

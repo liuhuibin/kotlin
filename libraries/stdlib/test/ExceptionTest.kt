@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package test.exceptions
@@ -22,6 +22,8 @@ class ExceptionTest {
     @Test fun nullPointerException() = testCreateException(::NullPointerException, ::NullPointerException)
     @Test fun classCastException() = testCreateException(::ClassCastException, ::ClassCastException)
     @Test fun noSuchElementException() = testCreateException(::NoSuchElementException, ::NoSuchElementException)
+    @Test fun concurrentModificationException() = testCreateException(::ConcurrentModificationException, ::ConcurrentModificationException)
+    @Test fun arithmeticException() = testCreateException(::ArithmeticException, ::ArithmeticException)
 
     @Test fun noWhenBranchMatchedException() = testCreateException(::NoWhenBranchMatchedException, ::NoWhenBranchMatchedException, ::NoWhenBranchMatchedException, ::NoWhenBranchMatchedException)
     @Test fun uninitializedPropertyAccessException() = testCreateException(::UninitializedPropertyAccessException, ::UninitializedPropertyAccessException, ::UninitializedPropertyAccessException, ::UninitializedPropertyAccessException)

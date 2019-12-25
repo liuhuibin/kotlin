@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.refactoring.rename;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.idea.refactoring.rename;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -22,11 +21,11 @@ import java.util.regex.Pattern;
 @RunWith(JUnit3RunnerWithInners.class)
 public class MultiModuleRenameTestGenerated extends AbstractMultiModuleRenameTest {
     private void runTest(String testDataFilePath) throws Exception {
-        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
 
     public void testAllFilesPresentInRenameMultiModule() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentInSingleGeneratedClass(this.getClass(), new File("idea/testData/refactoring/renameMultiModule"), Pattern.compile("^(.+)\\.test$"), TargetBackend.ANY);
+        KotlinTestUtils.assertAllTestsPresentInSingleGeneratedClassWithExcluded(this.getClass(), new File("idea/testData/refactoring/renameMultiModule"), Pattern.compile("^(.+)\\.test$"), null);
     }
 
     @TestMetadata("fileNotUnderSourceRootWithNamesakeUnderSourceRoot/fileNotUnderSourceRootWithNamesakeUnderSourceRoot.test")
@@ -74,6 +73,11 @@ public class MultiModuleRenameTestGenerated extends AbstractMultiModuleRenameTes
         runTest("idea/testData/refactoring/renameMultiModule/headersAndImplsByHeaderClassSecondaryConstructorParameter/headersAndImplsByHeaderClassSecondaryConstructorParameter.test");
     }
 
+    @TestMetadata("headersAndImplsByHeaderClassWithFileNames/headersAndImplsByHeaderClassWithFileNames.test")
+    public void testHeadersAndImplsByHeaderClassWithFileNames_HeadersAndImplsByHeaderClassWithFileNames() throws Exception {
+        runTest("idea/testData/refactoring/renameMultiModule/headersAndImplsByHeaderClassWithFileNames/headersAndImplsByHeaderClassWithFileNames.test");
+    }
+
     @TestMetadata("headersAndImplsByHeaderFun/headersAndImplsByHeaderFun.test")
     public void testHeadersAndImplsByHeaderFun_HeadersAndImplsByHeaderFun() throws Exception {
         runTest("idea/testData/refactoring/renameMultiModule/headersAndImplsByHeaderFun/headersAndImplsByHeaderFun.test");
@@ -117,6 +121,11 @@ public class MultiModuleRenameTestGenerated extends AbstractMultiModuleRenameTes
     @TestMetadata("headersAndImplsByImplClassSecondaryConstructorParameter/headersAndImplsByImplClassSecondaryConstructorParameter.test")
     public void testHeadersAndImplsByImplClassSecondaryConstructorParameter_HeadersAndImplsByImplClassSecondaryConstructorParameter() throws Exception {
         runTest("idea/testData/refactoring/renameMultiModule/headersAndImplsByImplClassSecondaryConstructorParameter/headersAndImplsByImplClassSecondaryConstructorParameter.test");
+    }
+
+    @TestMetadata("headersAndImplsByImplClassWithFileNames/headersAndImplsByImplClassWithFileNames.test")
+    public void testHeadersAndImplsByImplClassWithFileNames_HeadersAndImplsByImplClassWithFileNames() throws Exception {
+        runTest("idea/testData/refactoring/renameMultiModule/headersAndImplsByImplClassWithFileNames/headersAndImplsByImplClassWithFileNames.test");
     }
 
     @TestMetadata("headersAndImplsByImplFun/headersAndImplsByImplFun.test")

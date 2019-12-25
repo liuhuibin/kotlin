@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.config.LanguageFeature;
 import org.jetbrains.kotlin.config.LanguageVersionSettings;
 import org.jetbrains.kotlin.descriptors.*;
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationSplitter;
+import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget;
 import org.jetbrains.kotlin.descriptors.annotations.Annotations;
 import org.jetbrains.kotlin.descriptors.annotations.CompositeAnnotations;
 import org.jetbrains.kotlin.descriptors.impl.*;
@@ -41,6 +42,7 @@ import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
+import org.jetbrains.kotlin.resolve.calls.components.InferenceSession;
 import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowInfo;
 import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowInfoFactory;
 import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowValueFactory;
@@ -88,6 +90,7 @@ public class DescriptorResolver {
     private final TypeApproximator typeApproximator;
     private final DeclarationReturnTypeSanitizer declarationReturnTypeSanitizer;
     private final DataFlowValueFactory dataFlowValueFactory;
+    private final Iterable<DeclarationSignatureAnonymousTypeTransformer> anonymousTypeTransformers;
 
     public DescriptorResolver(
             @NotNull AnnotationResolver annotationResolver,
@@ -106,7 +109,8 @@ public class DescriptorResolver {
             @NotNull Project project,
             @NotNull TypeApproximator approximator,
             @NotNull DeclarationReturnTypeSanitizer declarationReturnTypeSanitizer,
-            @NotNull DataFlowValueFactory dataFlowValueFactory
+            @NotNull DataFlowValueFactory dataFlowValueFactory,
+            @NotNull Iterable<DeclarationSignatureAnonymousTypeTransformer> anonymousTypeTransformers
     ) {
         this.annotationResolver = annotationResolver;
         this.builtIns = builtIns;
@@ -125,6 +129,7 @@ public class DescriptorResolver {
         typeApproximator = approximator;
         this.declarationReturnTypeSanitizer = declarationReturnTypeSanitizer;
         this.dataFlowValueFactory = dataFlowValueFactory;
+        this.anonymousTypeTransformers = anonymousTypeTransformers;
     }
 
     public List<KotlinType> resolveSupertypes(
@@ -296,7 +301,8 @@ public class DescriptorResolver {
             @NotNull KtParameter valueParameter,
             int index,
             @NotNull KotlinType type,
-            @NotNull BindingTrace trace
+            @NotNull BindingTrace trace,
+            @NotNull Annotations additionalAnnotations
     ) {
         KotlinType varargElementType = null;
         KotlinType variableType = type;
@@ -305,22 +311,7 @@ public class DescriptorResolver {
             variableType = getVarargParameterType(type);
         }
 
-        KtModifierList modifierList = valueParameter.getModifierList();
-
-        Annotations allAnnotations =
-                annotationResolver.resolveAnnotationsWithoutArguments(scope, valueParameter.getModifierList(), trace);
-        Annotations valueParameterAnnotations = Annotations.Companion.getEMPTY();
-
-        if (modifierList != null) {
-            if (valueParameter.hasValOrVar()) {
-                AnnotationSplitter annotationSplitter = AnnotationSplitter.create(
-                        storageManager, allAnnotations, SetsKt.setOf(CONSTRUCTOR_PARAMETER));
-                valueParameterAnnotations = annotationSplitter.getAnnotationsForTarget(CONSTRUCTOR_PARAMETER);
-            }
-            else {
-                valueParameterAnnotations = allAnnotations;
-            }
-        }
+        Annotations valueParameterAnnotations = resolveValueParameterAnnotations(scope, valueParameter, trace, additionalAnnotations);
 
         KtDestructuringDeclaration destructuringDeclaration = valueParameter.getDestructuringDeclaration();
 
@@ -387,6 +378,27 @@ public class DescriptorResolver {
 
         trace.record(BindingContext.VALUE_PARAMETER, valueParameter, valueParameterDescriptor);
         return valueParameterDescriptor;
+    }
+
+    @NotNull
+    private Annotations resolveValueParameterAnnotations(
+            @NotNull LexicalScope scope,
+            @NotNull KtParameter parameter,
+            @NotNull BindingTrace trace,
+            @NotNull Annotations additionalAnnotations
+    ) {
+        KtModifierList modifierList = parameter.getModifierList();
+        if (modifierList == null) {
+            return additionalAnnotations;
+        }
+
+        Annotations allAnnotations = annotationResolver.resolveAnnotationsWithoutArguments(scope, modifierList, trace);
+        if (!parameter.hasValOrVar()) {
+            return new CompositeAnnotations(allAnnotations, additionalAnnotations);
+        }
+
+        AnnotationSplitter splitter = new AnnotationSplitter(storageManager, allAnnotations, SetsKt.setOf(CONSTRUCTOR_PARAMETER));
+        return new CompositeAnnotations(splitter.getAnnotationsForTarget(CONSTRUCTOR_PARAMETER), additionalAnnotations);
     }
 
     @NotNull
@@ -460,7 +472,8 @@ public class DescriptorResolver {
                     }
                     return null;
                 },
-                supertypeLoopsResolver
+                supertypeLoopsResolver,
+                storageManager
         );
         trace.record(BindingContext.TYPE_PARAMETER, typeParameter, typeParameterDescriptor);
         return typeParameterDescriptor;
@@ -549,12 +562,16 @@ public class DescriptorResolver {
         }
 
         if (!(declaration instanceof KtClass)) {
-            checkUpperBoundTypes(trace, upperBoundCheckRequests);
+            checkUpperBoundTypes(trace, upperBoundCheckRequests, declaration.hasModifier(KtTokens.OVERRIDE_KEYWORD));
             checkNamesInConstraints(declaration, descriptor, scope, trace);
         }
     }
 
-    public static void checkUpperBoundTypes(@NotNull BindingTrace trace, @NotNull List<UpperBoundCheckRequest> requests) {
+    public static void checkUpperBoundTypes(
+            @NotNull BindingTrace trace,
+            @NotNull List<UpperBoundCheckRequest> requests,
+            boolean hasOverrideModifier
+    ) {
         if (requests.isEmpty()) return;
 
         Set<Name> classBoundEncountered = new HashSet<>();
@@ -582,7 +599,7 @@ public class DescriptorResolver {
                 }
             }
 
-            checkUpperBoundType(upperBoundElement, upperBound, trace);
+            checkUpperBoundType(upperBoundElement, upperBound, trace, hasOverrideModifier);
         }
     }
 
@@ -630,9 +647,10 @@ public class DescriptorResolver {
     public static void checkUpperBoundType(
             KtTypeReference upperBound,
             @NotNull KotlinType upperBoundType,
-            BindingTrace trace
+            BindingTrace trace,
+            boolean hasOverrideModifier
     ) {
-        if (!TypeUtils.canHaveSubtypes(KotlinTypeChecker.DEFAULT, upperBoundType)) {
+        if (!hasOverrideModifier && !TypeUtils.canHaveSubtypes(KotlinTypeChecker.DEFAULT, upperBoundType)) {
             trace.report(FINAL_UPPER_BOUND.on(upperBound, upperBoundType));
         }
         if (DynamicTypesKt.isDynamic(upperBoundType)) {
@@ -782,7 +800,8 @@ public class DescriptorResolver {
             @NotNull LexicalScope scopeForInitializerResolution,
             @NotNull KtDestructuringDeclarationEntry entry,
             @NotNull BindingTrace trace,
-            @NotNull DataFlowInfo dataFlowInfo
+            @NotNull DataFlowInfo dataFlowInfo,
+            @NotNull InferenceSession inferenceSession
     ) {
         KtDestructuringDeclaration destructuringDeclaration = (KtDestructuringDeclaration) entry.getParent();
         KtExpression initializer = destructuringDeclaration.getInitializer();
@@ -803,6 +822,7 @@ public class DescriptorResolver {
                 entry,
                 trace,
                 dataFlowInfo,
+                inferenceSession,
                 VariableAsPropertyInfo.Companion.createFromDestructuringDeclarationEntry(componentType));
     }
 
@@ -826,7 +846,8 @@ public class DescriptorResolver {
             @NotNull LexicalScope scopeForInitializerResolution,
             @NotNull KtProperty property,
             @NotNull BindingTrace trace,
-            @NotNull DataFlowInfo dataFlowInfo
+            @NotNull DataFlowInfo dataFlowInfo,
+            @NotNull InferenceSession inferenceSession
     ) {
         return resolveAsPropertyDescriptor(
                 containingDeclaration,
@@ -835,6 +856,7 @@ public class DescriptorResolver {
                 property,
                 trace,
                 dataFlowInfo,
+                inferenceSession,
                 VariableAsPropertyInfo.Companion.createFromProperty(property));
     }
 
@@ -846,6 +868,7 @@ public class DescriptorResolver {
             @NotNull KtVariableDeclaration variableDeclaration,
             @NotNull BindingTrace trace,
             @NotNull DataFlowInfo dataFlowInfo,
+            @NotNull InferenceSession inferenceSession,
             @NotNull VariableAsPropertyInfo propertyInfo
     ) {
         KtModifierList modifierList = variableDeclaration.getModifierList();
@@ -858,16 +881,21 @@ public class DescriptorResolver {
                                                                  trace.getBindingContext(), container)
                             : Modality.FINAL;
 
-        AnnotationSplitter.PropertyWrapper wrapper = new AnnotationSplitter.PropertyWrapper(variableDeclaration);
-
         Annotations allAnnotations = annotationResolver.resolveAnnotationsWithoutArguments(scopeForDeclarationResolution, modifierList, trace);
-        AnnotationSplitter annotationSplitter =
-                new AnnotationSplitter(storageManager, allAnnotations,
-                                       () -> AnnotationSplitter.getTargetSet(false, trace.getBindingContext(), wrapper));
+        Set<AnnotationUseSiteTarget> targetSet = EnumSet.of(PROPERTY, PROPERTY_GETTER, FIELD);
+        if (isVar) {
+            targetSet.add(PROPERTY_SETTER);
+            targetSet.add(SETTER_PARAMETER);
+        }
+        if (variableDeclaration instanceof KtProperty && ((KtProperty) variableDeclaration).hasDelegate()) {
+            targetSet.add(PROPERTY_DELEGATE_FIELD);
+        }
+        AnnotationSplitter annotationSplitter = new AnnotationSplitter(storageManager, allAnnotations, targetSet);
 
         Annotations propertyAnnotations = new CompositeAnnotations(CollectionsKt.listOf(
-                annotationSplitter.getAnnotationsForTargets(PROPERTY, FIELD, PROPERTY_DELEGATE_FIELD),
-                annotationSplitter.getOtherAnnotations()));
+                annotationSplitter.getAnnotationsForTarget(PROPERTY),
+                annotationSplitter.getOtherAnnotations())
+        );
 
         PropertyDescriptorImpl propertyDescriptor = PropertyDescriptorImpl.create(
                 container,
@@ -886,7 +914,6 @@ public class DescriptorResolver {
                 modifierList != null && modifierList.hasModifier(KtTokens.EXTERNAL_KEYWORD),
                 propertyInfo.getHasDelegate()
         );
-        wrapper.setDescriptor(propertyDescriptor);
 
         List<TypeParameterDescriptorImpl> typeParameterDescriptors;
         LexicalScope scopeForDeclarationResolutionWithTypeParameters;
@@ -927,14 +954,23 @@ public class DescriptorResolver {
             }
         }
 
-        ReceiverParameterDescriptor receiverDescriptor =
-                DescriptorFactory.createExtensionReceiverParameterForCallable(propertyDescriptor, receiverType);
+        ReceiverParameterDescriptor receiverDescriptor;
+        if (receiverType != null) {
+            AnnotationSplitter splitter = new AnnotationSplitter(storageManager, receiverType.getAnnotations(), EnumSet.of(RECEIVER));
+            receiverDescriptor = DescriptorFactory.createExtensionReceiverParameterForCallable(
+                    propertyDescriptor, receiverType, splitter.getAnnotationsForTarget(RECEIVER)
+            );
+        }
+        else {
+            receiverDescriptor = null;
+        }
 
         LexicalScope scopeForInitializer = ScopeUtils.makeScopeForPropertyInitializer(scopeForInitializerResolutionWithTypeParameters, propertyDescriptor);
         KotlinType propertyType = propertyInfo.getVariableType();
         KotlinType typeIfKnown = propertyType != null ? propertyType : variableTypeAndInitializerResolver.resolveTypeNullable(
                 propertyDescriptor, scopeForInitializer,
-                variableDeclaration, dataFlowInfo, /* local = */ trace, false
+                variableDeclaration, dataFlowInfo, inferenceSession,
+                trace, /* local = */ false
         );
 
         PropertyGetterDescriptorImpl getter = resolvePropertyGetterDescriptor(
@@ -952,7 +988,7 @@ public class DescriptorResolver {
         assert type != null : "At least getter type must be initialized via resolvePropertyGetterDescriptor";
 
         variableTypeAndInitializerResolver.setConstantForVariableIfNeeded(
-                propertyDescriptor, scopeForInitializer, variableDeclaration, dataFlowInfo, type, trace
+                propertyDescriptor, scopeForInitializer, variableDeclaration, dataFlowInfo, type, inferenceSession, trace
         );
 
         propertyDescriptor.setType(type, typeParameterDescriptors, getDispatchReceiverParameterIfNeeded(container), receiverDescriptor);
@@ -966,7 +1002,11 @@ public class DescriptorResolver {
                 propertyInfo.getPropertySetter(),
                 propertyInfo.getHasDelegate());
 
-        propertyDescriptor.initialize(getter, setter);
+        propertyDescriptor.initialize(
+                getter, setter,
+                new FieldDescriptorImpl(annotationSplitter.getAnnotationsForTarget(FIELD), propertyDescriptor),
+                new FieldDescriptorImpl(annotationSplitter.getAnnotationsForTarget(PROPERTY_DELEGATE_FIELD), propertyDescriptor)
+        );
 
         trace.record(BindingContext.VARIABLE, variableDeclaration, propertyDescriptor);
         return propertyDescriptor;
@@ -977,8 +1017,16 @@ public class DescriptorResolver {
             @NotNull DeclarationDescriptorWithVisibility descriptor,
             @NotNull KtDeclaration declaration,
             @NotNull KotlinType type,
-            @NotNull BindingTrace trace
+            @NotNull BindingTrace trace,
+            @NotNull Iterable<DeclarationSignatureAnonymousTypeTransformer> anonymousTypeTransformers
     ) {
+        for (DeclarationSignatureAnonymousTypeTransformer transformer : anonymousTypeTransformers) {
+            KotlinType transformedType = transformer.transformAnonymousType(descriptor, type);
+            if (transformedType != null) {
+                return transformedType;
+            }
+        }
+
         ClassifierDescriptor classifier = type.getConstructor().getDeclarationDescriptor();
         if (classifier == null || !DescriptorUtils.isAnonymousObject(classifier) || DescriptorUtils.isLocal(descriptor)) {
             return type;
@@ -996,7 +1044,6 @@ public class DescriptorResolver {
         return type;
     }
 
-
     @Nullable
     private PropertySetterDescriptor resolvePropertySetterDescriptor(
             @NotNull LexicalScope scopeWithTypeParameters,
@@ -1008,10 +1055,13 @@ public class DescriptorResolver {
             boolean hasDelegate
     ) {
         PropertySetterDescriptorImpl setterDescriptor = null;
+        Annotations setterTargetedAnnotations = annotationSplitter.getAnnotationsForTarget(PROPERTY_SETTER);
+        Annotations parameterTargetedAnnotations = annotationSplitter.getAnnotationsForTarget(SETTER_PARAMETER);
         if (setter != null) {
             Annotations annotations = new CompositeAnnotations(CollectionsKt.listOf(
-                    annotationSplitter.getAnnotationsForTarget(PROPERTY_SETTER),
-                    annotationResolver.resolveAnnotationsWithoutArguments(scopeWithTypeParameters, setter.getModifierList(), trace)));
+                    setterTargetedAnnotations,
+                    annotationResolver.resolveAnnotationsWithoutArguments(scopeWithTypeParameters, setter.getModifierList(), trace)
+            ));
             KtParameter parameter = setter.getParameter();
 
             setterDescriptor = new PropertySetterDescriptorImpl(
@@ -1051,8 +1101,9 @@ public class DescriptorResolver {
                     }
                 }
 
-                ValueParameterDescriptorImpl valueParameterDescriptor =
-                        resolveValueParameterDescriptor(scopeWithTypeParameters, setterDescriptor, parameter, 0, type, trace);
+                ValueParameterDescriptorImpl valueParameterDescriptor = resolveValueParameterDescriptor(
+                        scopeWithTypeParameters, setterDescriptor, parameter, 0, type, trace, parameterTargetedAnnotations
+                );
                 setterDescriptor.initialize(valueParameterDescriptor);
             }
             else {
@@ -1062,15 +1113,16 @@ public class DescriptorResolver {
             trace.record(BindingContext.PROPERTY_ACCESSOR, setter, setterDescriptor);
         }
         else if (property.isVar()) {
-            Annotations setterAnnotations = annotationSplitter.getAnnotationsForTarget(PROPERTY_SETTER);
-            setterDescriptor = DescriptorFactory.createSetter(propertyDescriptor, setterAnnotations, !hasDelegate,
-                                                              /* isExternal = */ false, property.hasModifier(KtTokens.INLINE_KEYWORD),
-                                                              propertyDescriptor.getSource());
+            setterDescriptor = DescriptorFactory.createSetter(
+                    propertyDescriptor, setterTargetedAnnotations, parameterTargetedAnnotations,
+                    !hasDelegate && setterTargetedAnnotations.isEmpty() && parameterTargetedAnnotations.isEmpty(),
+                    false, property.hasModifier(KtTokens.INLINE_KEYWORD),
+                    propertyDescriptor.getSource()
+            );
         }
 
         if (!property.isVar()) {
             if (setter != null) {
-                //                trace.getErrorHandler().genericError(setter.asElement().getNode(), "A 'val'-property cannot have a setter");
                 trace.report(VAL_WITH_SETTER.on(setter));
             }
         }
@@ -1090,10 +1142,12 @@ public class DescriptorResolver {
     ) {
         PropertyGetterDescriptorImpl getterDescriptor;
         KotlinType getterType;
+        Annotations getterTargetedAnnotations = annotationSplitter.getAnnotationsForTarget(PROPERTY_GETTER);
         if (getter != null) {
             Annotations getterAnnotations = new CompositeAnnotations(CollectionsKt.listOf(
-                    annotationSplitter.getAnnotationsForTarget(PROPERTY_GETTER),
-                    annotationResolver.resolveAnnotationsWithoutArguments(scopeForDeclarationResolution, getter.getModifierList(), trace)));
+                    getterTargetedAnnotations,
+                    annotationResolver.resolveAnnotationsWithoutArguments(scopeForDeclarationResolution, getter.getModifierList(), trace)
+            ));
 
             getterDescriptor = new PropertyGetterDescriptorImpl(
                     propertyDescriptor, getterAnnotations,
@@ -1108,9 +1162,11 @@ public class DescriptorResolver {
             trace.record(BindingContext.PROPERTY_ACCESSOR, getter, getterDescriptor);
         }
         else {
-            Annotations getterAnnotations = annotationSplitter.getAnnotationsForTarget(PROPERTY_GETTER);
-            getterDescriptor = DescriptorFactory.createGetter(propertyDescriptor, getterAnnotations, !hasDelegate,
-                                                              /* isExternal = */ false, property.hasModifier(KtTokens.INLINE_KEYWORD));
+            getterDescriptor = DescriptorFactory.createGetter(
+                    propertyDescriptor, getterTargetedAnnotations,
+                    !hasDelegate && getterTargetedAnnotations.isEmpty(),
+                    /* isExternal = */ false, property.hasModifier(KtTokens.INLINE_KEYWORD)
+            );
             getterType = propertyTypeIfKnown;
         }
 
@@ -1159,7 +1215,7 @@ public class DescriptorResolver {
         return wrappedTypeFactory.createRecursionIntolerantDeferredType(trace, () -> {
             PreliminaryDeclarationVisitor.Companion.createForDeclaration(function, trace, languageVersionSettings);
             KotlinType type = expressionTypingServices.getBodyExpressionType(trace, scope, dataFlowInfo, function, functionDescriptor);
-            KotlinType publicType = transformAnonymousTypeIfNeeded(functionDescriptor, function, type, trace);
+            KotlinType publicType = transformAnonymousTypeIfNeeded(functionDescriptor, function, type, trace, anonymousTypeTransformers);
             UnwrappedType approximatedType = typeApproximator.approximateDeclarationType(publicType, false, languageVersionSettings);
             KotlinType sanitizedType = declarationReturnTypeSanitizer.sanitizeReturnType(approximatedType, wrappedTypeFactory, trace, languageVersionSettings);
             functionsTypingVisitor.checkTypesForReturnStatements(function, trace, sanitizedType);
@@ -1186,15 +1242,18 @@ public class DescriptorResolver {
             }
         }
 
-        AnnotationSplitter.PropertyWrapper propertyWrapper = new AnnotationSplitter.PropertyWrapper(parameter);
         Annotations allAnnotations = annotationResolver.resolveAnnotationsWithoutArguments(scope, parameter.getModifierList(), trace);
-        AnnotationSplitter annotationSplitter =
-                new AnnotationSplitter(storageManager, allAnnotations,
-                                       () -> AnnotationSplitter.getTargetSet(true, trace.getBindingContext(), propertyWrapper));
+        Set<AnnotationUseSiteTarget> targetSet = EnumSet.of(PROPERTY, PROPERTY_GETTER, FIELD, CONSTRUCTOR_PARAMETER, PROPERTY_SETTER);
+        if (isMutable) {
+            targetSet.add(PROPERTY_SETTER);
+            targetSet.add(SETTER_PARAMETER);
+        }
+        AnnotationSplitter annotationSplitter = new AnnotationSplitter(storageManager, allAnnotations, targetSet);
 
         Annotations propertyAnnotations = new CompositeAnnotations(
-                annotationSplitter.getAnnotationsForTargets(PROPERTY, FIELD),
-                annotationSplitter.getOtherAnnotations());
+                annotationSplitter.getAnnotationsForTarget(PROPERTY),
+                annotationSplitter.getOtherAnnotations()
+        );
 
         PropertyDescriptorImpl propertyDescriptor = PropertyDescriptorImpl.create(
                 classDescriptor,
@@ -1212,10 +1271,7 @@ public class DescriptorResolver {
                 false,
                 false
         );
-        propertyWrapper.setDescriptor(propertyDescriptor);
-        propertyDescriptor.setType(
-                type, Collections.emptyList(), getDispatchReceiverParameterIfNeeded(classDescriptor), (ReceiverParameterDescriptor) null
-        );
+        propertyDescriptor.setType(type, Collections.emptyList(), getDispatchReceiverParameterIfNeeded(classDescriptor), null);
 
         Annotations setterAnnotations = annotationSplitter.getAnnotationsForTarget(PROPERTY_SETTER);
         Annotations getterAnnotations = new CompositeAnnotations(CollectionsKt.listOf(
@@ -1223,9 +1279,18 @@ public class DescriptorResolver {
 
         PropertyGetterDescriptorImpl getter = DescriptorFactory.createDefaultGetter(propertyDescriptor, getterAnnotations);
         PropertySetterDescriptor setter =
-                propertyDescriptor.isVar() ? DescriptorFactory.createDefaultSetter(propertyDescriptor, setterAnnotations) : null;
+                propertyDescriptor.isVar()
+                ? DescriptorFactory.createDefaultSetter(
+                        propertyDescriptor, setterAnnotations, annotationSplitter.getAnnotationsForTarget(SETTER_PARAMETER)
+                )
+                : null;
 
-        propertyDescriptor.initialize(getter, setter);
+        propertyDescriptor.initialize(
+                getter, setter,
+                new FieldDescriptorImpl(annotationSplitter.getAnnotationsForTarget(FIELD), propertyDescriptor),
+                null
+        );
+
         getter.initialize(propertyDescriptor.getType());
 
         trace.record(BindingContext.PRIMARY_CONSTRUCTOR_PARAMETER, parameter, propertyDescriptor);
@@ -1284,21 +1349,6 @@ public class DescriptorResolver {
             KotlinType substitutedBound = substitutor.safeSubstitute(bound, Variance.INVARIANT);
             if (!KotlinTypeChecker.DEFAULT.isSubtypeOf(typeArgument, substitutedBound)) {
                 trace.report(UPPER_BOUND_VIOLATED.on(jetTypeArgument, substitutedBound, typeArgument));
-            }
-        }
-    }
-
-    public static void checkBoundsInTypeAlias(
-            @NotNull TypeAliasExpansionReportStrategy reportStrategy,
-            @NotNull KotlinType unsubstitutedArgument,
-            @NotNull KotlinType typeArgument,
-            @NotNull TypeParameterDescriptor typeParameterDescriptor,
-            @NotNull TypeSubstitutor substitutor
-    ) {
-        for (KotlinType bound : typeParameterDescriptor.getUpperBounds()) {
-            KotlinType substitutedBound = substitutor.safeSubstitute(bound, Variance.INVARIANT);
-            if (!KotlinTypeChecker.DEFAULT.isSubtypeOf(typeArgument, substitutedBound)) {
-                reportStrategy.boundsViolationInSubstitution(substitutedBound, unsubstitutedArgument, typeArgument, typeParameterDescriptor);
             }
         }
     }

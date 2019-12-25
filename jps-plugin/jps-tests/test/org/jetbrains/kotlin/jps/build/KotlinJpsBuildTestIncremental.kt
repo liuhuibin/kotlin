@@ -17,32 +17,45 @@
 package org.jetbrains.kotlin.jps.build
 
 import com.intellij.openapi.util.io.FileUtil
+import org.jetbrains.jps.builders.CompileScopeTestBuilder
 import org.jetbrains.kotlin.cli.common.arguments.CommonCompilerArguments
 import org.jetbrains.jps.builders.JpsBuildTestCase
+import org.jetbrains.jps.builders.logging.BuildLoggingManager
 import org.jetbrains.kotlin.compilerRunner.JpsKotlinCompilerRunner
-import org.jetbrains.kotlin.config.IncrementalCompilation
 import org.jetbrains.kotlin.config.LanguageVersion
-import org.jetbrains.kotlin.jps.model.JpsKotlinCompilerSettings
 import kotlin.reflect.KMutableProperty1
 import org.jetbrains.kotlin.daemon.common.COMPILE_DAEMON_CUSTOM_RUN_FILES_PATH_FOR_TESTS
 import org.jetbrains.kotlin.daemon.common.COMPILE_DAEMON_ENABLED_PROPERTY
 import org.jetbrains.kotlin.daemon.common.isDaemonEnabled
+import org.jetbrains.kotlin.incremental.LookupSymbol
+import org.jetbrains.kotlin.jps.build.fixtures.EnableICFixture
 import org.jetbrains.kotlin.jps.model.kotlinCommonCompilerArguments
 import org.jetbrains.kotlin.jps.model.kotlinCompilerArguments
+import org.junit.Assert
 import java.io.File
 
 class KotlinJpsBuildTestIncremental : KotlinJpsBuildTest() {
-    var isICEnabledBackup: Boolean = false
+    private val enableICFixture = EnableICFixture()
 
     override fun setUp() {
         super.setUp()
-        isICEnabledBackup = IncrementalCompilation.isEnabled()
-        IncrementalCompilation.setIsEnabled(true)
+        enableICFixture.setUp()
     }
 
     override fun tearDown() {
-        IncrementalCompilation.setIsEnabled(isICEnabledBackup)
+        enableICFixture.tearDown()
         super.tearDown()
+    }
+
+    fun testKotlinJavaScriptChangePackage() {
+        initProject(LibraryDependency.JS_STDLIB)
+        buildAllModules().assertSuccessful()
+
+        val class2Kt = File(workDir, "src/Class2.kt")
+        val newClass2KtContent = class2Kt.readText().replace("package2", "package1")
+        JpsBuildTestCase.change(class2Kt.path, newClass2KtContent)
+        buildAllModules().assertSuccessful()
+        checkOutputFilesList(File(workDir, "out/production"))
     }
 
     fun testJpsDaemonIC() {
@@ -87,7 +100,7 @@ class KotlinJpsBuildTestIncremental : KotlinJpsBuildTest() {
 
         checkWhen(touch("src/main.kt"), null, packageClasses("kotlinProject", "src/main.kt", "foo.MainKt"))
         checkWhen(touch("src/boo.kt"), null, packageClasses("kotlinProject", "src/boo.kt", "boo.BooKt"))
-        checkWhen(touch("src/Bar.kt"), arrayOf("src/Bar.kt"), arrayOf(klass("kotlinProject", "foo.Bar")))
+        checkWhen(touch("src/Bar.kt"), arrayOf("src/Bar.kt"), arrayOf(module("kotlinProject"), klass("kotlinProject", "foo.Bar")))
 
         checkWhen(del("src/main.kt"),
                   pathsToCompile = null,
@@ -96,7 +109,7 @@ class KotlinJpsBuildTestIncremental : KotlinJpsBuildTest() {
         assertFilesNotExistInOutput(module, "foo/MainKt.class")
 
         checkWhen(touch("src/boo.kt"), null, packageClasses("kotlinProject", "src/boo.kt", "boo.BooKt"))
-        checkWhen(touch("src/Bar.kt"), null, arrayOf(klass("kotlinProject", "foo.Bar")))
+        checkWhen(touch("src/Bar.kt"), null, arrayOf(module("kotlinProject"), klass("kotlinProject", "foo.Bar")))
     }
 
     fun testManyFilesForPackage() {

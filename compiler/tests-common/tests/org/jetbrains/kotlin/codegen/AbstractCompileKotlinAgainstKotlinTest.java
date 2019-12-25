@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.codegen;
@@ -11,25 +11,27 @@ import com.intellij.openapi.util.Disposer;
 import kotlin.Pair;
 import kotlin.text.StringsKt;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.cli.common.modules.ModuleBuilder;
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment;
 import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime;
+import org.jetbrains.kotlin.config.CommonConfigurationKeys;
 import org.jetbrains.kotlin.config.CompilerConfiguration;
 import org.jetbrains.kotlin.load.kotlin.ModuleVisibilityManager;
 import org.jetbrains.kotlin.load.kotlin.PackagePartClassUtils;
 import org.jetbrains.kotlin.psi.KtFile;
 import org.jetbrains.kotlin.test.ConfigurationKind;
+import org.jetbrains.kotlin.test.InTextDirectivesUtils;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
 import org.jetbrains.kotlin.utils.ExceptionUtilsKt;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public abstract class AbstractCompileKotlinAgainstKotlinTest extends CodegenTestCase {
     private File tmpdir;
@@ -47,15 +49,15 @@ public abstract class AbstractCompileKotlinAgainstKotlinTest extends CodegenTest
     }
 
     @Override
-    protected void doMultiFileTest(@NotNull File wholeFile, @NotNull List<TestFile> files, @Nullable File javaFilesDir) throws Exception {
-        assert javaFilesDir == null : ".java files are not supported yet in this test";
-        doTwoFileTest(files);
+    protected void doMultiFileTest(@NotNull File wholeFile, @NotNull List<TestFile> files) {
+        boolean isIgnored = InTextDirectivesUtils.isIgnoredTarget(getBackend(), wholeFile);
+        doTwoFileTest(files, !isIgnored);
     }
 
     @NotNull
-    protected Pair<ClassFileFactory, ClassFileFactory> doTwoFileTest(@NotNull List<TestFile> files) throws Exception {
+    protected Pair<ClassFileFactory, ClassFileFactory> doTwoFileTest(@NotNull List<TestFile> files, boolean reportProblems) {
         // Note that it may be beneficial to improve this test to handle many files, compiling them successively against all previous
-        assert files.size() == 2 : "There should be exactly two files in this test";
+        assert files.size() == 2 || (files.size() == 3 && files.get(2).name.equals("CoroutineUtil.kt")) : "There should be exactly two files in this test";
         TestFile fileA = files.get(0);
         TestFile fileB = files.get(1);
         ClassFileFactory factoryA = compileA(fileA, files);
@@ -65,11 +67,13 @@ public abstract class AbstractCompileKotlinAgainstKotlinTest extends CodegenTest
             invokeBox(PackagePartClassUtils.getFilePartShortName(new File(fileB.name).getName()));
         }
         catch (Throwable e) {
-            String result = "FIRST: \n\n" + factoryA.createText();
-            if (factoryB != null) {
-                result += "\n\nSECOND: \n\n" + factoryB.createText();
+            if (reportProblems) {
+                String result = "FIRST: \n\n" + factoryA.createText();
+                if (factoryB != null) {
+                    result += "\n\nSECOND: \n\n" + factoryB.createText();
+                }
+                System.out.println(result);
             }
-            System.out.println(result);
             throw ExceptionUtilsKt.rethrow(e);
         }
         return new Pair<>(factoryA, factoryB);
@@ -88,33 +92,43 @@ public abstract class AbstractCompileKotlinAgainstKotlinTest extends CodegenTest
     }
 
     @NotNull
-    private ClassFileFactory compileA(@NotNull TestFile testFile, List<TestFile> files) throws IOException {
+    private ClassFileFactory compileA(@NotNull TestFile testFile, List<TestFile> files) {
         Disposable compileDisposable = createDisposable("compileA");
-        CompilerConfiguration configuration =
-                createConfiguration(ConfigurationKind.ALL, getJdkKind(files),
-                                    Collections.singletonList(KotlinTestUtils.getAnnotationsJar()),
-                                    Collections.emptyList(), Collections.singletonList(testFile));
+        CompilerConfiguration configuration = createConfiguration(
+                ConfigurationKind.ALL, getJdkKind(files), Collections.singletonList(KotlinTestUtils.getAnnotationsJar()),
+                Collections.emptyList(), Collections.singletonList(testFile)
+        );
+
+        configuration.put(CommonConfigurationKeys.MODULE_NAME, "a");
 
         KotlinCoreEnvironment environment = KotlinCoreEnvironment.createForTests(
                 compileDisposable, configuration, EnvironmentConfigFiles.JVM_CONFIG_FILES);
 
-        return compileKotlin(testFile.name, testFile.content, aDir, environment, compileDisposable);
+        List<TestFile> filesToCompile =
+                files.size() == 2
+                ? Collections.singletonList(testFile)
+                // A-file and CoroutineUtil.kt
+                : Arrays.asList(testFile, files.get(2));
+
+        return compileKotlin(filesToCompile, aDir, environment, compileDisposable);
     }
 
     @NotNull
-    private ClassFileFactory compileB(@NotNull TestFile testFile, List<TestFile> files) throws IOException {
+    private ClassFileFactory compileB(@NotNull TestFile testFile, List<TestFile> files) {
         String commonHeader = StringsKt.substringBefore(files.get(0).content, "FILE:", "");
-        CompilerConfiguration configurationWithADirInClasspath =
-                createConfiguration(ConfigurationKind.ALL, getJdkKind(files),
-                                    Lists.newArrayList(KotlinTestUtils.getAnnotationsJar(), aDir),
-                                    Collections.emptyList(), Lists.newArrayList(testFile, new TestFile("header", commonHeader)));
+        CompilerConfiguration configuration = createConfiguration(
+                ConfigurationKind.ALL, getJdkKind(files), Lists.newArrayList(KotlinTestUtils.getAnnotationsJar(), aDir),
+                Collections.emptyList(), Lists.newArrayList(testFile, new TestFile("header", commonHeader))
+        );
+
+        configuration.put(CommonConfigurationKeys.MODULE_NAME, "b");
 
         Disposable compileDisposable = createDisposable("compileB");
         KotlinCoreEnvironment environment = KotlinCoreEnvironment.createForTests(
-                compileDisposable, configurationWithADirInClasspath, EnvironmentConfigFiles.JVM_CONFIG_FILES
+                compileDisposable, configuration, EnvironmentConfigFiles.JVM_CONFIG_FILES
         );
 
-        return compileKotlin(testFile.name, testFile.content, bDir, environment, compileDisposable);
+        return compileKotlin(Collections.singletonList(testFile), bDir, environment, compileDisposable);
     }
 
     private Disposable createDisposable(String debugName) {
@@ -125,16 +139,21 @@ public abstract class AbstractCompileKotlinAgainstKotlinTest extends CodegenTest
 
     @NotNull
     private ClassFileFactory compileKotlin(
-            @NotNull String fileName, @NotNull String content, @NotNull File outputDir, @NotNull KotlinCoreEnvironment environment,
+            @NotNull List<TestFile> files,
+            @NotNull File outputDir,
+            @NotNull KotlinCoreEnvironment environment,
             @NotNull Disposable disposable
-    ) throws IOException {
-        KtFile psiFile = KotlinTestUtils.createFile(fileName, content, environment.getProject());
+    ) {
+
+        List<KtFile> ktFiles =
+                files.stream().map(file -> KotlinTestUtils.createFile(file.name, file.content, environment.getProject()))
+                        .collect(Collectors.toList());
 
         ModuleVisibilityManager.SERVICE.getInstance(environment.getProject()).addModule(
                 new ModuleBuilder("module for test", tmpdir.getAbsolutePath(), "test")
         );
 
-        ClassFileFactory outputFiles = GenerationUtils.compileFileTo(psiFile, environment, outputDir);
+        ClassFileFactory outputFiles = GenerationUtils.compileFilesTo(ktFiles, environment, outputDir);
 
         Disposer.dispose(disposable);
         return outputFiles;

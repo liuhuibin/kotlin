@@ -1,6 +1,6 @@
-// IGNORE_BACKEND: JS, NATIVE
+// IGNORE_BACKEND: JVM_IR
+// TODO: Handle Sequences by extending DefaultIterableHandler.
 // FULL_JDK
-// WITH_RUNTIME
 
 val xsl = arrayListOf("a", "b", "c", "d")
 val xs = xsl.asSequence()
@@ -30,3 +30,6 @@ fun box(): String {
 // 1 next
 // 0 component1
 // 0 component2
+
+// The 1st ICONST_0 is for initializing the list. 2nd is for cmeThrown. 3rd is for initializing the index in the lowered for-loop.
+// 3 ICONST_0

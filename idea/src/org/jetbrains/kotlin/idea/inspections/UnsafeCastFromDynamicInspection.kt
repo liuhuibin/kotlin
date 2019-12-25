@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.inspections
@@ -9,7 +9,10 @@ import com.intellij.codeInspection.*
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElementVisitor
 import org.jetbrains.kotlin.idea.caches.resolve.analyze
-import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.psi.KtExpression
+import org.jetbrains.kotlin.psi.KtPsiFactory
+import org.jetbrains.kotlin.psi.createExpressionByPattern
+import org.jetbrains.kotlin.psi.expressionVisitor
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.calls.callUtil.getType
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
@@ -18,8 +21,8 @@ import org.jetbrains.kotlin.types.TypeUtils
 import org.jetbrains.kotlin.types.isDynamic
 
 class UnsafeCastFromDynamicInspection : AbstractKotlinInspection() {
-    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, session: LocalInspectionToolSession): PsiElementVisitor {
-        return expressionVisitor(fun(expression) {
+    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, session: LocalInspectionToolSession): PsiElementVisitor =
+        expressionVisitor(fun(expression) {
             val context = expression.analyze(BodyResolveMode.PARTIAL)
             val expectedType = context[BindingContext.EXPECTED_EXPRESSION_TYPE, expression] ?: return
             val actualType = expression.getType(context) ?: return
@@ -29,10 +32,10 @@ class UnsafeCastFromDynamicInspection : AbstractKotlinInspection() {
                     expression,
                     "Implicit (unsafe) cast from dynamic to $expectedType",
                     ProblemHighlightType.GENERIC_ERROR_OR_WARNING,
-                    CastExplicitlyFix(expectedType))
+                    CastExplicitlyFix(expectedType)
+                )
             }
         })
-    }
 }
 
 private class CastExplicitlyFix(private val type: KotlinType) : LocalQuickFix {

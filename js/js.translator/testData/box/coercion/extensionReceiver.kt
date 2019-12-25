@@ -1,5 +1,5 @@
+// EXPECTED_REACHABLE_NODES: 1282
 // IGNORE_BACKEND: JS_IR
-// EXPECTED_REACHABLE_NODES: 1110
 fun box(): String {
     val a = 'Q'.foo()
     if (a != "number") return "fail1: $a"

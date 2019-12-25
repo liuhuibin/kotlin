@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.quickfix
@@ -17,6 +17,7 @@ import org.jetbrains.kotlin.idea.configuration.BuildSystemType
 import org.jetbrains.kotlin.idea.configuration.getBuildSystemType
 import org.jetbrains.kotlin.idea.facet.KotlinFacet
 import org.jetbrains.kotlin.idea.facet.getOrCreateFacet
+import org.jetbrains.kotlin.idea.roots.invalidateProjectRoots
 import org.jetbrains.kotlin.idea.util.projectStructure.module
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtFile
@@ -44,6 +45,7 @@ class MakeModuleExperimentalFix(
 
             compilerSettings.additionalArguments += " $compilerArgument"
             facetSettings.updateMergedArguments()
+            project.invalidateProjectRoots()
         } finally {
             modelsProvider.dispose()
         }
@@ -54,7 +56,7 @@ class MakeModuleExperimentalFix(
         val facet = KotlinFacet.get(module) ?: return true
         val facetSettings = facet.configuration.settings
         val compilerSettings = facetSettings.compilerSettings ?: return true
-        return if (annotationFqName != ExperimentalUsageChecker.EXPERIMENTAL_FQ_NAME) {
+        return if (annotationFqName != ExperimentalUsageChecker.REQUIRES_OPT_IN_FQ_NAME) {
             compilerArgument !in compilerSettings.additionalArgumentsAsList
         } else {
             compilerSettings.additionalArgumentsAsList.none {
@@ -67,7 +69,7 @@ class MakeModuleExperimentalFix(
         override fun createAction(diagnostic: Diagnostic): IntentionAction? {
             val containingKtFile = diagnostic.psiElement.containingFile as? KtFile ?: return null
             val module = containingKtFile.module ?: return null
-            return MakeModuleExperimentalFix(containingKtFile, module, ExperimentalUsageChecker.EXPERIMENTAL_FQ_NAME)
+            return MakeModuleExperimentalFix(containingKtFile, module, ExperimentalUsageChecker.REQUIRES_OPT_IN_FQ_NAME)
         }
     }
 }

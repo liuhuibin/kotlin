@@ -1,5 +1,3 @@
-// WITH_RUNTIME
-
 val xs = listOf("a", "b", "c", "d")
 
 fun useAny(x: Any) {}
@@ -22,3 +20,6 @@ fun box(): String {
 // 1 next
 // 0 component1
 // 0 component2
+
+// The 1st ICONST_0 is for initializing the list. 2nd is for initializing the index in the lowered for-loop.
+// 2 ICONST_0

@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.highlighter
@@ -20,6 +9,7 @@ import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiNameIdentifierOwner
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
+import org.jetbrains.kotlin.descriptors.PropertyDescriptor
 import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
 import org.jetbrains.kotlin.descriptors.VariableDescriptor
 import org.jetbrains.kotlin.descriptors.impl.LocalVariableDescriptor
@@ -29,25 +19,21 @@ import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.renderer.DescriptorRenderer
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.BindingContext.*
+import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.calls.smartcasts.MultipleSmartCasts
 import org.jetbrains.kotlin.resolve.calls.tasks.isDynamic
 import org.jetbrains.kotlin.resolve.scopes.receivers.ExtensionReceiver
 import org.jetbrains.kotlin.resolve.scopes.receivers.ImplicitClassReceiver
 import org.jetbrains.kotlin.types.expressions.CaptureKind
 
-internal class VariablesHighlightingVisitor(holder: AnnotationHolder, bindingContext: BindingContext)
-    : AfterAnalysisHighlightingVisitor(holder, bindingContext) {
+internal class VariablesHighlightingVisitor(holder: AnnotationHolder, bindingContext: BindingContext) :
+    AfterAnalysisHighlightingVisitor(holder, bindingContext) {
 
     override fun visitSimpleNameExpression(expression: KtSimpleNameExpression) {
         val target = bindingContext.get(REFERENCE_TARGET, expression) ?: return
-        if (target is ValueParameterDescriptor) {
-            if (bindingContext.get(AUTO_CREATED_IT, target) == true) {
-                createInfoAnnotation(expression, "Automatically declared based on the expected type")
-                        .textAttributes = FUNCTION_LITERAL_DEFAULT_PARAMETER
-            }
-        }
-
-        if (expression.parent !is KtValueArgumentName) { // highlighted separately
+        if (target is ValueParameterDescriptor && bindingContext.get(AUTO_CREATED_IT, target) == true) {
+            createInfoAnnotation(expression, FUNCTION_LITERAL_DEFAULT_PARAMETER, "Automatically declared based on the expected type")
+        } else if (expression.parent !is KtValueArgumentName) { // highlighted separately
             highlightVariable(expression, target)
         }
 
@@ -60,11 +46,16 @@ internal class VariablesHighlightingVisitor(holder: AnnotationHolder, bindingCon
     }
 
     override fun visitParameter(parameter: KtParameter) {
-        val propertyDescriptor = bindingContext.get(BindingContext.PRIMARY_CONSTRUCTOR_PARAMETER, parameter)
+        val propertyDescriptor = bindingContext.get(PRIMARY_CONSTRUCTOR_PARAMETER, parameter)
         if (propertyDescriptor == null) {
             visitVariableDeclaration(parameter)
         }
         super.visitParameter(parameter)
+    }
+
+    override fun visitDestructuringDeclarationEntry(multiDeclarationEntry: KtDestructuringDeclarationEntry) {
+        visitVariableDeclaration(multiDeclarationEntry)
+        super.visitDestructuringDeclarationEntry(multiDeclarationEntry)
     }
 
     private fun getSmartCastTarget(expression: KtExpression): PsiElement {
@@ -89,31 +80,32 @@ internal class VariablesHighlightingVisitor(holder: AnnotationHolder, bindingCon
                     is ImplicitClassReceiver -> "Implicit receiver"
                     else -> "Unknown receiver"
                 }
-                createInfoAnnotation(expression,
-                                     "$receiverName smart cast to " + DescriptorRenderer.FQ_NAMES_IN_TYPES.renderType(type))
-                        .textAttributes = SMART_CAST_RECEIVER
+                createInfoAnnotation(
+                    expression,
+                    "$receiverName smart cast to " + DescriptorRenderer.FQ_NAMES_IN_TYPES.renderType(type)
+                ).textAttributes = SMART_CAST_RECEIVER
             }
         }
 
         val nullSmartCast = bindingContext.get(SMARTCAST_NULL, expression) == true
         if (nullSmartCast) {
-            createInfoAnnotation(expression, "Always null")
-                    .textAttributes = SMART_CONSTANT
+            createInfoAnnotation(expression, "Always null").textAttributes = SMART_CONSTANT
         }
 
         val smartCast = bindingContext.get(SMARTCAST, expression)
         if (smartCast != null) {
             val defaultType = smartCast.defaultType
             if (defaultType != null) {
-                createInfoAnnotation(getSmartCastTarget(expression),
-                                     "Smart cast to " + DescriptorRenderer.FQ_NAMES_IN_TYPES.renderType(defaultType))
-                        .textAttributes = SMART_CAST_VALUE
-            }
-            else if (smartCast is MultipleSmartCasts) {
+                createInfoAnnotation(
+                    getSmartCastTarget(expression),
+                    "Smart cast to " + DescriptorRenderer.FQ_NAMES_IN_TYPES.renderType(defaultType)
+                ).textAttributes = SMART_CAST_VALUE
+            } else if (smartCast is MultipleSmartCasts) {
                 for ((call, type) in smartCast.map) {
-                    createInfoAnnotation(getSmartCastTarget(expression),
-                                         "Smart cast to ${DescriptorRenderer.FQ_NAMES_IN_TYPES.renderType(type)} (for $call call)")
-                            .textAttributes = SMART_CAST_VALUE
+                    createInfoAnnotation(
+                        getSmartCastTarget(expression),
+                        "Smart cast to ${DescriptorRenderer.FQ_NAMES_IN_TYPES.renderType(type)} (for $call call)"
+                    ).textAttributes = SMART_CAST_VALUE
                 }
             }
         }
@@ -149,7 +141,7 @@ internal class VariablesHighlightingVisitor(holder: AnnotationHolder, bindingCon
 
                 val parent = elementToHighlight.parent
                 if (!(parent is PsiNameIdentifierOwner && parent.nameIdentifier == elementToHighlight)) {
-                    createInfoAnnotation(elementToHighlight, msg).textAttributes = WRAPPED_INTO_REF
+                    createInfoAnnotation(elementToHighlight, WRAPPED_INTO_REF, msg)
                     return
                 }
             }
@@ -160,6 +152,17 @@ internal class VariablesHighlightingVisitor(holder: AnnotationHolder, bindingCon
 
             if (descriptor is ValueParameterDescriptor) {
                 highlightName(elementToHighlight, PARAMETER)
+            }
+
+            if (descriptor is PropertyDescriptor && KotlinHighlightingUtil.hasCustomPropertyDeclaration(descriptor)) {
+                val isStaticDeclaration = DescriptorUtils.isStaticDeclaration(descriptor)
+                highlightName(
+                    elementToHighlight,
+                    if (isStaticDeclaration)
+                        PACKAGE_PROPERTY_CUSTOM_PROPERTY_DECLARATION
+                    else
+                        INSTANCE_PROPERTY_CUSTOM_PROPERTY_DECLARATION
+                )
             }
         }
     }

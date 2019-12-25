@@ -1,25 +1,18 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.completion.test.handlers
 
+import com.intellij.codeInsight.lookup.LookupElementPresentation
 import org.jetbrains.kotlin.idea.completion.test.COMPLETION_TEST_DATA_BASE_PATH
 import org.jetbrains.kotlin.idea.completion.test.KotlinCompletionTestCase
+import org.jetbrains.kotlin.test.JUnit3WithIdeaConfigurationRunner
+import org.junit.runner.RunWith
 import java.io.File
 
+@RunWith(JUnit3WithIdeaConfigurationRunner::class)
 class CompletionMultiFileHandlerTest : KotlinCompletionTestCase() {
     fun testExtensionFunctionImport() {
         doTest()
@@ -77,6 +70,14 @@ class CompletionMultiFileHandlerTest : KotlinCompletionTestCase() {
         doTest()
     }
 
+    fun testPropertyFunctionConflict() {
+        doTest()
+    }
+
+    fun testPropertyFunctionConflict2() {
+        doTest(tailText = " { Int, Int -> ... } (i: (Int, Int) -> Unit) (a.b)")
+    }
+
     fun testExclCharInsertImport() {
         doTest('!')
     }
@@ -109,17 +110,26 @@ class CompletionMultiFileHandlerTest : KotlinCompletionTestCase() {
         doTest()
     }
 
-    fun doTest(completionChar: Char = '\n', vararg extraFileNames: String) {
+    fun doTest(completionChar: Char = '\n', vararg extraFileNames: String, tailText: String? = null) {
         val fileName = getTestName(false)
 
         configureByFiles(null, *extraFileNames)
-        configureByFiles(null, fileName + "-1.kt", fileName + "-2.kt")
+        configureByFiles(null, "$fileName-1.kt", "$fileName-2.kt")
         complete(2)
         if (myItems != null) {
-            val item = myItems.singleOrNull() ?: error("Multiple items in completion")
+            val item = if (tailText == null)
+                myItems.singleOrNull() ?: error("Multiple items in completion")
+            else {
+                val presentation = LookupElementPresentation()
+                myItems.first {
+                    it.renderElement(presentation)
+                    presentation.tailText == tailText
+                } ?: error("Tail text not found")
+            }
+
             selectItem(item, completionChar)
         }
-        checkResultByFile(fileName + ".kt.after")
+        checkResultByFile("$fileName.kt.after")
     }
 
     override fun getTestDataPath() = File(COMPLETION_TEST_DATA_BASE_PATH, "/handlers/multifile/").path + File.separator

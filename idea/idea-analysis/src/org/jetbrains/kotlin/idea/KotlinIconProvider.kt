@@ -1,23 +1,13 @@
 /*
- * Copyright 2010-2016 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea
 
 import com.intellij.ide.IconProvider
 import com.intellij.openapi.project.DumbAware
+import com.intellij.openapi.project.IndexNotReadyException
 import com.intellij.openapi.util.Iconable
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi.PsiElement
@@ -52,7 +42,15 @@ class KotlinIconProvider : IconProvider(), DumbAware {
         val result = psiElement.getBaseIcon()
         if (flags and Iconable.ICON_FLAG_VISIBILITY > 0 && result != null && (psiElement is KtModifierListOwner && psiElement !is KtClassInitializer)) {
             val list = psiElement.modifierList
-            return createRowIcon(result.addExpectActualMarker(psiElement), getVisibilityIcon(list))
+            val visibilityIcon = getVisibilityIcon(list)
+
+            val withExpectedActual: Icon = try {
+                result.addExpectActualMarker(psiElement)
+            } catch (indexNotReady: IndexNotReadyException) {
+                result
+            }
+
+            createRowIcon(withExpectedActual, visibilityIcon)
         }
         return result
     }
@@ -98,7 +96,7 @@ class KotlinIconProvider : IconProvider(), DumbAware {
             return PlatformIcons.PUBLIC_ICON
         }
 
-        fun PsiElement.getBaseIcon(): Icon? = when(this) {
+        fun PsiElement.getBaseIcon(): Icon? = when (this) {
             is KtPackageDirective -> PlatformIcons.PACKAGE_ICON
             is KtLightClassForFacade -> KotlinIcons.FILE
             is KtLightClassForDecompiledDeclaration -> {
@@ -127,8 +125,7 @@ class KotlinIconProvider : IconProvider(), DumbAware {
             is KtParameter -> {
                 if (KtPsiUtil.getClassIfParameterIsProperty(this) != null) {
                     if (isMutable) KotlinIcons.FIELD_VAR else KotlinIcons.FIELD_VAL
-                }
-                else
+                } else
                     KotlinIcons.PARAMETER
             }
             is KtProperty -> if (isVar) KotlinIcons.FIELD_VAR else KotlinIcons.FIELD_VAL

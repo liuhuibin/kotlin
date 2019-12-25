@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 @file:kotlin.jvm.JvmMultifileClass
@@ -10,6 +10,8 @@ package kotlin.text
 
 /**
  * Concatenates this Char and a String.
+ *
+ * @sample samples.text.Chars.plus
  */
 @kotlin.internal.InlineOnly
 public inline operator fun Char.plus(other: String): String = this.toString() + other
@@ -23,6 +25,8 @@ public inline operator fun Char.plus(other: String): String = this.toString() + 
  *   - The two characters are the same (as compared by the == operator)
  *   - Applying the method [toUpperCase] to each character produces the same result
  *   - Applying the method [toLowerCase] to each character produces the same result
+ *
+ * @sample samples.text.Chars.equals
  */
 public fun Char.equals(other: Char, ignoreCase: Boolean = false): Boolean {
     if (this == other) return true

@@ -54,14 +54,17 @@ fun <RC : ResolvedCall<*>> RC.createFlatSignature(): FlatSignature<RC> {
 fun createOverloadingConflictResolver(
     builtIns: KotlinBuiltIns,
     module: ModuleDescriptor,
-    specificityComparator: TypeSpecificityComparator
+    specificityComparator: TypeSpecificityComparator,
+    platformOverloadsSpecificityComparator: PlatformOverloadsSpecificityComparator
 ) = OverloadingConflictResolver(
     builtIns,
     module,
     specificityComparator,
+    platformOverloadsSpecificityComparator,
     MutableResolvedCall<*>::getResultingDescriptor,
     ConstraintSystemBuilderImpl.Companion::forSpecificity,
     MutableResolvedCall<*>::createFlatSignature,
     { (it as? VariableAsFunctionResolvedCallImpl)?.variableCall },
-    { DescriptorToSourceUtils.descriptorToDeclaration(it) != null }
+    { DescriptorToSourceUtils.descriptorToDeclaration(it) != null },
+    null
 )

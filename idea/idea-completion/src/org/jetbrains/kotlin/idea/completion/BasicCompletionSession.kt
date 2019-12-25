@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.completion
@@ -55,12 +44,12 @@ import org.jetbrains.kotlin.load.java.sam.SamConstructorDescriptor
 import org.jetbrains.kotlin.load.java.sam.SamConstructorDescriptorKindExclude
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.platform.jvm.isJvm
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.*
 import org.jetbrains.kotlin.renderer.render
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.descriptorUtil.*
-import org.jetbrains.kotlin.resolve.jvm.platform.JvmPlatform
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindExclude
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
@@ -206,7 +195,9 @@ class BasicCompletionSession(
                 // no auto-popup on typing after "val", "var" and "fun" because it's likely the name of the declaration which is being typed by user
                 if (parameters.invocationCount == 0) {
                     val suppressOtherCompletion = when (declaration) {
-                        is KtNamedFunction, is KtProperty -> prefixMatcher.prefix.let { it.isEmpty() || it[0].isLowerCase() /* function name usually starts with lower case letter */ }
+                        is KtNamedFunction, is KtProperty -> prefixMatcher.prefix.let {
+                            it.isEmpty() || it[0].isLowerCase() /* function name usually starts with lower case letter */
+                        }
                         else -> true
                     }
                     if (suppressOtherCompletion) return
@@ -237,6 +228,8 @@ class BasicCompletionSession(
                 ).completeDslFunctions()
             }
 
+            KEYWORDS_ONLY.doComplete()
+
             val contextVariableTypesForSmartCompletion = withCollectRequiredContextVariableTypes(::completeWithSmartCompletion)
 
             val contextVariableTypesForReferenceVariants = withCollectRequiredContextVariableTypes { lookupElementFactory ->
@@ -249,28 +242,26 @@ class BasicCompletionSession(
 
                     prefix[0].isLowerCase() -> {
                         addReferenceVariantElements(lookupElementFactory, USUALLY_START_LOWER_CASE.intersect(descriptorKindFilter))
-                        flushToResultSet()
                         addReferenceVariantElements(lookupElementFactory, USUALLY_START_UPPER_CASE.intersect(descriptorKindFilter))
                     }
 
                     else -> {
                         addReferenceVariantElements(lookupElementFactory, USUALLY_START_UPPER_CASE.intersect(descriptorKindFilter))
-                        flushToResultSet()
                         addReferenceVariantElements(lookupElementFactory, USUALLY_START_LOWER_CASE.intersect(descriptorKindFilter))
                     }
                 }
                 referenceVariantsCollector!!.collectingFinished()
             }
 
-            KEYWORDS_ONLY.doComplete()
-
             // getting root packages from scope is very slow so we do this in alternative way
-            if (callTypeAndReceiver.receiver == null && callTypeAndReceiver.callType.descriptorKindFilter.kindMask.and(DescriptorKindFilter.PACKAGES_MASK) != 0) {
+            if (callTypeAndReceiver.receiver == null &&
+                callTypeAndReceiver.callType.descriptorKindFilter.kindMask.and(DescriptorKindFilter.PACKAGES_MASK) != 0
+            ) {
                 //TODO: move this code somewhere else?
                 val packageNames = PackageIndexUtil.getSubPackageFqNames(FqName.ROOT, searchScope, project, prefixMatcher.asNameFilter())
                     .toMutableSet()
 
-                if (TargetPlatformDetector.getPlatform(parameters.originalFile as KtFile) == JvmPlatform) {
+                if (TargetPlatformDetector.getPlatform(parameters.originalFile as KtFile).isJvm()) {
                     JavaPsiFacade.getInstance(project).findPackage("")?.getSubPackages(searchScope)?.forEach { psiPackage ->
                         val name = psiPackage.name
                         if (Name.isValidIdentifier(name!!)) {
@@ -339,8 +330,19 @@ class BasicCompletionSession(
                     }
                 }
 
-                if (configuration.staticMembers && callTypeAndReceiver is CallTypeAndReceiver.DEFAULT && prefix.isNotEmpty()) {
-                    staticMembersCompletion.completeFromIndices(indicesHelper(false), collector)
+                if (configuration.staticMembers && prefix.isNotEmpty()) {
+                    if (!receiverTypes.isNullOrEmpty()) {
+                        staticMembersCompletion.completeObjectMemberExtensionsFromIndices(
+                            indicesHelper(false),
+                            receiverTypes.map { it.type },
+                            callTypeAndReceiver.callType,
+                            collector
+                        )
+                    }
+
+                    if (callTypeAndReceiver is CallTypeAndReceiver.DEFAULT) {
+                        staticMembersCompletion.completeFromIndices(indicesHelper(false), collector)
+                    }
                 }
             }
         }
@@ -462,7 +464,7 @@ class BasicCompletionSession(
                                     if (file != null) {
                                         val receiverInFile =
                                             file.findElementAt(receiver.startOffset)?.getParentOfType<KtSimpleNameExpression>(false)
-                                                    ?: return
+                                                ?: return
                                         receiverInFile.mainReference.bindToFqName(fqNameToImport, FORCED_SHORTENING)
                                     }
                                 }
@@ -556,12 +558,12 @@ class BasicCompletionSession(
 
             val keywordsPrefix = prefix.substringBefore('@') // if there is '@' in the prefix - use shorter prefix to not loose 'this' etc
             val isUseSiteAnnotationTarget = position.prevLeaf()?.node?.elementType == KtTokens.AT
-            KeywordCompletion.complete(expression ?: parameters.position, keywordsPrefix, isJvmModule) { lookupElement ->
+            KeywordCompletion.complete(expression ?: parameters.position, resultSet.prefixMatcher, isJvmModule) { lookupElement ->
                 val keyword = lookupElement.lookupString
                 if (keyword in keywordsToSkip) return@complete
 
                 when (keyword) {
-                // if "this" is parsed correctly in the current context - insert it and all this@xxx items
+                    // if "this" is parsed correctly in the current context - insert it and all this@xxx items
                     "this" -> {
                         if (expression != null) {
                             collector.addElements(
@@ -577,7 +579,7 @@ class BasicCompletionSession(
                         }
                     }
 
-                // if "return" is parsed correctly in the current context - insert it and all return@xxx items
+                    // if "return" is parsed correctly in the current context - insert it and all return@xxx items
                     "return" -> {
                         if (expression != null) {
                             collector.addElements(returnExpressionItems(bindingContext, expression))

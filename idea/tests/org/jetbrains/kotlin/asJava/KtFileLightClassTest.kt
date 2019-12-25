@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.asJava
@@ -28,8 +17,12 @@ import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCase
 import org.jetbrains.kotlin.idea.test.KotlinLightProjectDescriptor
 import org.jetbrains.kotlin.idea.test.PluginTestCaseBase
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.test.JUnit3WithIdeaConfigurationRunner
+import org.junit.runner.RunWith
 
+@RunWith(JUnit3WithIdeaConfigurationRunner::class)
 class KtFileLightClassTest : KotlinLightCodeInsightFixtureTestCase() {
     override fun getProjectDescriptor(): LightProjectDescriptor = KotlinLightProjectDescriptor.INSTANCE
 
@@ -64,14 +57,16 @@ class KtFileLightClassTest : KotlinLightCodeInsightFixtureTestCase() {
     fun testNoFacadeForScript() {
         val file = myFixture.configureByText("foo.kts", "package foo") as KtFile
         assertEquals(0, file.classes.size)
-        val facadeFiles = KotlinAsJavaSupport.getInstance(project).findFilesForFacade(FqName("foo.FooKt"), GlobalSearchScope.allScope(project))
+        val facadeFiles =
+            KotlinAsJavaSupport.getInstance(project).findFilesForFacade(FqName("foo.FooKt"), GlobalSearchScope.allScope(project))
         assertEquals(0, facadeFiles.size)
     }
 
     fun testNoFacadeForHeaderClass() {
         val file = myFixture.configureByText("foo.kt", "header fun foo(): Int") as KtFile
         assertEquals(0, file.classes.size)
-        val facadeFiles = KotlinAsJavaSupport.getInstance(project).findFilesForFacade(FqName("foo.FooKt"), GlobalSearchScope.allScope(project))
+        val facadeFiles =
+            KotlinAsJavaSupport.getInstance(project).findFilesForFacade(FqName("foo.FooKt"), GlobalSearchScope.allScope(project))
         assertEquals(0, facadeFiles.size)
     }
 
@@ -80,20 +75,22 @@ class KtFileLightClassTest : KotlinLightCodeInsightFixtureTestCase() {
     }
 
     fun testInjectedCode() {
-        myFixture.configureByText("foo.kt", """
+        myFixture.configureByText(
+            "foo.kt", """
             import org.intellij.lang.annotations.Language
 
             fun foo(@Language("kotlin") a: String){a.toString()}
 
             fun bar(){ foo("class<caret> A") }
-            """)
+            """
+        )
 
 
         myFixture.testHighlighting("foo.kt")
 
         val injectedFile = (editor as? EditorWindow)?.injectedFile
         assertEquals("Wrong injection language", "kotlin", injectedFile?.language?.id)
-        assertEquals("Injected class should be `A`", "A", (injectedFile as KtFile).classes.single().name)
+        assertEquals("Injected class should be `A`", "A", ((injectedFile as KtFile).declarations.single() as KtClass).toLightClass()!!.name)
     }
 
 
@@ -113,9 +110,9 @@ class KtFileLightClassTest : KotlinLightCodeInsightFixtureTestCase() {
         fun lightElement(file: PsiFile): PsiElement = (file as KtFile).classes.single()
             .methods.first { it.name == "bar" }
             .annotations.first { it.qualifiedName == "kotlin.Deprecated" }.also {
-            // Otherwise following asserts have no sense
-            TestCase.assertTrue("psi element should be light ", it is KtLightElement<*, *>)
-        }
+                // Otherwise following asserts have no sense
+                TestCase.assertTrue("psi element should be light ", it is KtLightElement<*, *>)
+            }
 
 
         val copied = psiFile.copied()

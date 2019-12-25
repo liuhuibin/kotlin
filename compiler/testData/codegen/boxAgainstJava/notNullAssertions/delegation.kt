@@ -1,3 +1,4 @@
+// IGNORE_BACKEND: JVM_IR
 // FILE: Delegation.java
 
 public class Delegation {
@@ -27,7 +28,6 @@ fun box(): String {
         return "Fail: should have been an exception"
     }
     catch(e: IllegalStateException) {
-        println(e.message)
         return "OK"
     }
 }

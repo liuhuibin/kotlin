@@ -1,11 +1,10 @@
-// IGNORE_BACKEND: JS_IR
-// TODO: muted automatically, investigate should it be ran for JS or not
-// IGNORE_BACKEND: JS, NATIVE
+// IGNORE_BACKEND_FIR: JVM_IR
+// TARGET_BACKEND: JVM
 
 // WITH_REFLECT
 
-import kotlin.reflect.*
-import kotlin.reflect.jvm.*
+import kotlin.reflect.KParameter
+import kotlin.reflect.jvm.reflect
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 

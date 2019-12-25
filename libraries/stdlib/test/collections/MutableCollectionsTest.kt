@@ -1,10 +1,11 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package test.collections
 
+import kotlin.random.Random
 import kotlin.test.*
 
 
@@ -112,6 +113,18 @@ class MutableCollectionTest {
         assertNotEquals(list, shuffled)
         assertEquals(list.toSet(), shuffled.toSet())
         assertEquals(list.size, shuffled.distinct().size)
+    }
+
+    @Test fun shuffledPredictably() {
+        val list = List(10) { it }
+        val shuffled1 = list.shuffled(Random(1))
+        val shuffled11 = list.shuffled(Random(1))
+
+        assertEquals(shuffled1, shuffled11)
+        assertEquals("[1, 4, 0, 6, 2, 8, 9, 7, 3, 5]", shuffled1.toString())
+
+        val shuffled2 = list.shuffled(Random(42))
+        assertEquals("[5, 0, 4, 9, 2, 8, 1, 7, 6, 3]", shuffled2.toString())
     }
 
 }

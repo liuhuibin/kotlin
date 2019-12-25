@@ -13,37 +13,37 @@ import java.io.File
 
 class PillConfigurablePlugin : Plugin<Project> {
     override fun apply(project: Project) {
-        project.configurations.create(EmbeddedComponents.CONFIGURATION_NAME)
+        project.configurations.maybeCreate(EmbeddedComponents.CONFIGURATION_NAME)
         project.extensions.create("pill", PillExtension::class.java)
     }
 }
 
 class JpsCompatiblePlugin : Plugin<Project> {
     companion object {
-        private fun mapper(module: String, vararg configurations: String): DependencyMapper {
-            return DependencyMapper("org.jetbrains.kotlin", module, *configurations) { MappedDependency(PDependency.Library(module)) }
-        }
-
         private fun getDependencyMappers(projectLibraries: List<PLibrary>): List<DependencyMapper> {
             val mappersForKotlinLibrariesExeptStdlib = projectLibraries
                 .filter { it.name != "kotlin-stdlib" }
-                .mapTo(mutableListOf()) { mapper(it.name, "default", "distJar", "runtimeElements") }
+                .map { DependencyMapper.forProject(it.originalName) { MappedDependency(PDependency.Library(it.name)) } }
 
-            return mappersForKotlinLibrariesExeptStdlib + listOf(
-                DependencyMapper("org.jetbrains.kotlin", "kotlin-stdlib", "distJar", "runtimeElements") {
+            val disabledModuleMappers = listOf(
+                ":kotlin-stdlib-common",
+                ":core:builtins",
+                ":kotlin-compiler",
+                ":kotlin-compiler-embeddable",
+                ":kotlin-test:kotlin-test-common",
+                ":kotlin-test:kotlin-test-annotations-common"
+            ).map { DependencyMapper.forProject(it) { null } }
+
+            return listOf(
+                DependencyMapper.forProject(":kotlin-stdlib") {
                     MappedDependency(
                         PDependency.Library("kotlin-stdlib"),
                         listOf(PDependency.Library("annotations-13.0"))
                     )
                 },
-                DependencyMapper("org.jetbrains.kotlin", "kotlin-reflect-api", "runtimeElements") {
-                    MappedDependency(PDependency.Library("kotlin-reflect"))
-                },
-                DependencyMapper("org.jetbrains.kotlin", "kotlin-compiler-embeddable", "runtimeJar") { null },
-                DependencyMapper("org.jetbrains.kotlin", "kotlin-stdlib-js", "distJar") { null },
-                DependencyMapper("org.jetbrains.kotlin", "kotlin-compiler", "runtimeJar") { null },
-                DependencyMapper("org.jetbrains.kotlin", "compiler", "runtimeElements") { null }
-            )
+                DependencyMapper.forProject(":kotlin-test:kotlin-test-jvm") { MappedDependency(PDependency.Library("kotlin-test-jvm")) },
+                DependencyMapper.forProject(":kotlin-reflect-api") { MappedDependency(PDependency.Library("kotlin-reflect")) }
+            ) + mappersForKotlinLibrariesExeptStdlib + disabledModuleMappers
         }
 
         fun getProjectLibraries(rootProject: Project): List<PLibrary> {
@@ -64,7 +64,8 @@ class JpsCompatiblePlugin : Plugin<Project> {
                     PLibrary(
                         library.name,
                         classes = listOf(File(libraryPath, "$archivesBaseName.jar")).filterExisting(),
-                        sources = listOf(File(libraryPath, "$archivesBaseName-sources.jar")).filterExisting()
+                        sources = listOf(File(libraryPath, "$archivesBaseName-sources.jar")).filterExisting(),
+                        originalName = library.path
                     )
                 }
 
@@ -97,13 +98,18 @@ class JpsCompatiblePlugin : Plugin<Project> {
     private lateinit var platformVersion: String
     private lateinit var platformBaseNumber: String
     private lateinit var platformDir: File
+    private lateinit var intellijCoreDir: File
+    private var isAndroidStudioPlatform: Boolean = false
 
     private fun initEnvironment(project: Project) {
         projectDir = project.projectDir
         platformVersion = project.extensions.extraProperties.get("versions.intellijSdk").toString()
         platformBaseNumber = platformVersion.substringBefore(".", "").takeIf { it.isNotEmpty() }
-                ?: error("Invalid platform version: $platformVersion")
+            ?: platformVersion.substringBefore("-", "").takeIf { it.isNotEmpty() }
+            ?: error("Invalid platform version: $platformVersion")
         platformDir = IntellijRootUtils.getIntellijRootDir(project)
+        intellijCoreDir = File(platformDir.parentFile.parentFile.parentFile, "intellij-core")
+        isAndroidStudioPlatform = project.extensions.extraProperties.has("versions.androidStudioRelease")
     }
 
     private fun pill(rootProject: Project) {
@@ -124,17 +130,20 @@ class JpsCompatiblePlugin : Plugin<Project> {
         }
 
         val projectLibraries = getProjectLibraries(rootProject)
-        val parserContext = ParserContext(getDependencyMappers(projectLibraries), variant)
+        val dependencyMappers = getDependencyMappers(projectLibraries)
+
+        val parserContext = ParserContext(dependencyMappers, variant)
 
         val jpsProject = parse(rootProject, projectLibraries, parserContext)
             .mapLibraries(this::attachPlatformSources, this::attachAsmSources)
 
-        generateKotlinPluginArtifactFile(rootProject).write()
-
         val files = render(jpsProject)
 
         removeExistingIdeaLibrariesAndModules()
-        removeJpsRunConfigurations()
+        removeJpsAndPillRunConfigurations()
+        removeAllArtifactConfigurations()
+
+        generateKotlinPluginArtifactFile(rootProject, dependencyMappers).write()
 
         copyRunConfigurations()
         setOptionsForDefaultJunitRunConfiguration(rootProject)
@@ -146,7 +155,8 @@ class JpsCompatiblePlugin : Plugin<Project> {
         initEnvironment(project)
 
         removeExistingIdeaLibrariesAndModules()
-        removeJpsRunConfigurations()
+        removeJpsAndPillRunConfigurations()
+        removeAllArtifactConfigurations()
     }
 
     private fun removeExistingIdeaLibrariesAndModules() {
@@ -154,10 +164,17 @@ class JpsCompatiblePlugin : Plugin<Project> {
         File(projectDir, ".idea/modules").deleteRecursively()
     }
 
-    private fun removeJpsRunConfigurations() {
+    private fun removeJpsAndPillRunConfigurations() {
         File(projectDir, ".idea/runConfigurations")
             .walk()
-            .filter { it.name.startsWith("JPS_") && it.extension.toLowerCase() == "xml" }
+            .filter { (it.name.startsWith("JPS_") || it.name.startsWith("Pill_")) && it.extension.toLowerCase() == "xml" }
+            .forEach { it.delete() }
+    }
+
+    private fun removeAllArtifactConfigurations() {
+        File(projectDir, ".idea/artifacts")
+            .walk()
+            .filter { it.extension.toLowerCase() == "xml" }
             .forEach { it.delete() }
     }
 
@@ -165,12 +182,19 @@ class JpsCompatiblePlugin : Plugin<Project> {
         val runConfigurationsDir = File(projectDir, "buildSrc/src/main/resources/runConfigurations")
         val targetDir = File(projectDir, ".idea/runConfigurations")
         val platformDirProjectRelative = "\$PROJECT_DIR\$/" + platformDir.toRelativeString(projectDir)
+        val additionalIdeaArgs = if (isAndroidStudioPlatform) "-Didea.platform.prefix=AndroidStudio" else ""
 
         targetDir.mkdirs()
 
+        fun substitute(text: String): String {
+            return text
+                .replace("\$IDEA_HOME_PATH\$", platformDirProjectRelative)
+                .replace("\$ADDITIONAL_IDEA_ARGS\$", additionalIdeaArgs)
+        }
+
         runConfigurationsDir.listFiles()
             .filter { it.extension == "xml" }
-            .map { it.name to it.readText().replace("\$IDEA_HOME_PATH\$", platformDirProjectRelative) }
+            .map { it.name to substitute(it.readText()) }
             .forEach { File(targetDir, it.first).writeText(it.second) }
     }
 
@@ -232,10 +256,15 @@ class JpsCompatiblePlugin : Plugin<Project> {
                     .configurations.getByName("robolectricClasspath")
                     .files.joinToString(File.pathSeparator)
 
+                if (options.none { it == "-ea" }) {
+                    options += "-ea"
+                }
+
                 addOrReplaceOptionValue("idea.home.path", platformDirProjectRelative)
                 addOrReplaceOptionValue("ideaSdk.androidPlugin.path", platformDirProjectRelative + "/plugins/android/lib")
                 addOrReplaceOptionValue("robolectric.classpath", robolectricClasspath)
-                addOrReplaceOptionValue("use.pill", "true")
+                addOrReplaceOptionValue("use.jps", "true")
+                addOrReplaceOptionValue("kotlinVersion", project.rootProject.extra["kotlinVersion"].toString())
 
                 val isAndroidStudioBunch = project.findProperty("versions.androidStudioRelease") != null
                 addOrReplaceOptionValue("idea.platform.prefix", if (isAndroidStudioBunch) "AndroidStudio" else null)
@@ -271,9 +300,9 @@ class JpsCompatiblePlugin : Plugin<Project> {
     }
 
     private fun attachPlatformSources(library: PLibrary): PLibrary {
-        val platformSourcesJar = File(platformDir, "../sources/ideaIC-$platformVersion-sources.jar")
+        val platformSourcesJar = File(platformDir, "../../../sources/intellij-$platformVersion-sources.jar")
 
-        if (library.classes.any { it.startsWith(platformDir) }) {
+        if (library.classes.any { it.startsWith(platformDir) || it.startsWith(intellijCoreDir) }) {
             return library.attachSource(platformSourcesJar)
         }
 

@@ -18,10 +18,10 @@ package org.jetbrains.kotlin.resolve;
 
 import kotlin.Pair;
 import kotlin.Unit;
+import kotlin.annotations.jvm.Mutable;
 import kotlin.collections.CollectionsKt;
 import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
-import org.jetbrains.annotations.Mutable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.descriptors.*;
@@ -29,12 +29,14 @@ import org.jetbrains.kotlin.descriptors.impl.FunctionDescriptorImpl;
 import org.jetbrains.kotlin.descriptors.impl.PropertyAccessorDescriptorImpl;
 import org.jetbrains.kotlin.descriptors.impl.PropertyDescriptorImpl;
 import org.jetbrains.kotlin.name.Name;
+import org.jetbrains.kotlin.resolve.descriptorUtil.DescriptorUtilsKt;
 import org.jetbrains.kotlin.types.FlexibleTypesKt;
 import org.jetbrains.kotlin.types.KotlinType;
 import org.jetbrains.kotlin.types.KotlinTypeKt;
 import org.jetbrains.kotlin.types.TypeConstructor;
 import org.jetbrains.kotlin.types.checker.KotlinTypeChecker;
 import org.jetbrains.kotlin.types.checker.KotlinTypeCheckerImpl;
+import org.jetbrains.kotlin.types.checker.KotlinTypeRefiner;
 import org.jetbrains.kotlin.utils.SmartSet;
 
 import java.util.*;
@@ -49,22 +51,40 @@ public class OverridingUtil {
                     ExternalOverridabilityCondition.class.getClassLoader()
             ));
 
-    public static final OverridingUtil DEFAULT = new OverridingUtil(new KotlinTypeChecker.TypeConstructorEquality() {
-        @Override
-        public boolean equals(@NotNull TypeConstructor a, @NotNull TypeConstructor b) {
-            return a.equals(b);
-        }
-    });
+    public static final OverridingUtil DEFAULT;
+
+    private static final KotlinTypeChecker.TypeConstructorEquality DEFAULT_TYPE_CONSTRUCTOR_EQUALITY =
+            new KotlinTypeChecker.TypeConstructorEquality() {
+                @Override
+                public boolean equals(@NotNull TypeConstructor a, @NotNull TypeConstructor b) {
+                    return a.equals(b);
+                }
+            };
+
+    static {
+
+        DEFAULT = new OverridingUtil(DEFAULT_TYPE_CONSTRUCTOR_EQUALITY, KotlinTypeRefiner.Default.INSTANCE);
+    }
 
     @NotNull
     public static OverridingUtil createWithEqualityAxioms(@NotNull KotlinTypeChecker.TypeConstructorEquality equalityAxioms) {
-        return new OverridingUtil(equalityAxioms);
+        return new OverridingUtil(equalityAxioms, KotlinTypeRefiner.Default.INSTANCE);
     }
 
+    @NotNull
+    public static OverridingUtil createWithTypeRefiner(@NotNull KotlinTypeRefiner kotlinTypeRefiner) {
+        return new OverridingUtil(DEFAULT_TYPE_CONSTRUCTOR_EQUALITY, kotlinTypeRefiner);
+    }
+
+    private final KotlinTypeRefiner kotlinTypeRefiner;
     private final KotlinTypeChecker.TypeConstructorEquality equalityAxioms;
 
-    private OverridingUtil(KotlinTypeChecker.TypeConstructorEquality axioms) {
+    private OverridingUtil(
+            @NotNull KotlinTypeChecker.TypeConstructorEquality axioms,
+            @NotNull KotlinTypeRefiner kotlinTypeRefiner
+    ) {
         equalityAxioms = axioms;
+        this.kotlinTypeRefiner = kotlinTypeRefiner;
     }
 
     /**
@@ -73,7 +93,11 @@ public class OverridingUtil {
      */
     @NotNull
     public static <D extends CallableDescriptor> Set<D> filterOutOverridden(@NotNull Set<D> candidateSet) {
-        return filterOverrides(candidateSet, new Function2<D, D, Pair<CallableDescriptor, CallableDescriptor>>() {
+        boolean allowDescriptorCopies = !candidateSet.isEmpty() &&
+                                        DescriptorUtilsKt
+                                                .isTypeRefinementEnabled(DescriptorUtilsKt.getModule(candidateSet.iterator().next()));
+
+        return filterOverrides(candidateSet, allowDescriptorCopies, new Function2<D, D, Pair<CallableDescriptor, CallableDescriptor>>() {
             @Override
             public Pair<CallableDescriptor, CallableDescriptor> invoke(D a, D b) {
                 return new Pair<CallableDescriptor, CallableDescriptor>(a, b);
@@ -84,6 +108,7 @@ public class OverridingUtil {
     @NotNull
     public static <D> Set<D> filterOverrides(
             @NotNull Set<D> candidateSet,
+            boolean allowDescriptorCopies,
             @NotNull Function2<? super D, ? super D, Pair<CallableDescriptor, CallableDescriptor>> transformFirst
     ) {
         if (candidateSet.size() <= 1) return candidateSet;
@@ -96,10 +121,10 @@ public class OverridingUtil {
                 Pair<CallableDescriptor, CallableDescriptor> meAndOther = transformFirst.invoke(meD, otherD);
                 CallableDescriptor me = meAndOther.component1();
                 CallableDescriptor other = meAndOther.component2();
-                if (overrides(me, other)) {
+                if (overrides(me, other, allowDescriptorCopies)) {
                     iterator.remove();
                 }
-                else if (overrides(other, me)) {
+                else if (overrides(other, me, allowDescriptorCopies)) {
                     continue outerLoop;
                 }
             }
@@ -114,7 +139,9 @@ public class OverridingUtil {
     /**
      * @return whether f overrides g
      */
-    public static <D extends CallableDescriptor> boolean overrides(@NotNull D f, @NotNull D g) {
+    public static <D extends CallableDescriptor> boolean overrides(
+            @NotNull D f, @NotNull D g, boolean allowDeclarationCopies
+    ) {
         // In a multi-module project different "copies" of the same class may be present in different libraries,
         // that's why we use structural equivalence for members (DescriptorEquivalenceForOverrides).
 
@@ -123,11 +150,11 @@ public class OverridingUtil {
         // we'll be getting sets of members that do not override each other, but are structurally equivalent.
         // As other code relies on no equal descriptors passed here, we guard against f == g, but this may not be necessary
         // Note that this is needed for the usage of this function in the IDE code
-        if (!f.equals(g) && DescriptorEquivalenceForOverrides.INSTANCE.areEquivalent(f.getOriginal(), g.getOriginal())) return true;
+        if (!f.equals(g) && DescriptorEquivalenceForOverrides.INSTANCE.areEquivalent(f.getOriginal(), g.getOriginal(), allowDeclarationCopies)) return true;
 
         CallableDescriptor originalG = g.getOriginal();
         for (D overriddenFunction : DescriptorUtils.getAllOverriddenDescriptors(f)) {
-            if (DescriptorEquivalenceForOverrides.INSTANCE.areEquivalent(originalG, overriddenFunction)) return true;
+            if (DescriptorEquivalenceForOverrides.INSTANCE.areEquivalent(originalG, overriddenFunction, allowDeclarationCopies)) return true;
         }
         return false;
     }
@@ -279,7 +306,12 @@ public class OverridingUtil {
 
             if (superReturnType != null && subReturnType != null) {
                 boolean bothErrors = KotlinTypeKt.isError(subReturnType) && KotlinTypeKt.isError(superReturnType);
-                if (!bothErrors && !typeChecker.isSubtypeOf(subReturnType, superReturnType)) {
+                if (!bothErrors &&
+                    !typeChecker.isSubtypeOf(
+                            kotlinTypeRefiner.refineType(subReturnType),
+                            kotlinTypeRefiner.refineType(superReturnType)
+                    )
+                ) {
                     return OverrideCompatibilityInfo.conflict("Return type mismatch");
                 }
             }
@@ -356,18 +388,19 @@ public class OverridingUtil {
         return null;
     }
 
-    private static boolean areTypesEquivalent(
+    private boolean areTypesEquivalent(
             @NotNull KotlinType typeInSuper,
             @NotNull KotlinType typeInSub,
             @NotNull KotlinTypeChecker typeChecker
     ) {
         boolean bothErrors = KotlinTypeKt.isError(typeInSuper) && KotlinTypeKt.isError(typeInSub);
-        return bothErrors || typeChecker.equalTypes(typeInSuper, typeInSub);
+        if (bothErrors) return true;
+        return typeChecker.equalTypes(kotlinTypeRefiner.refineType(typeInSuper), kotlinTypeRefiner.refineType(typeInSub));
     }
 
     // See JLS 8, 8.4.4 Generic Methods
     // TODO: use TypeSubstitutor instead
-    private static boolean areTypeParametersEquivalent(
+    private boolean areTypeParametersEquivalent(
             @NotNull TypeParameterDescriptor superTypeParameter,
             @NotNull TypeParameterDescriptor subTypeParameter,
             @NotNull KotlinTypeChecker typeChecker
@@ -404,7 +437,7 @@ public class OverridingUtil {
         return parameters;
     }
 
-    public static void generateOverridesInFunctionGroup(
+    public void generateOverridesInFunctionGroup(
             @SuppressWarnings("UnusedParameters")
             @NotNull Name name, //DO NOT DELETE THIS PARAMETER: needed to make sure all descriptors have the same name
             @NotNull Collection<? extends CallableMemberDescriptor> membersFromSupertypes,
@@ -428,7 +461,7 @@ public class OverridingUtil {
                Visibilities.isVisibleIgnoringReceiver(fromSuper, overriding);
     }
 
-    private static Collection<CallableMemberDescriptor> extractAndBindOverridesForMember(
+    private Collection<CallableMemberDescriptor> extractAndBindOverridesForMember(
             @NotNull CallableMemberDescriptor fromCurrent,
             @NotNull Collection<? extends CallableMemberDescriptor> descriptorsFromSuper,
             @NotNull ClassDescriptor current,
@@ -437,7 +470,7 @@ public class OverridingUtil {
         Collection<CallableMemberDescriptor> bound = new ArrayList<CallableMemberDescriptor>(descriptorsFromSuper.size());
         Collection<CallableMemberDescriptor> overridden = SmartSet.create();
         for (CallableMemberDescriptor fromSupertype : descriptorsFromSuper) {
-            OverrideCompatibilityInfo.Result result = DEFAULT.isOverridableBy(fromSupertype, fromCurrent, current).getResult();
+            OverrideCompatibilityInfo.Result result = isOverridableBy(fromSupertype, fromCurrent, current).getResult();
 
             boolean isVisibleForOverride = isVisibleForOverride(fromCurrent, fromSupertype);
 

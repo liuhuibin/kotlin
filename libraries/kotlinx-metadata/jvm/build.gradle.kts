@@ -4,6 +4,7 @@ description = "Kotlin JVM metadata manipulation library"
 
 plugins {
     kotlin("jvm")
+    id("jps-compatible")
 }
 
 /*
@@ -20,6 +21,9 @@ group = "org.jetbrains.kotlinx"
 val deployVersion = findProperty("kotlinxMetadataDeployVersion") as String?
 version = deployVersion ?: "0.1-SNAPSHOT"
 
+jvmTarget = "1.6"
+javaHome = rootProject.extra["JDK_16"] as String
+
 sourceSets {
     "main" { projectDefault() }
     "test" { projectDefault() }
@@ -32,7 +36,7 @@ configurations.getByName("compileOnly").extendsFrom(shadows)
 configurations.getByName("testCompile").extendsFrom(shadows)
 
 dependencies {
-    compile(project(":kotlin-stdlib"))
+    compile(kotlinStdlib())
     shadows(project(":kotlinx-metadata"))
     shadows(project(":core:metadata"))
     shadows(project(":core:metadata.jvm"))
@@ -40,18 +44,24 @@ dependencies {
     testCompile(commonDep("junit:junit"))
     testCompile(intellijDep()) { includeJars("asm-all", rootProject = rootProject) }
     testCompileOnly(project(":kotlin-reflect-api"))
-    testRuntime(projectDist(":kotlin-reflect"))
+    testRuntime(project(":kotlin-reflect"))
+}
+
+
+if (deployVersion != null) {
+    publish()
 }
 
 noDefaultJar()
 
-val shadowJar = task<ShadowJar>("shadowJar") {
+tasks.register<ShadowJar>("shadowJar") {
     callGroovy("manifestAttributes", manifest, project)
     manifest.attributes["Implementation-Version"] = version
 
     from(mainSourceSet.output)
     exclude("**/*.proto")
     configurations = listOf(shadows)
+    relocate("org.jetbrains.kotlin", "kotlinx.metadata.internal")
 
     val artifactRef = outputs.files.singleFile
     runtimeJarArtifactBy(this, artifactRef)
@@ -70,11 +80,3 @@ sourcesJar {
 }
 
 javadocJar()
-
-if (deployVersion != null) {
-    publish()
-}
-
-projectTest {
-    workingDir = rootDir
-}

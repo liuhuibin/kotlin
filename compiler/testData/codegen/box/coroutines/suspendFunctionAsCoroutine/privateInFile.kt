@@ -1,4 +1,4 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
 // WITH_RUNTIME
 // WITH_COROUTINES
 // COMMON_COROUTINES_TEST
@@ -10,7 +10,7 @@ import COROUTINES_PACKAGE.intrinsics.*
 var x = true
 private suspend fun foo(): String  {
     if (x) {
-        return suspendCoroutineOrReturn<String> {
+        return suspendCoroutineUninterceptedOrReturn<String> {
             it.resume("OK")
             COROUTINE_SUSPENDED
         }

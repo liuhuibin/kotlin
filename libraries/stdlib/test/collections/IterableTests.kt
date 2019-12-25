@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package test.collections
@@ -140,6 +140,11 @@ abstract class OrderedIterableTests<T : Iterable<String>>(createFrom: (Array<out
         data.toList().let { expectedSingleChunk ->
             assertEquals(expectedSingleChunk, data.chunked(size).single())
             assertEquals(expectedSingleChunk, data.chunked(size + 3).single())
+            assertEquals(expectedSingleChunk, data.chunked(Int.MAX_VALUE).single())
+        }
+
+        createFrom("a", "b").let { iterable ->
+            assertEquals(iterable.toList(), iterable.chunked(Int.MAX_VALUE).single())
         }
 
         assertTrue(empty.chunked(3).isEmpty())
@@ -193,6 +198,24 @@ abstract class OrderedIterableTests<T : Iterable<String>>(createFrom: (Array<out
         for (illegalValue in listOf(Int.MIN_VALUE, -1, 0)) {
             assertFailsWith<IllegalArgumentException>("size $illegalValue") { data.windowed(illegalValue, 1) }
             assertFailsWith<IllegalArgumentException>("step $illegalValue") { data.windowed(1, illegalValue) }
+        }
+
+        // index overflow tests
+        for (partialWindows in listOf(true, false)) {
+
+            val windowed1 = data.windowed(5, Int.MAX_VALUE, partialWindows)
+            assertEquals(data.take(5), windowed1.single())
+            val windowed2 = data.windowed(Int.MAX_VALUE, 5, partialWindows)
+            assertEquals(if (partialWindows) listOf(data.toList(), listOf("5", "6")) else listOf(), windowed2)
+            val windowed3 = data.windowed(Int.MAX_VALUE, Int.MAX_VALUE, partialWindows)
+            assertEquals(if (partialWindows) listOf(data.toList()) else listOf(), windowed3)
+
+            val windowedTransform1 = data.windowed(5, Int.MAX_VALUE, partialWindows) { it.joinToString("") }
+            assertEquals("01234", windowedTransform1.single())
+            val windowedTransform2 = data.windowed(Int.MAX_VALUE, 5, partialWindows) { it.joinToString("") }
+            assertEquals(if (partialWindows) listOf("0123456", "56") else listOf(), windowedTransform2)
+            val windowedTransform3 = data.windowed(Int.MAX_VALUE, Int.MAX_VALUE, partialWindows) { it.joinToString("") }
+            assertEquals(if (partialWindows) listOf("0123456") else listOf(), windowedTransform3)
         }
     }
 
@@ -508,3 +531,17 @@ fun <T> Iterator<T>.assertSorted(isInOrder: (T, T) -> Boolean) {
     return
 }
 
+data class Sortable<K : Comparable<K>>(val key: K, val index: Int) : Comparable<Sortable<K>> {
+    override fun compareTo(other: Sortable<K>): Int = this.key.compareTo(other.key)
+}
+
+
+fun <K : Comparable<K>> Iterator<Sortable<K>>.assertStableSorted(descending: Boolean = false) {
+    assertSorted { a, b ->
+        val relation = a.key.compareTo(b.key)
+        (if (descending) relation > 0 else relation < 0) || relation == 0 && a.index < b.index
+    }
+}
+
+fun <K : Comparable<K>> Iterable<Sortable<K>>.assertStableSorted(descending: Boolean = false) =
+    iterator().assertStableSorted(descending = descending)

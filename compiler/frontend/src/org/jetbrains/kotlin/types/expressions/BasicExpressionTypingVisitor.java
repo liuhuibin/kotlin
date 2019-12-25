@@ -19,6 +19,7 @@ package org.jetbrains.kotlin.types.expressions;
 import com.google.common.collect.Lists;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.StubBasedPsiElement;
 import com.intellij.psi.tree.IElementType;
 import com.intellij.psi.tree.TokenSet;
 import com.intellij.psi.util.PsiTreeUtil;
@@ -109,15 +110,21 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
             return qualifiedExpression.getOperationSign() == KtTokens.DOT &&
                    qualifiedExpression.getReceiverExpression() == KtPsiUtil.deparenthesize(expression);
         }
-        if (parent instanceof KtBinaryExpression) {
-            KtBinaryExpression binaryExpression = (KtBinaryExpression) parent;
-            if (!OperatorConventions.BINARY_OPERATION_NAMES.containsKey(binaryExpression.getOperationToken()) &&
-                !KtTokens.ALL_ASSIGNMENTS.contains(binaryExpression.getOperationToken())) {
-                return false;
-            }
-            return PsiTreeUtil.isAncestor(binaryExpression.getLeft(), expression, false);
+
+        return isLValue(expression, parent);
+    }
+
+    public static boolean isLValue(@NotNull KtSimpleNameExpression expression, @Nullable PsiElement parent) {
+        if (!(parent instanceof KtBinaryExpression)) {
+            return false;
         }
-        return false;
+
+        KtBinaryExpression binaryExpression = (KtBinaryExpression) parent;
+        if (!OperatorConventions.BINARY_OPERATION_NAMES.containsKey(binaryExpression.getOperationToken()) &&
+            !KtTokens.ALL_ASSIGNMENTS.contains(binaryExpression.getOperationToken())) {
+            return false;
+        }
+        return PsiTreeUtil.isAncestor(binaryExpression.getLeft(), expression, false);
     }
 
     private static boolean isDangerousWithNull(@NotNull KtSimpleNameExpression expression, @NotNull ExpressionTypingContext context) {
@@ -790,7 +797,7 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
                     context.trace.record(BindingContext.VARIABLE_REASSIGNMENT, expression);
                     KtExpression stubExpression = ExpressionTypingUtils.createFakeExpressionOfType(
                             baseExpression.getProject(), context.trace, "e", type);
-                    checkLValue(context.trace, context, baseExpression, stubExpression, expression);
+                    checkLValue(context.trace, context, baseExpression, stubExpression, expression, false);
                 }
                 // x++ type is x type, but ++x type is x.inc() type
                 DataFlowValue receiverValue = components.dataFlowValueFactory.createDataFlowValue(
@@ -923,7 +930,8 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
             @NotNull ExpressionTypingContext context,
             @NotNull KtExpression expressionWithParenthesis,
             @Nullable KtExpression rightHandSide,
-            @NotNull KtOperationExpression operationExpression
+            @NotNull KtOperationExpression operationExpression,
+            boolean arraySetMethodAlreadyResolved
     ) {
         KtExpression expression = KtPsiUtil.deparenthesize(expressionWithParenthesis);
         if (expression instanceof KtArrayAccessExpression) {
@@ -931,26 +939,42 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
             KtExpression arrayExpression = arrayAccessExpression.getArrayExpression();
             if (arrayExpression == null || rightHandSide == null) return false;
 
-            TemporaryBindingTrace ignoreReportsTrace = TemporaryBindingTrace.create(trace, "Trace for checking set function");
-            ExpressionTypingContext findSetterContext = context.replaceBindingTrace(ignoreReportsTrace);
-            KotlinTypeInfo info = resolveArrayAccessSetMethod(arrayAccessExpression, rightHandSide, findSetterContext, ignoreReportsTrace);
+            BindingTrace traceWithIndexedLValue;
+            boolean methodSetIsResolved;
+            if (!arraySetMethodAlreadyResolved) {
+                TemporaryBindingTrace ignoreReportsTrace = TemporaryBindingTrace.create(trace, "Trace for checking set function");
+                ExpressionTypingContext findSetterContext = context.replaceBindingTrace(ignoreReportsTrace);
+                KotlinTypeInfo info = resolveArrayAccessSetMethod(arrayAccessExpression, rightHandSide, findSetterContext, ignoreReportsTrace);
+
+                traceWithIndexedLValue = ignoreReportsTrace;
+                methodSetIsResolved = info.getType() != null;
+            } else {
+                traceWithIndexedLValue = trace;
+                methodSetIsResolved = true;
+            }
 
             IElementType operationType = operationExpression.getOperationReference().getReferencedNameElementType();
             if (KtTokens.AUGMENTED_ASSIGNMENTS.contains(operationType)
                     || operationType == KtTokens.PLUSPLUS || operationType == KtTokens.MINUSMINUS) {
-                ResolvedCall<?> resolvedCall = ignoreReportsTrace.get(INDEXED_LVALUE_SET, expression);
+                ResolvedCall<?> resolvedCall = traceWithIndexedLValue.get(INDEXED_LVALUE_SET, expression);
                 if (resolvedCall != null && trace.wantsDiagnostics()) {
                     // Call must be validated with the actual, not temporary trace in order to report operator diagnostic
                     // Only unary assignment expressions (++, --) and +=/... must be checked, normal assignments have the proper trace
                     CallCheckerContext callCheckerContext =
-                            new CallCheckerContext(context, components.deprecationResolver, components.moduleDescriptor, trace);
+                            new CallCheckerContext(
+                                    context,
+                                    components.deprecationResolver,
+                                    components.moduleDescriptor,
+                                    components.missingSupertypesResolver,
+                                    trace
+                            );
                     for (CallChecker checker : components.callCheckers) {
                         checker.check(resolvedCall, expression, callCheckerContext);
                     }
                 }
             }
 
-            return info.getType() != null;
+            return methodSetIsResolved;
         }
 
         VariableDescriptor variable = BindingContextUtils.extractVariableDescriptorFromReference(trace.getBindingContext(), expression);
@@ -1020,7 +1044,12 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
 
     @NotNull
     private CallCheckerContext createCallCheckerContext(@NotNull ExpressionTypingContext context) {
-        return new CallCheckerContext(context, components.deprecationResolver, components.moduleDescriptor);
+        return new CallCheckerContext(
+                context,
+                components.deprecationResolver,
+                components.moduleDescriptor,
+                components.missingSupertypesResolver
+        );
     }
 
     @Override
@@ -1187,8 +1216,9 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
         KotlinType refinedType = KotlinBuiltIns.isNothingOrNullableNothing(receiver.getType()) ?
                                  components.builtIns.getNullableAnyType() :
                                  receiver.getType();
-        Collection<SimpleFunctionDescriptor> equalsMembers = refinedType.getMemberScope().getContributedFunctions(
-                OperatorNameConventions.EQUALS, new KotlinLookupLocation(expression.getOperationReference()));
+        Collection<? extends SimpleFunctionDescriptor> equalsMembers = refinedType.getMemberScope().getContributedFunctions(
+                OperatorNameConventions.EQUALS, new KotlinLookupLocation(expression.getOperationReference())
+        );
 
         return CollectionsKt.filter(equalsMembers, descriptor -> {
             if (ErrorUtils.isError(descriptor)) return true;
@@ -1428,7 +1458,11 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
             if (rightType != null) {
                 if (TypeIntersector.isIntersectionEmpty(leftType, rightType)) {
                     context.trace.report(EQUALITY_NOT_APPLICABLE.on(expression, expression.getOperationReference(), leftType, rightType));
+                } else {
+                    EnumCompatibilityCheckerKt.checkEnumsForCompatibility(context, expression, leftType, rightType);
                 }
+
+
                 SenselessComparisonChecker.checkSenselessComparisonWithNull(
                         expression, left, right, context,
                         expr -> facade.getTypeInfo(expr, context).getType(),
@@ -1451,7 +1485,9 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
     @NotNull
     private KotlinTypeInfo assignmentIsNotAnExpressionError(KtBinaryExpression expression, ExpressionTypingContext context) {
         facade.checkStatementType(expression, context);
-        context.trace.report(ASSIGNMENT_IN_EXPRESSION_CONTEXT.on(expression));
+        if (!context.isDebuggerContext) {
+            context.trace.report(ASSIGNMENT_IN_EXPRESSION_CONTEXT.on(expression));
+        }
         return TypeInfoFactoryKt.noTypeInfo(context);
     }
 
@@ -1574,6 +1610,10 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
     }
 
     private static void checkLiteralPrefixAndSuffix(@NotNull PsiElement expression, ExpressionTypingContext context) {
+        if (expression instanceof StubBasedPsiElement && ((StubBasedPsiElement) expression).getStub() != null) {
+            return;
+        }
+
         checkLiteralPrefixOrSuffix(PsiTreeUtil.prevLeaf(expression), context);
         checkLiteralPrefixOrSuffix(PsiTreeUtil.nextLeaf(expression), context);
     }
@@ -1606,7 +1646,13 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
         if (baseExpression == null) {
             return TypeInfoFactoryKt.noTypeInfo(context);
         }
-        return facade.getTypeInfo(baseExpression, context, isStatement);
+        if (components.typeResolutionInterceptor.isEmpty()) return facade.getTypeInfo(baseExpression, context, isStatement);
+
+        KotlinType newExpectedType = components.typeResolutionInterceptor.interceptType(baseExpression, context, context.expectedType);
+        KotlinTypeInfo resultTypeInfo = facade.getTypeInfo(baseExpression, newExpectedType == context.expectedType ? context : context.replaceExpectedType(newExpectedType), isStatement);
+        KotlinType newResultType = components.typeResolutionInterceptor.interceptType(baseExpression, context, resultTypeInfo.getType());
+        components.dataFlowAnalyzer.checkType(newResultType, expression, context);
+        return resultTypeInfo.getType() == newResultType ? resultTypeInfo : resultTypeInfo.replaceType(newResultType);
     }
 
     protected void resolveAnnotationsOnExpression(KtAnnotatedExpression expression, ExpressionTypingContext context) {
@@ -1707,15 +1753,9 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
                 context, call, arrayAccessExpression, isGet ? OperatorNameConventions.GET : OperatorNameConventions.SET);
 
         List<KtExpression> indices = arrayAccessExpression.getIndexExpressions();
-        // The accumulated data flow info of all index expressions is saved on the last index
-        KotlinTypeInfo resultTypeInfo = arrayTypeInfo;
-        if (!indices.isEmpty()) {
-            resultTypeInfo = facade.getTypeInfo(indices.get(indices.size() - 1), context);
-        }
 
-        if (!isGet) {
-            resultTypeInfo = facade.getTypeInfo(rightHandSide, context);
-        }
+        KotlinTypeInfo resultTypeInfo =
+                computeAccumulatedInfoForArrayAccessExpression(arrayTypeInfo, indices, rightHandSide, isGet, context, facade);
 
         if ((isImplicit && !functionResults.isSuccess()) || !functionResults.isSingleResult()) {
             traceForResolveResult.report(isGet ? NO_GET_METHOD.on(arrayAccessExpression) : NO_SET_METHOD.on(arrayAccessExpression));
@@ -1724,5 +1764,41 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
         traceForResolveResult.record(isGet ? INDEXED_LVALUE_GET : INDEXED_LVALUE_SET, arrayAccessExpression,
                                      functionResults.getResultingCall());
         return resultTypeInfo.replaceType(functionResults.getResultingDescriptor().getReturnType());
+    }
+
+    private static KotlinTypeInfo computeAccumulatedInfoForArrayAccessExpression(
+            @NotNull KotlinTypeInfo arrayTypeInfo,
+            @NotNull List<KtExpression> indices,
+            @Nullable KtExpression rightHandSide,
+            boolean isGet,
+            @NotNull ExpressionTypingContext context,
+            @NotNull ExpressionTypingInternals facade
+    ) {
+        KotlinTypeInfo accumulatedTypeInfo = null;
+        boolean forceResolve = !context.languageVersionSettings.supportsFeature(LanguageFeature.NewInference);
+
+        // The accumulated data flow info of all index expressions is saved on the last index
+        if (!indices.isEmpty()) {
+            accumulatedTypeInfo = getTypeInfo(indices.get(indices.size() - 1), facade, context, forceResolve);
+        }
+
+        if (!isGet && rightHandSide != null) {
+            accumulatedTypeInfo = getTypeInfo(rightHandSide, facade, context, forceResolve);
+        }
+
+        return accumulatedTypeInfo != null ? accumulatedTypeInfo : arrayTypeInfo;
+    }
+
+    private static KotlinTypeInfo getTypeInfo(
+            @NotNull KtExpression expression,
+            @NotNull ExpressionTypingInternals facade,
+            @NotNull ExpressionTypingContext context,
+            boolean forceExpressionResolve
+    ) {
+        if (forceExpressionResolve) {
+            return facade.getTypeInfo(expression, context);
+        } else {
+            return BindingContextUtils.getRecordedTypeInfo(expression, context.trace.getBindingContext());
+        }
     }
 }

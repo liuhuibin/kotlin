@@ -22,6 +22,7 @@ import com.intellij.lang.ASTNode;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.Ref;
 import com.intellij.psi.util.PsiTreeUtil;
+import kotlin.Pair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns;
@@ -35,6 +36,7 @@ import org.jetbrains.kotlin.descriptors.impl.ValueParameterDescriptorImpl;
 import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.psi.*;
+import org.jetbrains.kotlin.resolve.BindingContext;
 import org.jetbrains.kotlin.resolve.BindingContextUtils;
 import org.jetbrains.kotlin.resolve.BindingTrace;
 import org.jetbrains.kotlin.resolve.calls.CallResolver;
@@ -53,6 +55,7 @@ import org.jetbrains.kotlin.resolve.calls.tasks.TracingStrategy;
 import org.jetbrains.kotlin.resolve.calls.util.CallMaker;
 import org.jetbrains.kotlin.resolve.descriptorUtil.AnnotationsForResolveKt;
 import org.jetbrains.kotlin.resolve.scopes.receivers.ReceiverValue;
+import org.jetbrains.kotlin.storage.StorageManager;
 import org.jetbrains.kotlin.types.*;
 import org.jetbrains.kotlin.types.typeUtil.TypeUtilsKt;
 
@@ -67,7 +70,7 @@ public class ControlStructureTypingUtils {
     private static final Logger LOG = Logger.getInstance(ControlStructureTypingUtils.class);
 
     public enum ResolveConstruct {
-        IF("if"), ELVIS("elvis"), EXCL_EXCL("ExclExcl"), WHEN("when");
+        IF("if"), ELVIS("elvis"), EXCL_EXCL("ExclExcl"), WHEN("when"), TRY("try");
 
         private final String name;
         private final Name specialFunctionName;
@@ -95,15 +98,18 @@ public class ControlStructureTypingUtils {
     private final CallResolver callResolver;
     private final DataFlowAnalyzer dataFlowAnalyzer;
     private final ModuleDescriptor moduleDescriptor;
+    private final StorageManager storageManager;
 
     public ControlStructureTypingUtils(
             @NotNull CallResolver callResolver,
             @NotNull DataFlowAnalyzer dataFlowAnalyzer,
-            @NotNull ModuleDescriptor moduleDescriptor
+            @NotNull ModuleDescriptor moduleDescriptor,
+            @NotNull StorageManager storageManager
     ) {
         this.callResolver = callResolver;
         this.dataFlowAnalyzer = dataFlowAnalyzer;
         this.moduleDescriptor = moduleDescriptor;
+        this.storageManager = storageManager;
     }
 
     /*package*/ ResolvedCall<FunctionDescriptor> resolveSpecialConstructionAsCall(
@@ -116,6 +122,45 @@ public class ControlStructureTypingUtils {
     ) {
         SimpleFunctionDescriptorImpl function = createFunctionDescriptorForSpecialConstruction(
                 construct, argumentNames, isArgumentNullable);
+        return resolveSpecialConstructionAsCall(call, function, construct, context, dataFlowInfoForArguments);
+    }
+
+    /*package*/ ResolvedCall<FunctionDescriptor> resolveTryAsCall(
+            @NotNull Call call,
+            @NotNull List<Pair<KtExpression, VariableDescriptor>> catchedExceptions,
+            @NotNull ExpressionTypingContext context,
+            @Nullable MutableDataFlowInfoForArguments dataFlowInfoForArguments
+    ) {
+        List<String> argumentNames = Lists.newArrayList("tryBlock");
+        List<Boolean> argumentsNullability = Lists.newArrayList(false);
+
+        int counter = 0;
+        for (Pair<KtExpression, VariableDescriptor> descriptorPair : catchedExceptions) {
+            // catchedExceptions are corresponding to PSI arguments that were used to create a call
+            // therefore, it's important to use only them to have consistent parameters
+            argumentNames.add("catchBlock" + counter);
+            argumentsNullability.add(false);
+
+            KtExpression catchBlock = descriptorPair.getFirst();
+            VariableDescriptor catchedExceptionDescriptor = descriptorPair.getSecond();
+            context.trace.record(BindingContext.NEW_INFERENCE_CATCH_EXCEPTION_PARAMETER, catchBlock, Ref.create(catchedExceptionDescriptor));
+
+            counter++;
+        }
+
+        SimpleFunctionDescriptorImpl function =
+                createFunctionDescriptorForSpecialConstruction(ResolveConstruct.TRY, argumentNames, argumentsNullability);
+
+        return resolveSpecialConstructionAsCall(call, function, ResolveConstruct.TRY, context, dataFlowInfoForArguments);
+    }
+
+    private ResolvedCall<FunctionDescriptor> resolveSpecialConstructionAsCall(
+            @NotNull Call call,
+            @NotNull SimpleFunctionDescriptorImpl function,
+            @NotNull ResolveConstruct construct,
+            @NotNull ExpressionTypingContext context,
+            @Nullable MutableDataFlowInfoForArguments dataFlowInfoForArguments
+    ) {
         TracingStrategy tracing = createTracingForSpecialConstruction(call, construct.getName(), context);
         TypeSubstitutor knownTypeParameterSubstitutor = createKnownTypeParameterSubstitutorForSpecialCall(construct, function, context.expectedType, context.languageVersionSettings);
         ResolutionCandidate<FunctionDescriptor> resolutionCandidate =
@@ -161,7 +206,7 @@ public class ControlStructureTypingUtils {
 
         TypeParameterDescriptor typeParameter = TypeParameterDescriptorImpl.createWithDefaultBound(
                 function, Annotations.Companion.getEMPTY(), false, Variance.INVARIANT,
-                construct.getSpecialTypeParameterName(), 0);
+                construct.getSpecialTypeParameterName(), 0, storageManager);
 
         KotlinType type = typeParameter.getDefaultType();
         KotlinType nullableType = TypeUtils.makeNullable(type);
@@ -250,6 +295,20 @@ public class ControlStructureTypingUtils {
             dataFlowInfoForArgumentsMap.put(argument, entryDataFlowInfo);
         }
         return createIndependentDataFlowInfoForArgumentsForCall(subjectDataFlowInfo, dataFlowInfoForArgumentsMap);
+    }
+
+    public static MutableDataFlowInfoForArguments createDataFlowInfoForArgumentsOfTryCall(
+            @NotNull Call callForTry,
+            @NotNull DataFlowInfo dataFlowInfoBeforeTry,
+            @NotNull DataFlowInfo dataFlowInfoAfterTry
+    ) {
+        Map<ValueArgument, DataFlowInfo> dataFlowInfoForArgumentsMap = new HashMap<>();
+        List<? extends ValueArgument> valueArguments = callForTry.getValueArguments();
+        dataFlowInfoForArgumentsMap.put(valueArguments.get(0), dataFlowInfoBeforeTry);
+        for (int i = 1; i < valueArguments.size(); i++) {
+            dataFlowInfoForArgumentsMap.put(valueArguments.get(i), dataFlowInfoAfterTry);
+        }
+        return createIndependentDataFlowInfoForArgumentsForCall(dataFlowInfoBeforeTry, dataFlowInfoForArgumentsMap);
     }
 
     /*package*/ static Call createCallForSpecialConstruction(

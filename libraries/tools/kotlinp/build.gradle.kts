@@ -1,4 +1,5 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 description = "kotlinp"
 
@@ -6,15 +7,34 @@ plugins {
     kotlin("jvm")
 }
 
+val kotlinpAsmVersion = "7.0.1"
+
 val shadows by configurations.creating
-shadows.extendsFrom(configurations.getByName("compile"))
+
+repositories {
+    maven("https://jetbrains.bintray.com/intellij-third-party-dependencies/")
+}
 
 dependencies {
-    compile(project(":kotlinx-metadata"))
-    compile(project(":kotlinx-metadata-jvm"))
-    compile("org.ow2.asm:asm:6.0")
+    compileOnly(project(":kotlinx-metadata"))
+    compileOnly(project(":kotlinx-metadata-jvm"))
+    compile("org.jetbrains.intellij.deps:asm-all:$kotlinpAsmVersion")
+
+    testCompileOnly(project(":kotlinx-metadata"))
+    testCompileOnly(project(":kotlinx-metadata-jvm"))
     testCompile(commonDep("junit:junit"))
     testCompile(projectTests(":generators:test-generator"))
+
+    testRuntime(project(":kotlinx-metadata-jvm", configuration = "runtime"))
+
+    testRuntimeOnly(intellijCoreDep()) { includeJars("intellij-core") }
+
+    Platform[192].orHigher {
+        testRuntimeOnly(intellijDep()) { includeJars("platform-concurrency", "platform-objectSerializer") }
+    }
+
+    shadows(project(":kotlinx-metadata-jvm", configuration = "runtime"))
+    shadows("org.jetbrains.intellij.deps:asm-all:$kotlinpAsmVersion")
 }
 
 sourceSets {
@@ -41,5 +61,15 @@ val shadowJar by task<ShadowJar> {
 tasks {
     "assemble" {
         dependsOn(shadowJar)
+    }
+    "test" {
+        // These dependencies are needed because ForTestCompileRuntime loads jars from dist
+        dependsOn(rootProject.tasks.named("dist"))
+    }
+}
+
+tasks.withType<KotlinCompile> {
+    kotlinOptions {
+        freeCompilerArgs += listOf("-Xuse-experimental=kotlin.Experimental")
     }
 }

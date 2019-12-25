@@ -41,7 +41,7 @@ class DeprecatedSymbolUsageFix(
 
     override fun invoke(replacementStrategy: UsageReplacementStrategy, project: Project, editor: Editor?) {
         val element = element ?: return
-        val result = replacementStrategy.createReplacer(element)!!.invoke()
+        val result = replacementStrategy.createReplacer(element)?.invoke()
         if (result != null) {
             val offset = (result.getCalleeExpressionIfAny() ?: result).textOffset
             editor?.moveCaret(offset)
@@ -50,13 +50,18 @@ class DeprecatedSymbolUsageFix(
 
     companion object : KotlinSingleIntentionActionFactory() {
         override fun createAction(diagnostic: Diagnostic): IntentionAction? {
-            val (nameExpression, replacement) = DeprecatedSymbolUsageFixBase.extractDataFromDiagnostic(diagnostic) ?: return null
+            val (nameExpression, replacement) = extractDataFromDiagnostic(diagnostic, false) ?: return null
             return DeprecatedSymbolUsageFix(nameExpression, replacement)
         }
 
         fun isImportToBeRemoved(import: KtImportDirective): Boolean {
-            return !import.isAllUnder && import.targetDescriptors().all {
-                DeprecatedSymbolUsageFixBase.fetchReplaceWithPattern(it, import.project) != null
+            if (import.isAllUnder) return false
+
+            val targetDescriptors = import.targetDescriptors()
+            if (targetDescriptors.isEmpty()) return false
+
+            return targetDescriptors.all {
+                fetchReplaceWithPattern(it, import.project, null, false) != null
             }
         }
     }

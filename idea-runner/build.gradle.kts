@@ -10,9 +10,9 @@ dependencies {
     compileOnly(project(":idea:idea-gradle"))
     compileOnly(project(":idea:idea-jvm"))
 
-    compile(intellijDep())
-    
-    runtimeOnly(files(toolsJar()))
+    runtimeOnly(intellijDep())
+    runtimeOnly(intellijRuntimeAnnotations())
+    runtimeOnly(toolsJar())
 }
 
 val ideaPluginDir: File by rootProject.extra

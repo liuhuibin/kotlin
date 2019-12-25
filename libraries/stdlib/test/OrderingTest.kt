@@ -1,12 +1,11 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package test.comparisons
 
 import kotlin.test.*
-import kotlin.comparisons.*
 
 data class Item(val name: String, val rating: Int) : Comparable<Item> {
     public override fun compareTo(other: Item): Int {
@@ -136,8 +135,8 @@ class OrderingTest {
     @Test
     fun sortUsingCustomComparator() {
         val comparator = object : Comparator<Item> {
-            override fun compare(o1: Item, o2: Item): Int {
-                return compareValuesBy(o1, o2, { it.name }, { it.rating })
+            override fun compare(a: Item, b: Item): Int {
+                return compareValuesBy(a, b, { it.name }, { it.rating })
             }
 
             override fun equals(other: Any?): Boolean {
@@ -161,6 +160,8 @@ class OrderingTest {
 
         assertEquals(Double.POSITIVE_INFINITY, maxOf(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY))
         assertEquals(Double.POSITIVE_INFINITY, maxOf(Double.POSITIVE_INFINITY, Double.MAX_VALUE, Double.MIN_VALUE))
+        assertEquals(0.0, maxOf(0.0, -0.0))
+        assertEquals(0.0, maxOf(-0.0, 0.0))
     }
 
     @Test
@@ -181,6 +182,8 @@ class OrderingTest {
 
         assertEquals(Double.NEGATIVE_INFINITY, minOf(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY))
         assertEquals(Double.MIN_VALUE, minOf(Double.POSITIVE_INFINITY, Double.MAX_VALUE, Double.MIN_VALUE))
+        assertEquals(-0.0, minOf(0.0, -0.0))
+        assertEquals(-0.0, minOf(-0.0, 0.0))
     }
 
     @Test

@@ -1,4 +1,3 @@
-import org.jetbrains.kotlin.gradle.dsl.Coroutines
 
 plugins {
     kotlin("jvm")
@@ -9,27 +8,22 @@ jvmTarget = "1.6"
 
 dependencies {
     compile(project(":kotlin-script-runtime"))
-    compile(projectDist(":kotlin-stdlib"))
+    compile(kotlinStdlib())
     compile(project(":kotlin-scripting-common"))
+    testCompile(commonDep("junit"))
 }
 
 sourceSets {
     "main" { projectDefault() }
-    "test" {}
+    "test" { projectDefault() }
 }
 
-kotlin.experimental.coroutines = Coroutines.ENABLE
-
-val jar = runtimeJar()
-val sourcesJar = sourcesJar()
-val javadocJar = javadocJar()
-
-dist()
-
-ideaPlugin {
-    from(jar, sourcesJar)
+tasks.withType<org.jetbrains.kotlin.gradle.dsl.KotlinCompile<*>> {
+    kotlinOptions.freeCompilerArgs += "-Xallow-kotlin-package"
 }
-
-standardPublicJars()
 
 publish()
+
+runtimeJar()
+sourcesJar()
+javadocJar()

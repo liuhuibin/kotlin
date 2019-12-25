@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.inspections
@@ -49,7 +49,7 @@ class ReplaceStringFormatWithLiteralInspection : AbstractKotlinInspection() {
             }
 
             val context = callExpression.analyze(BodyResolveMode.PARTIAL)
-            if (args.drop(1).any { it.isSubtypeOfFormattable(context) }) return
+            if (args.asSequence().drop(1).any { it.isSubtypeOfFormattable(context) }) return
 
             holder.registerProblem(
                 qualifiedExpression ?: callExpression,
@@ -75,7 +75,7 @@ class ReplaceStringFormatWithLiteralInspection : AbstractKotlinInspection() {
 
             val args = callExpression.valueArguments.mapNotNull { it.getArgumentExpression() }
             val format = args[0].text.removePrefix("\"").removeSuffix("\"")
-            val replaceArgs = args.drop(1).mapTo(LinkedList()) { ConvertToStringTemplateIntention.buildText(it, false) }
+            val replaceArgs = args.asSequence().drop(1).mapTo(LinkedList()) { ConvertToStringTemplateIntention.buildText(it, false) }
             val stringLiteral = stringPlaceHolder.replace(format) { replaceArgs.pop() }
 
             (qualifiedExpression ?: callExpression).also { it.replace(KtPsiFactory(it).createStringTemplate(stringLiteral)) }

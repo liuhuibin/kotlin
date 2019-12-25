@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.liveTemplates
@@ -18,71 +18,78 @@ import junit.framework.TestCase
 import org.jetbrains.annotations.NonNls
 import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCase
 import org.jetbrains.kotlin.idea.test.KotlinWithJdkAndRuntimeLightProjectDescriptor
+import org.jetbrains.kotlin.test.JUnit3WithIdeaConfigurationRunner
+import org.junit.runner.RunWith
 import java.io.File
 import java.util.*
 
+@RunWith(JUnit3WithIdeaConfigurationRunner::class)
 class LiveTemplatesTest : KotlinLightCodeInsightFixtureTestCase() {
     override fun setUp() {
         super.setUp()
         myFixture.testDataPath = File(TEST_DATA_BASE_PATH).path + File.separator
-        TemplateManagerImpl.setTemplateTesting(myModule.project, testRootDisposable)
+        TemplateManagerImpl.setTemplateTesting(module.project, testRootDisposable)
     }
 
     fun testSout() {
-        paremeterless()
+        parameterless()
     }
 
     fun testSout_BeforeCall() {
-        paremeterless()
+        parameterless()
     }
 
     fun testSout_BeforeCallSpace() {
-        paremeterless()
+        parameterless()
     }
 
     fun testSout_BeforeBinary() {
-        paremeterless()
+        parameterless()
     }
 
     fun testSout_InCallArguments() {
-        paremeterless()
+        parameterless()
     }
 
     fun testSout_BeforeQualifiedCall() {
-        paremeterless()
+        parameterless()
     }
 
     fun testSout_AfterSemicolon() {
-        paremeterless()
+        parameterless()
     }
 
     fun testSoutf() {
-        paremeterless()
+        parameterless()
     }
 
     fun testSoutf_InCompanion() {
-        paremeterless()
+        parameterless()
     }
 
     fun testSerr() {
-        paremeterless()
+        parameterless()
     }
 
     fun testMain() {
-        paremeterless()
+        parameterless()
+    }
+
+    fun testMaina() {
+        parameterless()
     }
 
     fun testSoutv() {
         start()
 
         assertStringItems("DEFAULT_BUFFER_SIZE", "args", "x", "y")
-        typeAndNextTab("y")
+        typeAndNextTab("y.plus(\"test\")")
 
         checkAfter()
     }
 
     fun testSoutp() {
-        paremeterless()
+        parameterless()
     }
 
     fun testFun0() {
@@ -228,7 +235,7 @@ class LiveTemplatesTest : KotlinLightCodeInsightFixtureTestCase() {
         doTestIfnInn()
     }
 
-    private fun paremeterless() {
+    private fun parameterless() {
         start()
 
         checkAfter()
@@ -268,17 +275,18 @@ class LiveTemplatesTest : KotlinLightCodeInsightFixtureTestCase() {
         val project = project
         UIUtil.invokeAndWaitIfNeeded(Runnable {
             CommandProcessor.getInstance().executeCommand(
-                    project,
-                    {
-                        templateState!!.nextTab()
-                    },
-                    "nextTab",
-                    null)
+                project,
+                {
+                    templateState!!.nextTab()
+                },
+                "nextTab",
+                null
+            )
         })
     }
 
     private fun nextTab(times: Int) {
-        for (i in 0..times - 1) {
+        for (i in 0 until times) {
             nextTab()
         }
     }
@@ -300,7 +308,7 @@ class LiveTemplatesTest : KotlinLightCodeInsightFixtureTestCase() {
     }
 
     private fun assertStringItems(@NonNls vararg items: String) {
-        TestCase.assertEquals(Arrays.asList(*items), Arrays.asList(*itemStringsSorted))
+        TestCase.assertEquals(listOf(*items), listOf(*itemStringsSorted))
     }
 
     private val itemStrings: Array<String>

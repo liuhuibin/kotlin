@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 @file:kotlin.jvm.JvmName("MapAccessorsKt")
@@ -35,7 +35,7 @@ public inline operator fun <V, V1 : V> Map<in String, @Exact V>.getValue(thisRef
 public inline operator fun <V, V1 : V> MutableMap<in String, out @Exact V>.getValue(thisRef: Any?, property: KProperty<*>): V1 =
     @Suppress("UNCHECKED_CAST") (getOrImplicitDefault(property.name) as V1)
 
-@Deprecated("Use getValue() with two type parameters instead")
+@Deprecated("Use getValue() with two type parameters instead", level = DeprecationLevel.ERROR)
 @kotlin.jvm.JvmName("getVarContravariant")
 @kotlin.internal.LowPriorityInOverloadResolution
 @kotlin.internal.InlineOnly

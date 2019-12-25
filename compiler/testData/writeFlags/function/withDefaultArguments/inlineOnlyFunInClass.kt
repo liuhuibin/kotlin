@@ -1,3 +1,4 @@
+// IGNORE_BACKEND: JVM_IR
 class MyClass() {
     @Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
     @kotlin.internal.InlineOnly
@@ -7,4 +8,4 @@ class MyClass() {
 
 // TESTED_OBJECT_KIND: function
 // TESTED_OBJECTS: MyClass, test$default
-// FLAGS: ACC_STATIC, ACC_BRIDGE, ACC_SYNTHETIC
+// FLAGS: ACC_STATIC, ACC_SYNTHETIC

@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.actions.generate
@@ -29,12 +18,8 @@ import org.jetbrains.kotlin.descriptors.PropertyDescriptor
 import org.jetbrains.kotlin.diagnostics.Errors
 import org.jetbrains.kotlin.idea.caches.resolve.analyzeWithContent
 import org.jetbrains.kotlin.idea.codeInsight.DescriptorToSourceUtilsIde
-import org.jetbrains.kotlin.idea.core.CollectingNameValidator
-import org.jetbrains.kotlin.idea.core.KotlinNameSuggester
-import org.jetbrains.kotlin.idea.core.appendElement
-import org.jetbrains.kotlin.idea.core.isVisible
+import org.jetbrains.kotlin.idea.core.*
 import org.jetbrains.kotlin.idea.core.util.DescriptorMemberChooserObject
-import org.jetbrains.kotlin.idea.core.insertMembersAfter
 import org.jetbrains.kotlin.idea.util.IdeDescriptorRenderers
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.siblings
@@ -53,9 +38,9 @@ import java.util.*
 
 class KotlinGenerateSecondaryConstructorAction : KotlinGenerateMemberActionBase<KotlinGenerateSecondaryConstructorAction.Info>() {
     class Info(
-            val propertiesToInitialize: List<PropertyDescriptor>,
-            val superConstructors: List<ConstructorDescriptor>,
-            val classDescriptor: ClassDescriptor
+        val propertiesToInitialize: List<PropertyDescriptor>,
+        val superConstructors: List<ConstructorDescriptor>,
+        val classDescriptor: ClassDescriptor
     )
 
     override fun isValidForClass(targetClass: KtClassOrObject): Boolean {
@@ -72,8 +57,8 @@ class KotlinGenerateSecondaryConstructorAction : KotlinGenerateMemberActionBase<
         val project = klass.project
         val superClassDescriptor = classDescriptor.getSuperClassNotAny() ?: return emptyList()
         val candidates = superClassDescriptor.constructors
-                .filter { it.isVisible(classDescriptor) }
-                .map { DescriptorMemberChooserObject(DescriptorToSourceUtilsIde.getAnyDeclaration(project, it) ?: klass, it) }
+            .filter { it.isVisible(classDescriptor) }
+            .map { DescriptorMemberChooserObject(DescriptorToSourceUtilsIde.getAnyDeclaration(project, it) ?: klass, it) }
         if (ApplicationManager.getApplication().isUnitTestMode || candidates.size <= 1) return candidates
 
         return with(MemberChooser(candidates.toTypedArray(), false, true, klass.project)) {
@@ -87,10 +72,12 @@ class KotlinGenerateSecondaryConstructorAction : KotlinGenerateMemberActionBase<
 
     private fun choosePropertiesToInitialize(klass: KtClassOrObject, context: BindingContext): List<DescriptorMemberChooserObject> {
         val candidates = klass.declarations
-                .filterIsInstance<KtProperty>()
-                .filter { it.isVar || context.diagnostics.forElement(it).any { it.factory in Errors.MUST_BE_INITIALIZED_DIAGNOSTICS } }
-                .map { context.get(BindingContext.VARIABLE, it) as PropertyDescriptor }
-                .map { DescriptorMemberChooserObject(it.source.getPsi()!!, it) }
+            .asSequence()
+            .filterIsInstance<KtProperty>()
+            .filter { it.isVar || context.diagnostics.forElement(it).any { it.factory in Errors.MUST_BE_INITIALIZED_DIAGNOSTICS } }
+            .map { context.get(BindingContext.VARIABLE, it) as PropertyDescriptor }
+            .map { DescriptorMemberChooserObject(it.source.getPsi()!!, it) }
+            .toList()
         if (ApplicationManager.getApplication().isUnitTestMode || candidates.isEmpty()) return candidates
 
         return with(MemberChooser(candidates.toTypedArray(), true, true, klass.project, false, null)) {
@@ -117,7 +104,8 @@ class KotlinGenerateSecondaryConstructorAction : KotlinGenerateMemberActionBase<
         fun Info.findAnchor(): PsiElement? {
             targetClass.declarations.lastIsInstanceOrNull<KtSecondaryConstructor>()?.let { return it }
             val lastPropertyToInitialize = propertiesToInitialize.lastOrNull()?.source?.getPsi()
-            val declarationsAfter = lastPropertyToInitialize?.siblings()?.filterIsInstance<KtDeclaration>() ?: targetClass.declarations.asSequence()
+            val declarationsAfter =
+                lastPropertyToInitialize?.siblings()?.filterIsInstance<KtDeclaration>() ?: targetClass.declarations.asSequence()
             val firstNonProperty = declarationsAfter.firstOrNull { it !is KtProperty } ?: return null
             return firstNonProperty.siblings(forward = false).firstIsInstanceOrNull<KtProperty>() ?: targetClass.getOrCreateBody().lBrace
         }
@@ -139,9 +127,9 @@ class KotlinGenerateSecondaryConstructorAction : KotlinGenerateMemberActionBase<
     }
 
     private fun generateConstructor(
-            classDescriptor: ClassDescriptor,
-            propertiesToInitialize: List<PropertyDescriptor>,
-            superConstructor: ConstructorDescriptor?
+        classDescriptor: ClassDescriptor,
+        propertiesToInitialize: List<PropertyDescriptor>,
+        superConstructor: ConstructorDescriptor?
     ): KtSecondaryConstructor? {
         fun equalTypes(types1: Collection<KotlinType>, types2: Collection<KotlinType>): Boolean {
             return types1.size == types2.size && (types1.zip(types2)).all { KotlinTypeChecker.DEFAULT.equalTypes(it.first, it.second) }
@@ -150,8 +138,11 @@ class KotlinGenerateSecondaryConstructorAction : KotlinGenerateMemberActionBase<
         val constructorParamTypes = propertiesToInitialize.map { it.type } +
                 (superConstructor?.valueParameters?.map { it.varargElementType ?: it.type } ?: emptyList())
 
-        if (classDescriptor.constructors.any { it.source.getPsi() is KtConstructor<*>
-                && equalTypes(it.valueParameters.map { it.varargElementType ?: it.type }, constructorParamTypes) }) return null
+        if (classDescriptor.constructors.any { descriptor ->
+                descriptor.source.getPsi() is KtConstructor<*> &&
+                        equalTypes(descriptor.valueParameters.map { it.varargElementType ?: it.type }, constructorParamTypes)
+            }
+        ) return null
 
         val targetClass = classDescriptor.source.getPsi() as KtClass
         val psiFactory = KtPsiFactory(targetClass)
@@ -163,7 +154,7 @@ class KotlinGenerateSecondaryConstructorAction : KotlinGenerateMemberActionBase<
 
         if (superConstructor != null) {
             val substitutor = getTypeSubstitutor(superConstructor.containingDeclaration.defaultType, classDescriptor.defaultType)
-                    ?: TypeSubstitutor.EMPTY
+                ?: TypeSubstitutor.EMPTY
             val delegationCallArguments = ArrayList<String>()
             for (parameter in superConstructor.valueParameters) {
                 val isVararg = parameter.varargElementType != null
@@ -172,7 +163,7 @@ class KotlinGenerateSecondaryConstructorAction : KotlinGenerateMemberActionBase<
 
                 val typeToUse = parameter.varargElementType ?: parameter.type
                 val paramType = IdeDescriptorRenderers.SOURCE_CODE.renderType(
-                        substitutor.substitute(typeToUse, Variance.INVARIANT) ?: classDescriptor.builtIns.anyType
+                    substitutor.substitute(typeToUse, Variance.INVARIANT) ?: classDescriptor.builtIns.anyType
                 )
 
                 val modifiers = if (isVararg) "vararg " else ""
@@ -181,7 +172,8 @@ class KotlinGenerateSecondaryConstructorAction : KotlinGenerateMemberActionBase<
                 delegationCallArguments.add(if (isVararg) "*$paramName" else paramName)
             }
 
-            val delegationCall = psiFactory.creareDelegatedSuperTypeEntry(delegationCallArguments.joinToString(prefix = "super(", postfix = ")"))
+            val delegationCall =
+                psiFactory.creareDelegatedSuperTypeEntry(delegationCallArguments.joinToString(prefix = "super(", postfix = ")"))
             constructor.replaceImplicitDelegationCallWithExplicit(false).replace(delegationCall)
         }
 

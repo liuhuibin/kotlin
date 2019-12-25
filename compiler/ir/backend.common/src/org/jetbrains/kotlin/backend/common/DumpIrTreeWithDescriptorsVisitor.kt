@@ -1,10 +1,17 @@
+/*
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
+ */
+
 package org.jetbrains.kotlin.backend.common
 
+import org.jetbrains.kotlin.descriptors.CallableDescriptor
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.descriptors.ReceiverParameterDescriptor
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.util.render
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitor
 import org.jetbrains.kotlin.renderer.*
 import org.jetbrains.kotlin.types.KotlinType
@@ -12,161 +19,158 @@ import org.jetbrains.kotlin.utils.Printer
 
 class RenderIrElementWithDescriptorsVisitor : IrElementVisitor<String, Nothing?> {
     override fun visitElement(element: IrElement, data: Nothing?): String =
-            "? ${element.javaClass.simpleName}"
+        "? ${element.javaClass.simpleName}"
 
     override fun visitDeclaration(declaration: IrDeclaration, data: Nothing?): String =
-            "? ${declaration.javaClass.simpleName} ${declaration.descriptor.ref()}"
+        "? ${declaration.javaClass.simpleName} ${declaration.descriptor.ref()}"
 
     override fun visitModuleFragment(declaration: IrModuleFragment, data: Nothing?): String =
-            "MODULE_FRAGMENT ${declaration.descriptor}"
+        "MODULE_FRAGMENT ${declaration.descriptor}"
 
     override fun visitFile(declaration: IrFile, data: Nothing?): String =
-            "FILE ${declaration.name}"
+        "FILE ${declaration.path}"
 
     override fun visitFunction(declaration: IrFunction, data: Nothing?): String =
-            "FUN ${declaration.descriptor}"
+        "FUN ${declaration.descriptor}"
 
     override fun visitConstructor(declaration: IrConstructor, data: Nothing?): String =
-            "CONSTRUCTOR ${declaration.descriptor}"
+        "CONSTRUCTOR ${declaration.descriptor}"
 
     override fun visitProperty(declaration: IrProperty, data: Nothing?): String =
-            "PROPERTY ${declaration.descriptor}"
+        "PROPERTY ${declaration.descriptor}"
 
     override fun visitField(declaration: IrField, data: Nothing?): String =
-            "FIELD ${declaration.descriptor}"
+        "FIELD ${declaration.descriptor}"
 
     override fun visitClass(declaration: IrClass, data: Nothing?): String =
-            "CLASS ${declaration.descriptor}"
-
-    override fun visitTypeAlias(declaration: IrTypeAlias, data: Nothing?): String =
-            "TYPEALIAS ${declaration.descriptor} type=${declaration.descriptor.underlyingType.render()}"
+        "CLASS ${declaration.descriptor}"
 
     override fun visitVariable(declaration: IrVariable, data: Nothing?): String =
-            "VAR ${declaration.descriptor}"
+        "VAR ${declaration.descriptor}"
 
     override fun visitEnumEntry(declaration: IrEnumEntry, data: Nothing?): String =
-            "ENUM_ENTRY ${declaration.descriptor}"
+        "ENUM_ENTRY ${declaration.descriptor}"
 
     override fun visitAnonymousInitializer(declaration: IrAnonymousInitializer, data: Nothing?): String =
-            "ANONYMOUS_INITIALIZER ${declaration.descriptor}"
+        "ANONYMOUS_INITIALIZER ${declaration.descriptor}"
 
     override fun visitLocalDelegatedProperty(declaration: IrLocalDelegatedProperty, data: Nothing?): String =
-            "LOCAL_DELEGATED_PROPERTY ${declaration.descriptor}"
+        "LOCAL_DELEGATED_PROPERTY ${declaration.descriptor}"
 
     override fun visitExpressionBody(body: IrExpressionBody, data: Nothing?): String =
-            "EXPRESSION_BODY"
+        "EXPRESSION_BODY"
 
     override fun visitBlockBody(body: IrBlockBody, data: Nothing?): String =
-            "BLOCK_BODY"
+        "BLOCK_BODY"
 
     override fun visitSyntheticBody(body: IrSyntheticBody, data: Nothing?): String =
-            "SYNTHETIC_BODY kind=${body.kind}"
+        "SYNTHETIC_BODY kind=${body.kind}"
 
     override fun visitExpression(expression: IrExpression, data: Nothing?): String =
-            "? ${expression.javaClass.simpleName} type=${expression.type.render()}"
+        "? ${expression.javaClass.simpleName} type=${expression.type.render()}"
 
     override fun <T> visitConst(expression: IrConst<T>, data: Nothing?): String =
-            "CONST ${expression.kind} type=${expression.type.render()} value='${expression.value}'"
+        "CONST ${expression.kind} type=${expression.type.render()} value='${expression.value}'"
 
     override fun visitVararg(expression: IrVararg, data: Nothing?): String =
-            "VARARG type=${expression.type} varargElementType=${expression.varargElementType}"
+        "VARARG type=${expression.type} varargElementType=${expression.varargElementType}"
 
     override fun visitSpreadElement(spread: IrSpreadElement, data: Nothing?): String =
-            "SPREAD_ELEMENT"
+        "SPREAD_ELEMENT"
 
     override fun visitBlock(expression: IrBlock, data: Nothing?): String =
-            "BLOCK type=${expression.type.render()} origin=${expression.origin}"
+        "BLOCK type=${expression.type.render()} origin=${expression.origin}"
 
     override fun visitComposite(expression: IrComposite, data: Nothing?): String =
-            "COMPOSITE type=${expression.type.render()} origin=${expression.origin}"
+        "COMPOSITE type=${expression.type.render()} origin=${expression.origin}"
 
     override fun visitReturn(expression: IrReturn, data: Nothing?): String =
-            "RETURN type=${expression.type.render()} from='${expression.returnTarget}'"
+        "RETURN type=${expression.type.render()} from='${expression.returnTarget}'"
 
     override fun visitCall(expression: IrCall, data: Nothing?): String =
-            "CALL '${expression.descriptor}' ${expression.renderSuperQualifier()}" +
-                    "type=${expression.type.render()} origin=${expression.origin}"
+        "CALL '${expression.symbol.descriptor}' ${expression.renderSuperQualifier()}" +
+                "type=${expression.type.render()} origin=${expression.origin}"
 
     private fun IrCall.renderSuperQualifier(): String =
-            superQualifier?.let { "superQualifier=${it.name} " } ?: ""
+        superQualifierSymbol?.let { "superQualifier=${it.owner.name} " } ?: ""
 
     override fun visitDelegatingConstructorCall(expression: IrDelegatingConstructorCall, data: Nothing?): String =
-            "DELEGATING_CONSTRUCTOR_CALL '${expression.descriptor}'"
+        "DELEGATING_CONSTRUCTOR_CALL '${expression.symbol.descriptor}'"
 
     override fun visitEnumConstructorCall(expression: IrEnumConstructorCall, data: Nothing?): String =
-            "ENUM_CONSTRUCTOR_CALL '${expression.descriptor}'"
+        "ENUM_CONSTRUCTOR_CALL '${expression.symbol.descriptor}'"
 
     override fun visitInstanceInitializerCall(expression: IrInstanceInitializerCall, data: Nothing?): String =
-            "INSTANCE_INITIALIZER_CALL classDescriptor='${expression.classDescriptor}'"
+        "INSTANCE_INITIALIZER_CALL classDescriptor='${expression.classDescriptor}'"
 
     override fun visitGetValue(expression: IrGetValue, data: Nothing?): String =
-            "GET_VAR '${expression.descriptor}' type=${expression.type.render()} origin=${expression.origin}"
+        "GET_VAR '${expression.symbol.descriptor}' type=${expression.type.render()} origin=${expression.origin}"
 
     override fun visitSetVariable(expression: IrSetVariable, data: Nothing?): String =
-            "SET_VAR '${expression.descriptor}' type=${expression.type.render()} origin=${expression.origin}"
+        "SET_VAR '${expression.symbol.descriptor}' type=${expression.type.render()} origin=${expression.origin}"
 
     override fun visitGetField(expression: IrGetField, data: Nothing?): String =
-            "GET_FIELD '${expression.descriptor}' type=${expression.type.render()} origin=${expression.origin}"
+        "GET_FIELD '${expression.symbol.descriptor}' type=${expression.type.render()} origin=${expression.origin}"
 
     override fun visitSetField(expression: IrSetField, data: Nothing?): String =
-            "SET_FIELD '${expression.descriptor}' type=${expression.type.render()} origin=${expression.origin}"
+        "SET_FIELD '${expression.symbol.descriptor}' type=${expression.type.render()} origin=${expression.origin}"
 
     override fun visitGetObjectValue(expression: IrGetObjectValue, data: Nothing?): String =
-            "GET_OBJECT '${expression.descriptor}' type=${expression.type.render()}"
+        "GET_OBJECT '${expression.symbol.descriptor}' type=${expression.type.render()}"
 
     override fun visitGetEnumValue(expression: IrGetEnumValue, data: Nothing?): String =
-            "GET_ENUM '${expression.descriptor}' type=${expression.type.render()}"
+        "GET_ENUM '${expression.symbol.descriptor}' type=${expression.type.render()}"
 
     override fun visitStringConcatenation(expression: IrStringConcatenation, data: Nothing?): String =
-            "STRING_CONCATENATION type=${expression.type.render()}"
+        "STRING_CONCATENATION type=${expression.type.render()}"
 
     override fun visitTypeOperator(expression: IrTypeOperatorCall, data: Nothing?): String =
-            "TYPE_OP origin=${expression.operator} typeOperand=${expression.typeOperand.render()}"
+        "TYPE_OP origin=${expression.operator} typeOperand=${expression.typeOperand.render()}"
 
     override fun visitWhen(expression: IrWhen, data: Nothing?): String =
-            "WHEN type=${expression.type.render()} origin=${expression.origin}"
+        "WHEN type=${expression.type.render()} origin=${expression.origin}"
 
     override fun visitBranch(branch: IrBranch, data: Nothing?): String =
-            "BRANCH"
+        "BRANCH"
 
     override fun visitWhileLoop(loop: IrWhileLoop, data: Nothing?): String =
-            "WHILE label=${loop.label} origin=${loop.origin}"
+        "WHILE label=${loop.label} origin=${loop.origin}"
 
     override fun visitDoWhileLoop(loop: IrDoWhileLoop, data: Nothing?): String =
-            "DO_WHILE label=${loop.label} origin=${loop.origin}"
+        "DO_WHILE label=${loop.label} origin=${loop.origin}"
 
     override fun visitBreak(jump: IrBreak, data: Nothing?): String =
-            "BREAK label=${jump.label} loop.label=${jump.loop.label}"
+        "BREAK label=${jump.label} loop.label=${jump.loop.label}"
 
     override fun visitContinue(jump: IrContinue, data: Nothing?): String =
-            "CONTINUE label=${jump.label} loop.label=${jump.loop.label}"
+        "CONTINUE label=${jump.label} loop.label=${jump.loop.label}"
 
     override fun visitThrow(expression: IrThrow, data: Nothing?): String =
-            "THROW type=${expression.type.render()}"
+        "THROW type=${expression.type.render()}"
 
     override fun visitCallableReference(expression: IrCallableReference, data: Nothing?): String =
-            "CALLABLE_REFERENCE '${expression.descriptor}' type=${expression.type.render()} origin=${expression.origin}"
+        "CALLABLE_REFERENCE '${expression.symbol.descriptor}' type=${expression.type.render()} origin=${expression.origin}"
 
     override fun visitClassReference(expression: IrClassReference, data: Nothing?): String =
-            "CLASS_REFERENCE '${expression.descriptor}' type=${expression.type.render()}"
+        "CLASS_REFERENCE '${expression.symbol.descriptor}' type=${expression.type.render()}"
 
     override fun visitGetClass(expression: IrGetClass, data: Nothing?): String =
-            "GET_CLASS type=${expression.type.render()}"
+        "GET_CLASS type=${expression.type.render()}"
 
     override fun visitTry(aTry: IrTry, data: Nothing?): String =
-            "TRY type=${aTry.type.render()}"
+        "TRY type=${aTry.type.render()}"
 
     override fun visitCatch(aCatch: IrCatch, data: Nothing?): String =
-            "CATCH parameter=${aCatch.parameter.ref()}"
+        "CATCH parameter=${aCatch.parameter.ref()}"
 
     override fun visitErrorDeclaration(declaration: IrErrorDeclaration, data: Nothing?): String =
-            "ERROR_DECL ${declaration.descriptor.javaClass.simpleName} ${declaration.descriptor.ref()}"
+        "ERROR_DECL ${declaration.descriptor.javaClass.simpleName} ${declaration.descriptor.ref()}"
 
     override fun visitErrorExpression(expression: IrErrorExpression, data: Nothing?): String =
-            "ERROR_EXPR '${expression.description}' type=${expression.type.render()}"
+        "ERROR_EXPR '${expression.description}' type=${expression.type.render()}"
 
     override fun visitErrorCallExpression(expression: IrErrorCallExpression, data: Nothing?): String =
-            "ERROR_CALL '${expression.description}' type=${expression.type.render()}"
+        "ERROR_CALL '${expression.description}' type=${expression.type.render()}"
 
     companion object {
         val DECLARATION_RENDERER = DescriptorRenderer.withOptions {
@@ -181,26 +185,21 @@ class RenderIrElementWithDescriptorsVisitor : IrElementVisitor<String, Nothing?>
         val REFERENCE_RENDERER = DescriptorRenderer.ONLY_NAMES_WITH_SHORT_TYPES
 
         internal fun IrDeclaration.name(): String =
-                descriptor.let { it.name.toString() }
-
-        internal fun IrDeclaration.renderDeclared(): String =
-                DECLARATION_RENDERER.render(this.descriptor)
+            descriptor.let { it.name.toString() }
 
         internal fun DeclarationDescriptor.ref(): String =
-                if (this is ReceiverParameterDescriptor)
-                    "<receiver: ${containingDeclaration.ref()}>"
-                else
-                    REFERENCE_RENDERER.render(this)
+            if (this is ReceiverParameterDescriptor)
+                "<receiver: ${containingDeclaration.ref()}>"
+            else
+                REFERENCE_RENDERER.render(this)
 
         internal fun KotlinType.render(): String =
-                DECLARATION_RENDERER.renderType(this)
+            DECLARATION_RENDERER.renderType(this)
 
-        internal fun IrDeclaration.renderOrigin(): String =
-                if (origin != IrDeclarationOrigin.DEFINED) origin.toString() + " " else ""
     }
 }
 
-class DumpIrTreeWithDescriptorsVisitor(out: Appendable): IrElementVisitor<Unit, String> {
+class DumpIrTreeWithDescriptorsVisitor(out: Appendable) : IrElementVisitor<Unit, String> {
     val printer = Printer(out, "  ")
     val elementRenderer = RenderIrElementWithDescriptorsVisitor()
 
@@ -217,11 +216,11 @@ class DumpIrTreeWithDescriptorsVisitor(out: Appendable): IrElementVisitor<Unit, 
 
     override fun visitFile(declaration: IrFile, data: String) {
         declaration.dumpLabeledElementWith(data) {
-            if (declaration.fileAnnotations.isNotEmpty()) {
-                printer.println("fileAnnotations:")
+            if (declaration.annotations.isNotEmpty()) {
+                printer.println("annotations:")
                 indented {
-                    declaration.fileAnnotations.forEach {
-                        printer.println(ANNOTATIONS_RENDERER.renderAnnotation(it))
+                    declaration.annotations.forEach {
+                        it.accept(this, "")
                     }
                 }
             }
@@ -273,19 +272,21 @@ class DumpIrTreeWithDescriptorsVisitor(out: Appendable): IrElementVisitor<Unit, 
         expression.dumpLabeledElementWith(data) {
             dumpTypeArguments(expression)
 
+            val descriptor = expression.symbol.descriptor as CallableDescriptor
             expression.dispatchReceiver?.accept(this, "\$this")
             expression.extensionReceiver?.accept(this, "\$receiver")
-            for (valueParameter in expression.descriptor.valueParameters) {
+            for (valueParameter in descriptor.valueParameters) {
                 expression.getValueArgument(valueParameter.index)?.accept(this, valueParameter.name.asString())
             }
         }
     }
 
     private fun dumpTypeArguments(expression: IrMemberAccessExpression) {
-        for (typeParameter in expression.descriptor.original.typeParameters) {
+        val descriptor = expression.symbol.descriptor as CallableDescriptor
+        for (typeParameter in descriptor.original.typeParameters) {
             val typeArgument = expression.getTypeArgument(typeParameter) ?: continue
             val renderedParameter = DescriptorRenderer.ONLY_NAMES_WITH_SHORT_TYPES.render(typeParameter)
-            val renderedType = DescriptorRenderer.ONLY_NAMES_WITH_SHORT_TYPES.renderType(typeArgument)
+            val renderedType = typeArgument.render()
             printer.println("$renderedParameter: $renderedType")
         }
     }
@@ -361,5 +362,5 @@ class DumpIrTreeWithDescriptorsVisitor(out: Appendable): IrElementVisitor<Unit, 
     }
 
     private fun String.withLabel(label: String) =
-            if (label.isEmpty()) this else "$label: $this"
+        if (label.isEmpty()) this else "$label: $this"
 }

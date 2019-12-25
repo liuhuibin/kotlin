@@ -16,157 +16,57 @@
 
 package org.jetbrains.kotlin.idea.scratch.compile
 
-import com.intellij.execution.configurations.GeneralCommandLine
-import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.execution.process.ProcessOutput
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.compiler.ex.CompilerPathsEx
-import com.intellij.openapi.module.Module
-import com.intellij.openapi.roots.OrderEnumerator
-import com.intellij.openapi.util.io.FileUtil
 import com.intellij.psi.PsiElement
-import org.jetbrains.kotlin.codegen.ClassBuilderFactories
-import org.jetbrains.kotlin.codegen.CompilationErrorHandler
-import org.jetbrains.kotlin.codegen.KotlinCodegenFacade
-import org.jetbrains.kotlin.codegen.filterClassFiles
-import org.jetbrains.kotlin.codegen.state.GenerationState
-import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.console.KotlinConsoleKeeper
 import org.jetbrains.kotlin.diagnostics.Severity
 import org.jetbrains.kotlin.diagnostics.rendering.DefaultErrorMessages
 import org.jetbrains.kotlin.idea.caches.resolve.analyzeWithAllCompilerChecks
-import org.jetbrains.kotlin.idea.caches.resolve.getResolutionFacade
-import org.jetbrains.kotlin.idea.debugger.DebuggerUtils
 import org.jetbrains.kotlin.idea.refactoring.getLineNumber
 import org.jetbrains.kotlin.idea.scratch.*
 import org.jetbrains.kotlin.idea.scratch.output.ScratchOutput
 import org.jetbrains.kotlin.idea.scratch.output.ScratchOutputType
 import org.jetbrains.kotlin.idea.util.application.runReadAction
-import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.psi.KtPsiFactory
-import org.jetbrains.kotlin.psi.KtScript
 import org.jetbrains.kotlin.psi.psiUtil.getElementTextWithContext
 import org.jetbrains.kotlin.resolve.AnalyzingUtils
-import java.io.File
 
 class KtCompilingExecutor(file: ScratchFile) : ScratchExecutor(file) {
+    private var session: KtScratchExecutionSession? = null
+
     override fun execute() {
-        val module = file.getModule() ?: return error("Module should be selected")
-        val psiFile = file.getPsiFile() as? KtFile ?: return error("Couldn't find KtFile for current editor")
+        handler.clear(file)
+        handler.onStart(file)
 
-        if (!checkForErrors(psiFile)) {
-            return error("Compilation Error")
-        }
-
-        val result = KtScratchSourceFileProcessor().process(file)
-        when (result) {
-            is KtScratchSourceFileProcessor.Result.Error -> return error(result.message)
-            is KtScratchSourceFileProcessor.Result.OK -> {
-                ApplicationManager.getApplication().invokeLater {
-                    LOG.printDebugMessage("After processing by KtScratchSourceFileProcessor:\n ${result.code}")
-
-                    val modifiedScratchSourceFile =
-                        KtPsiFactory(psiFile.project).createFileWithLightClassSupport("tmp.kt", result.code, psiFile)
-
-                    try {
-                        val tempDir = compileFileToTempDir(modifiedScratchSourceFile) ?: return@invokeLater
-
-                        try {
-                            val commandLine = createCommandLine(module, result.mainClassName, tempDir.path)
-
-                            LOG.printDebugMessage(commandLine.commandLineString)
-
-                            val handler = CapturingProcessHandler(commandLine)
-                            ProcessOutputParser().parse(handler.runProcess())
-                        } finally {
-                            tempDir.delete()
-                        }
-                    } catch (e: Throwable) {
-                        LOG.info(result.code, e)
-                        handlers.forEach { it.error(file, e.message ?: "Couldn't compile ${psiFile.name}") }
-                    } finally {
-                        handlers.forEach { it.onFinish(file) }
-                    }
-                }
-            }
+        session = KtScratchExecutionSession(file, this)
+        session?.execute {
+            handler.onFinish(file)
+            session = null
         }
     }
 
-    private fun compileFileToTempDir(psiFile: KtFile): File? {
-        if (!checkForErrors(psiFile)) return null
+    override fun stop() {
+        if (session == null) return
 
-        val resolutionFacade = psiFile.getResolutionFacade()
-        val (bindingContext, files) = DebuggerUtils.analyzeInlinedFunctions(resolutionFacade, psiFile, false)
-
-        LOG.printDebugMessage("Analyzed files: \n${files.joinToString("\n") { it.virtualFilePath }}")
-
-        val generateClassFilter = object : GenerationState.GenerateClassFilter() {
-            override fun shouldGeneratePackagePart(ktFile: KtFile) = ktFile == psiFile
-            override fun shouldAnnotateClass(processingClassOrObject: KtClassOrObject) = true
-            override fun shouldGenerateClass(processingClassOrObject: KtClassOrObject) = processingClassOrObject.containingKtFile == psiFile
-            override fun shouldGenerateScript(script: KtScript) = false
+        try {
+            session?.stop()
+        } finally {
+            handler.onFinish(file)
         }
-
-        val state = GenerationState.Builder(
-            file.project,
-            ClassBuilderFactories.BINARIES,
-            resolutionFacade.moduleDescriptor,
-            bindingContext,
-            files,
-            CompilerConfiguration.EMPTY
-        ).generateDeclaredClassFilter(generateClassFilter).build()
-
-        KotlinCodegenFacade.compileCorrectFiles(state, CompilationErrorHandler.THROW_EXCEPTION)
-
-        return writeClassFilesToTempDir(state)
     }
 
-    private fun writeClassFilesToTempDir(state: GenerationState): File {
-        val classFiles = state.factory.asList().filterClassFiles()
-
-        val dir = FileUtil.createTempDirectory("compile", "scratch")
-
-        LOG.printDebugMessage("Temp output dir: ${dir.path}")
-
-        for (classFile in classFiles) {
-            val tmpOutFile = File(dir, classFile.relativePath)
-            tmpOutFile.parentFile.mkdirs()
-            tmpOutFile.createNewFile()
-            tmpOutFile.writeBytes(classFile.asByteArray())
-
-            LOG.printDebugMessage("Generated class file: ${classFile.relativePath}")
-        }
-        return dir
-    }
-
-    private fun createCommandLine(module: Module, mainClassName: String, tempOutDir: String): GeneralCommandLine {
-        val javaParameters = KotlinConsoleKeeper.createJavaParametersWithSdk(module)
-        javaParameters.mainClass = mainClassName
-
-        val compiledModulePath = CompilerPathsEx.getOutputPaths(arrayOf(module)).toList()
-        val moduleDependencies = OrderEnumerator.orderEntries(module).recursively().pathsList.pathList
-
-        javaParameters.classPath.add(tempOutDir)
-        javaParameters.classPath.addAll(compiledModulePath)
-        javaParameters.classPath.addAll(moduleDependencies)
-
-        return javaParameters.toCommandLine()
-    }
-
-    private fun checkForErrors(psiFile: KtFile): Boolean {
+    fun checkForErrors(psiFile: KtFile, expressions: List<ScratchExpression>): Boolean {
         return runReadAction {
             try {
                 AnalyzingUtils.checkForSyntacticErrors(psiFile)
             } catch (e: IllegalArgumentException) {
-                handlers.forEach { it.error(file, e.message ?: "Couldn't compile ${psiFile.name}") }
+                errorOccurs(e.message ?: "Couldn't compile ${psiFile.name}", isFatal = true)
                 return@runReadAction false
             }
 
             val analysisResult = psiFile.analyzeWithAllCompilerChecks()
 
             if (analysisResult.isError()) {
-                handlers.forEach { it.error(file, analysisResult.error.message ?: "Couldn't compile ${psiFile.name}") }
+                errorOccurs(analysisResult.error.message ?: "Couldn't compile ${psiFile.name}", isFatal = true)
                 return@runReadAction false
             }
 
@@ -178,47 +78,47 @@ class KtCompilingExecutor(file: ScratchFile) : ScratchExecutor(file) {
                     val errorText = DefaultErrorMessages.render(diagnostic)
                     if (psiFile == scratchPsiFile) {
                         if (diagnostic.psiElement.containingFile == psiFile) {
-                            val scratchExpression = file.findExpression(diagnostic.psiElement)
+                            val scratchExpression = expressions.findExpression(diagnostic.psiElement)
                             if (scratchExpression == null) {
                                 LOG.error("Couldn't find expression to report error: ${diagnostic.psiElement.getElementTextWithContext()}")
-                                handlers.forEach { it.error(file, errorText) }
+                                handler.error(file, errorText)
 
                             } else {
-                                handlers.forEach { it.handle(file, scratchExpression, ScratchOutput(errorText, ScratchOutputType.ERROR)) }
+                                handler.handle(file, scratchExpression, ScratchOutput(errorText, ScratchOutputType.ERROR))
                             }
                         } else {
-                            handlers.forEach { it.error(file, errorText) }
+                            handler.error(file, errorText)
                         }
                     } else {
-                        handlers.forEach { it.error(file, errorText) }
+                        handler.error(file, errorText)
                     }
                 }
+                handler.onFinish(file)
                 return@runReadAction false
             }
             return@runReadAction true
         }
     }
 
-    private fun error(message: String) {
-        handlers.forEach { it.error(file, message) }
-        handlers.forEach { it.onFinish(file) }
+    fun parseOutput(processOutput: ProcessOutput, expressions: List<ScratchExpression>) {
+        ProcessOutputParser(expressions).parse(processOutput)
     }
 
-    private fun ScratchFile.findExpression(psiElement: PsiElement): ScratchExpression? {
+    private fun List<ScratchExpression>.findExpression(psiElement: PsiElement): ScratchExpression? {
         val elementLine = psiElement.getLineNumber()
-        return getExpressions().firstOrNull { elementLine in it.lineStart..it.lineEnd }
+        return runReadAction { firstOrNull { elementLine in it.lineStart..it.lineEnd } }
     }
 
-    private fun ScratchFile.findExpression(lineStart: Int, lineEnd: Int): ScratchExpression? {
-        return getExpressions().firstOrNull { it.lineStart == lineStart && it.lineEnd == lineEnd }
+    private fun List<ScratchExpression>.findExpression(lineStart: Int, lineEnd: Int): ScratchExpression? {
+        return runReadAction { firstOrNull { it.lineStart == lineStart && it.lineEnd == lineEnd } }
     }
 
-    private inner class ProcessOutputParser {
+    private inner class ProcessOutputParser(private val expressions: List<ScratchExpression>) {
         fun parse(processOutput: ProcessOutput) {
             val out = processOutput.stdout
             val err = processOutput.stderr
             if (err.isNotBlank()) {
-                handlers.forEach { it.error(file, err) }
+                handler.error(file, err)
             }
             if (out.isNotBlank()) {
                 parseStdOut(out)
@@ -239,25 +139,21 @@ class KtCompilingExecutor(file: ScratchFile) : ScratchExecutor(file) {
                     val lineWoPrefix = line.removePrefix(KtScratchSourceFileProcessor.GENERATED_OUTPUT_PREFIX)
                     if (isResultEnd(lineWoPrefix)) {
                         val extractedLineInfo = extractLineInfoFrom(lineWoPrefix)
-                                ?: return error("Couldn't extract line info from line: $lineWoPrefix")
+                            ?: return errorOccurs("Couldn't extract line info from line: $lineWoPrefix", isFatal = true)
                         val (startLine, endLine) = extractedLineInfo
-                        val scratchExpression = file.findExpression(startLine, endLine)
+                        val scratchExpression = expressions.findExpression(startLine, endLine)
                         if (scratchExpression == null) {
                             LOG.error(
                                 "Couldn't find expression with start line = $startLine, end line = $endLine.\n" +
-                                        file.getExpressions().joinToString("\n")
+                                        expressions.joinToString("\n")
                             )
                         } else {
                             userOutput.forEach { output ->
-                                handlers.forEach {
-                                    it.handle(file, scratchExpression, ScratchOutput(output, ScratchOutputType.OUTPUT))
-                                }
+                                handler.handle(file, scratchExpression, ScratchOutput(output, ScratchOutputType.OUTPUT))
                             }
 
                             results.forEach { result ->
-                                handlers.forEach {
-                                    it.handle(file, scratchExpression, ScratchOutput(result, ScratchOutputType.RESULT))
-                                }
+                                handler.handle(file, scratchExpression, ScratchOutput(result, ScratchOutputType.RESULT))
                             }
                         }
 

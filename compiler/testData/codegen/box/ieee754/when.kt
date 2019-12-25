@@ -1,5 +1,5 @@
 // !LANGUAGE: -ProperIeee754Comparisons
-// IGNORE_BACKEND: JS_IR
+// DONT_TARGET_EXACT_BACKEND: JS_IR
 
 fun box(): String {
     val plusZero: Any = 0.0

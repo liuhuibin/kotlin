@@ -17,10 +17,7 @@
 package org.jetbrains.kotlin.backend.common
 
 import org.jetbrains.kotlin.ir.IrElement
-import org.jetbrains.kotlin.ir.declarations.IrClass
-import org.jetbrains.kotlin.ir.declarations.IrDeclarationContainer
-import org.jetbrains.kotlin.ir.declarations.IrFile
-import org.jetbrains.kotlin.ir.declarations.IrFunction
+import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.IrBody
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
@@ -28,23 +25,45 @@ import org.jetbrains.kotlin.ir.visitors.acceptVoid
 
 interface FileLoweringPass {
     fun lower(irFile: IrFile)
+
+    object Empty : FileLoweringPass {
+        override fun lower(irFile: IrFile) {
+            // Do nothing
+        }
+    }
 }
 
-interface ClassLoweringPass {
+interface ClassLoweringPass : FileLoweringPass {
     fun lower(irClass: IrClass)
+
+    override fun lower(irFile: IrFile) = runOnFilePostfix(irFile)
 }
 
-interface DeclarationContainerLoweringPass {
+interface ScriptLoweringPass : FileLoweringPass {
+    fun lower(irScript: IrScript)
+
+    override fun lower(irFile: IrFile) = runOnFilePostfix(irFile)
+}
+
+interface DeclarationContainerLoweringPass : FileLoweringPass {
     fun lower(irDeclarationContainer: IrDeclarationContainer)
+
+    override fun lower(irFile: IrFile) = runOnFilePostfix(irFile)
 }
 
-interface FunctionLoweringPass {
+interface FunctionLoweringPass : FileLoweringPass {
     fun lower(irFunction: IrFunction)
+
+    override fun lower(irFile: IrFile) = runOnFilePostfix(irFile)
 }
 
-interface BodyLoweringPass {
+interface BodyLoweringPass : FileLoweringPass {
     fun lower(irBody: IrBody)
+
+    override fun lower(irFile: IrFile) = runOnFilePostfix(irFile)
 }
+
+fun FileLoweringPass.lower(moduleFragment: IrModuleFragment) = moduleFragment.files.forEach { lower(it) }
 
 fun ClassLoweringPass.runOnFilePostfix(irFile: IrFile) {
     irFile.acceptVoid(object : IrElementVisitorVoid {
@@ -59,15 +78,36 @@ fun ClassLoweringPass.runOnFilePostfix(irFile: IrFile) {
     })
 }
 
+fun ScriptLoweringPass.runOnFilePostfix(irFile: IrFile) {
+    irFile.acceptVoid(object : IrElementVisitorVoid {
+        override fun visitElement(element: IrElement) {
+            element.acceptChildrenVoid(this)
+        }
+
+        override fun visitScript(declaration: IrScript) {
+            declaration.acceptChildrenVoid(this)
+            lower(declaration)
+        }
+    })
+}
+
 fun DeclarationContainerLoweringPass.asClassLoweringPass() = object : ClassLoweringPass {
     override fun lower(irClass: IrClass) {
         this@asClassLoweringPass.lower(irClass)
     }
 }
 
+fun DeclarationContainerLoweringPass.asScriptLoweringPass() = object : ScriptLoweringPass {
+    override fun lower(irScript: IrScript) {
+        this@asScriptLoweringPass.lower(irScript)
+    }
+}
+
 fun DeclarationContainerLoweringPass.runOnFilePostfix(irFile: IrFile) {
     this.asClassLoweringPass().runOnFilePostfix(irFile)
-    this.lower(irFile)
+    this.asScriptLoweringPass().runOnFilePostfix(irFile)
+
+    this.lower(irFile as IrDeclarationContainer)
 }
 
 fun BodyLoweringPass.runOnFilePostfix(irFile: IrFile) {

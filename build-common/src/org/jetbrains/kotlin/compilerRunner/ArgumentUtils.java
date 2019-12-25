@@ -16,7 +16,7 @@
 
 package org.jetbrains.kotlin.compilerRunner;
 
-import com.intellij.util.containers.ContainerUtil;
+import kotlin.collections.CollectionsKt;
 import kotlin.jvm.JvmClassMappingKt;
 import kotlin.reflect.KClass;
 import kotlin.reflect.KProperty1;
@@ -24,8 +24,10 @@ import kotlin.reflect.KVisibility;
 import kotlin.reflect.full.KClasses;
 import kotlin.reflect.jvm.ReflectJvmMapping;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.cli.common.arguments.Argument;
 import org.jetbrains.kotlin.cli.common.arguments.CommonToolArguments;
+import org.jetbrains.kotlin.cli.common.arguments.InternalArgument;
 import org.jetbrains.kotlin.cli.common.arguments.ParseCommandLineArgumentsKt;
 import org.jetbrains.kotlin.utils.StringsKt;
 
@@ -46,7 +48,7 @@ public class ArgumentUtils {
         Class<? extends CommonToolArguments> argumentsClass = arguments.getClass();
         convertArgumentsToStringList(arguments, argumentsClass.newInstance(), JvmClassMappingKt.getKotlinClass(argumentsClass), result);
         result.addAll(arguments.getFreeArgs());
-        result.addAll(arguments.getInternalArguments());
+        result.addAll(CollectionsKt.map(arguments.getInternalArguments(), InternalArgument::getStringRepresentation));
         return result;
     }
 
@@ -58,7 +60,7 @@ public class ArgumentUtils {
             @NotNull List<String> result
     ) throws IllegalAccessException, InstantiationException, InvocationTargetException {
         for (KProperty1 property : KClasses.getMemberProperties(clazz)) {
-            Argument argument = ContainerUtil.findInstance(property.getAnnotations(), Argument.class);
+            Argument argument = findInstance(property.getAnnotations(), Argument.class);
             if (argument == null) continue;
 
             if (property.getVisibility() != KVisibility.PUBLIC) continue;
@@ -87,5 +89,15 @@ public class ArgumentUtils {
                 result.add(value.toString());
             }
         }
+    }
+
+    @Nullable
+    private static <T> T findInstance(Iterable<? super T> iterable, Class<T> clazz) {
+        for (Object item : iterable) {
+            if (clazz.isInstance(item)) {
+                return clazz.cast(item);
+            }
+        }
+        return null;
     }
 }

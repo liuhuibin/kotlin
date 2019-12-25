@@ -1,12 +1,11 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package test.collections
 
 import kotlin.test.*
-import kotlin.comparisons.*
 
 fun fibonacci(): Sequence<Int> {
     // fibonacci terms
@@ -152,6 +151,13 @@ public class SequenceTest {
         assertEquals("13, 21, 34, 55, 89, 144, 233, 377, 610, 987, ...", fibonacci().drop(7).joinToString(limit = 10))
         assertEquals("13, 21, 34, 55, 89, 144, 233, 377, 610, 987, ...", fibonacci().drop(3).drop(4).joinToString(limit = 10))
         assertFailsWith<IllegalArgumentException> { fibonacci().drop(-1) }
+
+        val dropMax = fibonacci().drop(Int.MAX_VALUE)
+        run @Suppress("UNUSED_VARIABLE") {
+            val dropMore = dropMax.drop(Int.MAX_VALUE)
+            val takeMore = dropMax.take(Int.MAX_VALUE)
+        }
+
     }
 
     @Test fun take() {
@@ -224,6 +230,11 @@ public class SequenceTest {
         seq.toList().let { expectedSingleChunk ->
             assertEquals(expectedSingleChunk, seq.chunked(size).single())
             assertEquals(expectedSingleChunk, seq.chunked(size + 3).single())
+            assertEquals(expectedSingleChunk, seq.chunked(Int.MAX_VALUE).single())
+        }
+
+        infiniteSeq.take(2).let { seq2 ->
+            assertEquals(seq2.toList(), seq2.chunked(Int.MAX_VALUE).single())
         }
 
         assertTrue(emptySequence<String>().chunked(3).none())
@@ -243,6 +254,16 @@ public class SequenceTest {
         result.take(10).forEachIndexed { windowIndex, window ->
             val startElement = windowIndex * 3
             assertEquals((startElement until startElement + 5).toList(), window)
+        }
+
+        infiniteSeq.take(3500).windowed(2000, 1000, partialWindows = true).forEachIndexed { windowIndex, window ->
+            val startElement = windowIndex * 1000
+            val elementCount = when (windowIndex) {
+                3 -> 500
+                2 -> 1500
+                else -> 2000
+            }
+            assertEquals((startElement until startElement + elementCount).toList(), window)
         }
 
         val size = 7
@@ -290,6 +311,24 @@ public class SequenceTest {
         }
 
         ensureIsIntermediate(source = sequenceOf(1, 2, 3)) { it.windowed(2, 1) }
+
+        // index overflow tests
+        for (partialWindows in listOf(true, false)) {
+
+            val windowed1 = seq.windowed(5, Int.MAX_VALUE, partialWindows)
+            assertEquals(seq.take(5).toList(), windowed1.single())
+            val windowed2 = seq.windowed(Int.MAX_VALUE, 5, partialWindows)
+            assertEquals(if (partialWindows) listOf(seq.toList(), listOf(5, 6)) else listOf(), windowed2.toList())
+            val windowed3 = seq.windowed(Int.MAX_VALUE, Int.MAX_VALUE, partialWindows)
+            assertEquals(if (partialWindows) listOf(seq.toList()) else listOf(), windowed3.toList())
+
+            val windowedTransform1 = seq.windowed(5, Int.MAX_VALUE, partialWindows) { it.joinToString("") }
+            assertEquals("01234", windowedTransform1.single())
+            val windowedTransform2 = seq.windowed(Int.MAX_VALUE, 5, partialWindows) { it.joinToString("") }
+            assertEquals(if (partialWindows) listOf("0123456", "56") else listOf(), windowedTransform2.toList())
+            val windowedTransform3 = seq.windowed(Int.MAX_VALUE, Int.MAX_VALUE, partialWindows) { it.joinToString("") }
+            assertEquals(if (partialWindows) listOf("0123456") else listOf(), windowedTransform3.toList())
+        }
     }
 
     @Test fun zip() {
@@ -541,6 +580,26 @@ public class SequenceTest {
     @Test fun sortedWith() {
         val comparator = compareBy { s: String -> s.reversed() }
         assertEquals(listOf("act", "wast", "test"), sequenceOf("act", "test", "wast").sortedWith(comparator).toList())
+    }
+
+    @Test fun associateWith() {
+        val items = sequenceOf("Alice", "Bob", "Carol")
+        val itemsWithTheirLength = items.associateWith { it.length }
+
+        assertEquals(mapOf("Alice" to 5, "Bob" to 3, "Carol" to 5), itemsWithTheirLength)
+
+        val updatedLength =
+            items.drop(1).associateWithTo(itemsWithTheirLength.toMutableMap()) { name -> name.toLowerCase().count { it in "aeuio" }}
+
+        assertEquals(mapOf("Alice" to 5, "Bob" to 1, "Carol" to 2), updatedLength)
+    }
+
+    @Test fun orEmpty() {
+        val s1: Sequence<Int>? = null
+        assertEquals(emptySequence(), s1.orEmpty())
+
+        val s2: Sequence<Int>? = sequenceOf(1)
+        assertEquals(s2, s2.orEmpty())
     }
 
     /*

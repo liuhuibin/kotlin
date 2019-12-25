@@ -1,22 +1,12 @@
 /*
- * Copyright 2010-2016 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.decompiler.textBuilder
 
 import com.intellij.openapi.util.TextRange
+import org.jetbrains.kotlin.contracts.description.ContractProviderKey
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.idea.decompiler.navigation.ByDescriptorIndexer
 import org.jetbrains.kotlin.name.FqName
@@ -28,9 +18,10 @@ import org.jetbrains.kotlin.resolve.DescriptorUtils.isEnumEntry
 import org.jetbrains.kotlin.resolve.descriptorUtil.secondaryConstructors
 import org.jetbrains.kotlin.types.isFlexible
 
-private val DECOMPILED_CODE_COMMENT = "/* compiled code */"
-private val DECOMPILED_COMMENT_FOR_PARAMETER = "/* = compiled code */"
-private val FLEXIBLE_TYPE_COMMENT = "/* platform type */"
+private const val DECOMPILED_CODE_COMMENT = "/* compiled code */"
+private const val DECOMPILED_COMMENT_FOR_PARAMETER = "/* = compiled code */"
+private const val FLEXIBLE_TYPE_COMMENT = "/* platform type */"
+private const val DECOMPILED_CONTRACT_STUB = "contract { /* compiled contract */ }"
 
 fun DescriptorRendererOptions.defaultDecompilerRendererOptions() {
     withDefinedIn = false
@@ -43,10 +34,10 @@ fun DescriptorRendererOptions.defaultDecompilerRendererOptions() {
 }
 
 fun buildDecompiledText(
-        packageFqName: FqName,
-        descriptors: List<DeclarationDescriptor>,
-        descriptorRenderer: DescriptorRenderer,
-        indexers: Collection<DecompiledTextIndexer<*>> = listOf(ByDescriptorIndexer)
+    packageFqName: FqName,
+    descriptors: List<DeclarationDescriptor>,
+    descriptorRenderer: DescriptorRenderer,
+    indexers: Collection<DecompiledTextIndexer<*>> = listOf(ByDescriptorIndexer)
 ): DecompiledText {
     val builder = StringBuilder()
 
@@ -73,8 +64,7 @@ fun buildDecompiledText(
             }
             builder.append(descriptor.name.asString())
             builder.append(if (lastEnumEntry!!) ";" else ",")
-        }
-        else {
+        } else {
             builder.append(descriptorRenderer.render(descriptor).replace("= ...", DECOMPILED_COMMENT_FOR_PARAMETER))
         }
         var endOffset = builder.length
@@ -89,26 +79,29 @@ fun buildDecompiledText(
         if (descriptor is FunctionDescriptor || descriptor is PropertyDescriptor) {
             if ((descriptor as MemberDescriptor).modality != Modality.ABSTRACT) {
                 if (descriptor is FunctionDescriptor) {
-                    builder.append(" { ").append(DECOMPILED_CODE_COMMENT).append(" }")
-                }
-                else {
+                    with(builder) {
+                        append(" { ")
+                        if (descriptor.getUserData(ContractProviderKey)?.getContractDescription() != null) {
+                            append(DECOMPILED_CONTRACT_STUB).append("; ")
+                        }
+                        append(DECOMPILED_CODE_COMMENT).append(" }")
+                    }
+                } else {
                     // descriptor instanceof PropertyDescriptor
                     builder.append(" ").append(DECOMPILED_CODE_COMMENT)
                 }
                 endOffset = builder.length
             }
-        }
-        else if (descriptor is ClassDescriptor && !isEnumEntry(descriptor)) {
+        } else if (descriptor is ClassDescriptor && !isEnumEntry(descriptor)) {
             builder.append(" {\n")
 
-            val subindent = indent + "    "
+            val subindent = "$indent    "
 
             var firstPassed = false
             fun newlineExceptFirst() {
                 if (firstPassed) {
                     builder.append("\n")
-                }
-                else {
+                } else {
                     firstPassed = true
                 }
             }
@@ -139,7 +132,8 @@ fun buildDecompiledText(
                 if (member is CallableMemberDescriptor
                     && member.kind != CallableMemberDescriptor.Kind.DECLARATION
                     //TODO: not synthesized and component like
-                    && !DataClassDescriptorResolver.isComponentLike(member.name)) {
+                    && !DataClassDescriptorResolver.isComponentLike(member.name)
+                ) {
                     continue
                 }
                 newlineExceptFirst()

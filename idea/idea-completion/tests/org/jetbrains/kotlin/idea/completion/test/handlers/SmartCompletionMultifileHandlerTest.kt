@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.completion.test.handlers
@@ -21,16 +10,31 @@ import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementPresentation
 import org.jetbrains.kotlin.idea.completion.test.COMPLETION_TEST_DATA_BASE_PATH
 import org.jetbrains.kotlin.idea.completion.test.KotlinCompletionTestCase
+import org.jetbrains.kotlin.test.JUnit3WithIdeaConfigurationRunner
+import org.junit.runner.RunWith
 import java.io.File
 
+@RunWith(JUnit3WithIdeaConfigurationRunner::class)
 class SmartCompletionMultifileHandlerTest : KotlinCompletionTestCase() {
-    fun testImportExtensionFunction() { doTest() }
+    fun testImportExtensionFunction() {
+        doTest()
+    }
 
-    fun testImportExtensionProperty() { doTest() }
+    fun testImportExtensionProperty() {
+        doTest()
+    }
 
-    fun testAnonymousObjectGenericJava() { doTest() }
+    fun testAnonymousObjectGenericJava() {
+        doTest()
+    }
 
-    fun testNestedSamAdapter() { doTest(lookupString = "Nested") }
+    fun testImportAnonymousObject() {
+        doTest()
+    }
+
+    fun testNestedSamAdapter() {
+        doTest(lookupString = "Nested")
+    }
 
     override fun setUp() {
         setType(CompletionType.SMART)
@@ -40,7 +44,7 @@ class SmartCompletionMultifileHandlerTest : KotlinCompletionTestCase() {
     private fun doTest(lookupString: String? = null, itemText: String? = null) {
         val fileName = getTestName(false)
 
-        val fileNames = listOf(fileName + "-1.kt", fileName + "-2.kt", fileName + ".java")
+        val fileNames = listOf("$fileName-1.kt", "$fileName-2.kt", "$fileName.java")
 
         configureByFiles(null, *fileNames.filter { File(testDataPath + it).exists() }.toTypedArray())
 
@@ -64,7 +68,7 @@ class SmartCompletionMultifileHandlerTest : KotlinCompletionTestCase() {
             }
         }
 
-        checkResultByFile(fileName + ".kt.after")
+        checkResultByFile("$fileName.kt.after")
     }
 
     override fun getTestDataPath() = File(COMPLETION_TEST_DATA_BASE_PATH, "/handlers/multifile/smart/").path + File.separator

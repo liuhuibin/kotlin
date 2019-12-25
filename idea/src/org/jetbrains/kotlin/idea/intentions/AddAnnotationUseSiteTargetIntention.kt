@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.intentions
@@ -133,13 +133,13 @@ private fun KtAnnotationEntry.applicableUseSiteTargets(): List<AnnotationUseSite
         if (chosenTarget.isNullOrBlank())
             targets.take(1)
         else
-            targets.filter { it.renderName == chosenTarget }.take(1)
+            targets.asSequence().filter { it.renderName == chosenTarget }.take(1).toList()
     } else {
         targets
     }
 }
 
-private fun KtAnnotationEntry.addUseSiteTarget(useSiteTarget: AnnotationUseSiteTarget, project: Project) {
+fun KtAnnotationEntry.addUseSiteTarget(useSiteTarget: AnnotationUseSiteTarget, project: Project) {
     project.executeWriteCommand("Add use-site target") {
         replace(KtPsiFactory(this).createAnnotationEntry("@${useSiteTarget.renderName}:$shortName${valueArgumentList?.text ?: ""}"))
     }

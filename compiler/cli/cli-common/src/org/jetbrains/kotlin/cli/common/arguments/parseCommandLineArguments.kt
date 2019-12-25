@@ -38,12 +38,12 @@ private const val ADVANCED_ARGUMENT_PREFIX = "-X"
 private const val FREE_ARGS_DELIMITER = "--"
 
 data class ArgumentParseErrors(
-    val unknownArgs: MutableList<String> = SmartList<String>(),
+    val unknownArgs: MutableList<String> = SmartList(),
 
-    val unknownExtraFlags: MutableList<String> = SmartList<String>(),
+    val unknownExtraFlags: MutableList<String> = SmartList(),
 
     // Names of extra (-X...) arguments which have been passed in an obsolete form ("-Xaaa bbb", instead of "-Xaaa=bbb")
-    val extraArgumentsPassedInObsoleteForm: MutableList<String> = SmartList<String>(),
+    val extraArgumentsPassedInObsoleteForm: MutableList<String> = SmartList(),
 
     // Non-boolean arguments which have been passed multiple times, possibly with different values.
     // The key in the map is the name of the argument, the value is the last passed value.
@@ -54,16 +54,20 @@ data class ArgumentParseErrors(
 
     var argumentWithoutValue: String? = null,
 
-    val argfileErrors: MutableList<String> = SmartList()
+    val argfileErrors: MutableList<String> = SmartList(),
+
+    // Reports from internal arguments parsers
+    val internalArgumentsParsingProblems: MutableList<String> = SmartList()
 )
 
 // Parses arguments into the passed [result] object. Errors related to the parsing will be collected into [CommonToolArguments.errors].
 fun <A : CommonToolArguments> parseCommandLineArguments(args: List<String>, result: A) {
-    val preprocessed = preprocessCommandLineArguments(args, result.errors)
-    parsePreprocessedCommandLineArguments(preprocessed, result)
+    val errors = result.errors ?: ArgumentParseErrors().also { result.errors = it }
+    val preprocessed = preprocessCommandLineArguments(args, errors)
+    parsePreprocessedCommandLineArguments(preprocessed, result, errors)
 }
 
-private fun <A : CommonToolArguments> parsePreprocessedCommandLineArguments(args: List<String>, result: A) {
+private fun <A : CommonToolArguments> parsePreprocessedCommandLineArguments(args: List<String>, result: A, errors: ArgumentParseErrors) {
     data class ArgumentField(val property: KMutableProperty1<A, Any?>, val argument: Argument)
 
     @Suppress("UNCHECKED_CAST")
@@ -73,7 +77,6 @@ private fun <A : CommonToolArguments> parsePreprocessedCommandLineArguments(args
         ArgumentField(property as KMutableProperty1<A, Any?>, argument)
     }
 
-    val errors = result.errors
     val visitedArgs = mutableSetOf<String>()
     var freeArgsStarted = false
 
@@ -108,7 +111,7 @@ private fun <A : CommonToolArguments> parsePreprocessedCommandLineArguments(args
     }
 
     val freeArgs = ArrayList<String>()
-    val internalArguments = ArrayList<String>()
+    val internalArguments = ArrayList<InternalArgument>()
 
     var i = 0
     loop@ while (i < args.size) {
@@ -132,7 +135,13 @@ private fun <A : CommonToolArguments> parsePreprocessedCommandLineArguments(args
             if (parser == null) {
                 errors.unknownExtraFlags += arg
             } else {
-                internalArguments.add(arg)
+                val newInternalArgument = parser.parseInternalArgument(arg, errors) ?: continue
+                // Manual language feature setting overrides the previous value of the same feature setting, if it exists.
+                internalArguments.removeIf {
+                    (it as? ManualLanguageFeatureSetting)?.languageFeature ==
+                            (newInternalArgument as? ManualLanguageFeatureSetting)?.languageFeature
+                }
+                internalArguments.add(newInternalArgument)
             }
 
             continue
@@ -183,7 +192,11 @@ private fun <A : CommonToolArguments> updateField(property: KMutableProperty1<A,
     when (property.returnType.classifier) {
         Boolean::class, String::class -> property.set(result, value)
         Array<String>::class -> {
-            val newElements = (value as String).split(delimiter).toTypedArray()
+            val newElements = if (delimiter.isEmpty()) {
+                arrayOf(value as String)
+            } else {
+                (value as String).split(delimiter).toTypedArray()
+            }
             @Suppress("UNCHECKED_CAST")
             val oldValue = property.get(result) as Array<String>?
             property.set(result, if (oldValue != null) arrayOf(*oldValue, *newElements) else newElements)
@@ -195,7 +208,8 @@ private fun <A : CommonToolArguments> updateField(property: KMutableProperty1<A,
 /**
  * @return error message if arguments are parsed incorrectly, null otherwise
  */
-fun validateArguments(errors: ArgumentParseErrors): String? {
+fun validateArguments(errors: ArgumentParseErrors?): String? {
+    if (errors == null) return null
     if (errors.argumentWithoutValue != null) {
         return "No value passed for argument ${errors.argumentWithoutValue}"
     }

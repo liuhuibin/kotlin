@@ -1,6 +1,7 @@
+// IGNORE_BACKEND_FIR: JVM_IR
+// KJS_WITH_FULL_RUNTIME
 // !LANGUAGE: +VariableDeclarationInWhenSubject
 // WITH_RUNTIME
-// IGNORE_BACKEND: JS, JS_IR
 
 fun sparse(x: Int): Int {
     return when (val xx = (x % 4) * 100) {

@@ -26,7 +26,7 @@ import com.intellij.psi.util.PsiTreeUtil;
 import kotlin.jvm.functions.Function1;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.kotlin.idea.refactoring.KotlinRefactoringUtilKt;
+import org.jetbrains.kotlin.idea.core.util.PsiLinesUtilsKt;
 import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
@@ -228,10 +228,14 @@ public class KotlinExpressionMover extends AbstractKotlinUpDownMover {
     }
 
     @Nullable
-    private static LineRange getExpressionTargetRange(@NotNull Editor editor, @NotNull PsiElement sibling, boolean down) {
-
-        PsiElement start = sibling;
-        PsiElement end = sibling;
+    private static LineRange getExpressionTargetRange(
+            @NotNull Editor editor,
+            @NotNull PsiElement elementToCheck,
+            @NotNull PsiElement sibling,
+            boolean down
+    ) {
+        @Nullable PsiElement start = sibling;
+        @Nullable PsiElement end = sibling;
 
         if (!down) {
             if (sibling instanceof KtIfExpression) {
@@ -350,7 +354,59 @@ public class KotlinExpressionMover extends AbstractKotlinUpDownMover {
             }
         }
 
+        if (!(elementToCheck instanceof PsiComment)) {
+            Pair<PsiElement, PsiElement> extended = extendForSiblingComments(start, end, sibling, editor, down);
+            if (extended != null) {
+                start = extended.first;
+                end = extended.second;
+            }
+        }
+
         return start != null && end != null ? new LineRange(start, end, editor.getDocument()) : null;
+    }
+
+    private static @Nullable Pair<PsiElement, PsiElement> extendForSiblingComments(
+            @Nullable PsiElement start, @Nullable PsiElement end, @NotNull PsiElement sibling,
+            @NotNull Editor editor, boolean down
+    ) {
+        if (!(start == end && start == sibling)) {
+            return null;
+        }
+
+        boolean hasUpdate = false;
+
+        PsiElement current = sibling;
+        while (true) {
+            int nextLine = getElementLine(current, editor, !down) + (down ? 1 : -1);
+
+            current = firstNonWhiteSibling(current, down);
+            if (!(current instanceof PsiComment)) {
+                break;
+            }
+
+            if (getElementLine(current, editor, down) != nextLine) {
+                // An empty line is between current element and next sibling
+                break;
+            }
+
+            hasUpdate = true;
+            if (down) {
+                end = current;
+            }
+            else {
+                start = current;
+            }
+        }
+
+        if (down && end instanceof PsiComment) {
+            PsiElement next = firstNonWhiteSibling(end, true);
+            if (getElementLine(next, editor, true) == getElementLine(end, editor, false) + 1) {
+                hasUpdate = true;
+                end = next;
+            }
+        }
+
+        return hasUpdate ? Pair.create(start, end) : null;
     }
 
     @Nullable
@@ -399,7 +455,7 @@ public class KotlinExpressionMover extends AbstractKotlinUpDownMover {
         }
 
         if (elementToCheck instanceof KtExpression || elementToCheck instanceof PsiComment) {
-            return getExpressionTargetRange(editor, sibling, down);
+            return getExpressionTargetRange(editor, elementToCheck, sibling, down);
         }
 
         if (elementToCheck instanceof KtWhenEntry) {
@@ -411,7 +467,7 @@ public class KotlinExpressionMover extends AbstractKotlinUpDownMover {
 
     @Override
     protected boolean checkSourceElement(@NotNull PsiElement element) {
-        return PsiTreeUtil.instanceOf(element, MOVABLE_ELEMENT_CLASSES);
+        return PsiTreeUtil.instanceOf(element, MOVABLE_ELEMENT_CLASSES) || element.getNode().getElementType() == KtTokens.SEMICOLON;
     }
 
     @Override
@@ -427,6 +483,10 @@ public class KotlinExpressionMover extends AbstractKotlinUpDownMover {
 
     @Nullable
     private static PsiElement getMovableElement(@NotNull PsiElement element, boolean lookRight) {
+        if (element.getNode().getElementType() == KtTokens.SEMICOLON) {
+            return element;
+        }
+
         //noinspection unchecked
         PsiElement movableElement = PsiUtilsKt.getParentOfTypesAndPredicate(
                 element,
@@ -481,7 +541,7 @@ public class KotlinExpressionMover extends AbstractKotlinUpDownMover {
         }
 
         if (whiteSpaceTestSubject instanceof PsiWhiteSpace) {
-            if (KotlinRefactoringUtilKt.isMultiLine(whiteSpaceTestSubject)) {
+            if (PsiLinesUtilsKt.isMultiLine(whiteSpaceTestSubject)) {
                 int nearLine = down ? sourceRange.endLine : sourceRange.startLine - 1;
 
                 info.toMove = sourceRange;
@@ -591,8 +651,8 @@ public class KotlinExpressionMover extends AbstractKotlinUpDownMover {
     @Override
     public void beforeMove(@NotNull Editor editor, @NotNull MoveInfo info, boolean down) {
         if (parametersOrArgsToMove != null) {
-            PsiElement element1 = parametersOrArgsToMove.first;
-            PsiElement element2 = parametersOrArgsToMove.second;
+            PsiElement element1 = getLastSiblingOfSameTypeInLine(parametersOrArgsToMove.first, editor);
+            PsiElement element2 = getLastSiblingOfSameTypeInLine(parametersOrArgsToMove.second, editor);
 
             fixCommaIfNeeded(element1, down && isLastOfItsKind(element2, true));
             fixCommaIfNeeded(element2, !down && isLastOfItsKind(element1, true));
@@ -600,5 +660,21 @@ public class KotlinExpressionMover extends AbstractKotlinUpDownMover {
             //noinspection ConstantConditions
             PsiDocumentManager.getInstance(editor.getProject()).doPostponedOperationsAndUnblockDocument(editor.getDocument());
         }
+    }
+
+    @NotNull
+    private static PsiElement getLastSiblingOfSameTypeInLine(@NotNull PsiElement element, @NotNull Editor editor) {
+        PsiElement lastElement = element;
+        int lineNumber = getElementLine(element, editor, true);
+        while (true) {
+            PsiElement nextElement = PsiTreeUtil.getNextSiblingOfType(lastElement, lastElement.getClass());
+            if (nextElement != null && getElementLine(nextElement, editor, true) == lineNumber) {
+                lastElement = nextElement;
+            }
+            else {
+                break;
+            }
+        }
+        return lastElement;
     }
 }

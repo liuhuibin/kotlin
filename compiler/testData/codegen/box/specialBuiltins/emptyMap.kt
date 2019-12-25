@@ -1,4 +1,5 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
+
 private object EmptyMap : Map<Any, Nothing> {
     override val size: Int get() = 0
     override fun isEmpty(): Boolean = true

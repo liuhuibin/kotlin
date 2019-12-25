@@ -19,24 +19,29 @@ package org.jetbrains.kotlin.idea.quickfix.expectactual
 import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
-import org.jetbrains.kotlin.descriptors.ClassDescriptor
+import com.intellij.psi.PsiElement
+import com.intellij.psi.codeStyle.CodeStyleManager
+import org.jetbrains.kotlin.descriptors.CallableMemberDescriptor
 import org.jetbrains.kotlin.diagnostics.Diagnostic
 import org.jetbrains.kotlin.diagnostics.DiagnosticFactory
 import org.jetbrains.kotlin.diagnostics.Errors
+import org.jetbrains.kotlin.idea.core.ShortenReferences
+import org.jetbrains.kotlin.idea.core.toDescriptor
 import org.jetbrains.kotlin.idea.quickfix.KotlinQuickFixAction
 import org.jetbrains.kotlin.idea.quickfix.KotlinSingleIntentionActionFactory
-import org.jetbrains.kotlin.psi.KtClassOrObject
-import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.psi.KtPsiFactory
+import org.jetbrains.kotlin.idea.quickfix.TypeAccessibilityChecker
+import org.jetbrains.kotlin.idea.refactoring.getExpressionShortText
+import org.jetbrains.kotlin.idea.util.module
+import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.createSmartPointer
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
+import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 
 class AddActualFix(
-        actualClassOrObject: KtClassOrObject,
-        expectedClassOrObject: KtClassOrObject
+    actualClassOrObject: KtClassOrObject,
+    missedDeclarations: List<KtDeclaration>
 ) : KotlinQuickFixAction<KtClassOrObject>(actualClassOrObject) {
-
-    private val expectedClassPointer = expectedClassOrObject.createSmartPointer()
+    private val missedDeclarationPointers = missedDeclarations.map { it.createSmartPointer() }
 
     override fun getFamilyName() = text
 
@@ -44,28 +49,59 @@ class AddActualFix(
 
     override fun invoke(project: Project, editor: Editor?, file: KtFile) {
         val element = element ?: return
-        val expectedClass = expectedClassPointer.element ?: return
         val factory = KtPsiFactory(element)
-        val pureActualClass = factory.generateClassOrObjectByExpectedClass(
-                project, expectedClass, actualNeeded = true, existingDeclarations = element.declarations
-        )
-        for (declaration in pureActualClass.declarations) {
-            element.addDeclaration(declaration)
+
+        val codeStyleManager = CodeStyleManager.getInstance(project)
+
+        fun PsiElement.clean() {
+            ShortenReferences.DEFAULT.process(codeStyleManager.reformat(this) as KtElement)
         }
-        val primaryConstructor = pureActualClass.primaryConstructor
-        if (element.primaryConstructor == null && primaryConstructor != null) {
-            element.addAfter(primaryConstructor, element.nameIdentifier)
+
+        val module = element.module ?: return
+        val checker = TypeAccessibilityChecker.create(project, module)
+        val errors = linkedMapOf<KtDeclaration, KotlinTypeInaccessibleException>()
+        for (missedDeclaration in missedDeclarationPointers.mapNotNull { it.element }) {
+            val actualDeclaration = try {
+                when (missedDeclaration) {
+                    is KtClassOrObject -> factory.generateClassOrObject(project, false, missedDeclaration, checker)
+                    is KtFunction, is KtProperty -> missedDeclaration.toDescriptor()?.safeAs<CallableMemberDescriptor>()?.let {
+                        generateCallable(project, false, missedDeclaration, it, element, checker = checker)
+                    }
+                    else -> null
+                } ?: continue
+            } catch (e: KotlinTypeInaccessibleException) {
+                errors += missedDeclaration to e
+                continue
+            }
+
+            if (actualDeclaration is KtPrimaryConstructor) {
+                if (element.primaryConstructor == null)
+                    element.addAfter(actualDeclaration, element.nameIdentifier).clean()
+            } else {
+                element.addDeclaration(actualDeclaration).clean()
+            }
+        }
+
+        if (errors.isNotEmpty()) {
+            val message = errors.entries.joinToString(
+                separator = "\n",
+                prefix = "Some types are not accessible:\n"
+            ) { (declaration, error) ->
+                getExpressionShortText(declaration) + " -> " + error.message
+            }
+            showInaccessibleDeclarationError(element, message, editor)
         }
     }
 
     companion object : KotlinSingleIntentionActionFactory() {
         override fun createAction(diagnostic: Diagnostic): IntentionAction? {
-            val incompatibleMap = DiagnosticFactory.cast(diagnostic, Errors.NO_ACTUAL_CLASS_MEMBER_FOR_EXPECTED_CLASS).b
-            val expectedClassDescriptor = incompatibleMap.firstOrNull()?.first?.containingDeclaration as? ClassDescriptor
-                                          ?: return null
-            val expectedClassOrObject = DescriptorToSourceUtils.descriptorToDeclaration(expectedClassDescriptor) as? KtClassOrObject
-                                        ?: return null
-            return (diagnostic.psiElement as? KtClassOrObject)?.let { AddActualFix(it, expectedClassOrObject) }
+            val missedDeclarations = DiagnosticFactory.cast(diagnostic, Errors.NO_ACTUAL_CLASS_MEMBER_FOR_EXPECTED_CLASS).b.mapNotNull {
+                DescriptorToSourceUtils.descriptorToDeclaration(it.first) as? KtDeclaration
+            }.ifEmpty { return null }
+
+            return (diagnostic.psiElement as? KtClassOrObject)?.let {
+                AddActualFix(it, missedDeclarations)
+            }
         }
     }
 }

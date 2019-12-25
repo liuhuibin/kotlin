@@ -1,6 +1,6 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
 // TODO: Enable when JS backend supports Java class library
-// IGNORE_BACKEND: JS, NATIVE
+// TARGET_BACKEND: JVM
 public class SomeClass() : java.lang.Object() {
 }
 

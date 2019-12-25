@@ -16,12 +16,14 @@
 
 package org.jetbrains.kotlin.resolve.calls.smartcasts
 
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.lexer.KtToken
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext
+import org.jetbrains.kotlin.resolve.DescriptorEquivalenceForOverrides
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall
 import org.jetbrains.kotlin.resolve.calls.callUtil.isSafeCall
@@ -58,9 +60,13 @@ interface IdentifierInfo {
         override val canBeBound
             get() = kind == STABLE_VALUE
 
-        override fun equals(other: Any?) = other is Variable && variable == other.variable
+        override fun equals(other: Any?) =
+            other is Variable &&
+                    DescriptorEquivalenceForOverrides.areCallableDescriptorsEquivalent(
+                        variable, other.variable, allowCopiesFromTheSameDeclaration = true
+                    )
 
-        override fun hashCode() = variable.hashCode()
+        override fun hashCode() = variable.name.hashCode() * 31 + variable.containingDeclaration.original.hashCode()
 
         override fun toString() = variable.toString()
     }
@@ -75,6 +81,10 @@ interface IdentifierInfo {
         override val kind = STABLE_VALUE
 
         override fun toString() = descriptor.toString()
+    }
+
+    data class EnumEntry(val descriptor: ClassDescriptor) : IdentifierInfo {
+        override val kind: DataFlowValue.Kind = STABLE_VALUE
     }
 
     class Qualified(
@@ -229,7 +239,14 @@ private fun getIdForSimpleNameExpression(
             }
         }
 
-        is PackageViewDescriptor, is ClassDescriptor -> IdentifierInfo.PackageOrClass(declarationDescriptor)
+        is ClassDescriptor -> {
+            if (declarationDescriptor.kind == ClassKind.ENUM_ENTRY && languageVersionSettings.supportsFeature(LanguageFeature.SoundSmartcastForEnumEntries))
+                IdentifierInfo.EnumEntry(declarationDescriptor)
+            else
+                IdentifierInfo.PackageOrClass(declarationDescriptor)
+        }
+
+        is PackageViewDescriptor -> IdentifierInfo.PackageOrClass(declarationDescriptor)
 
         else -> IdentifierInfo.NO
     }

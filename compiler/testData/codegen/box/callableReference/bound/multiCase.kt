@@ -1,4 +1,5 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
+// IGNORE_BACKEND: NATIVE
 class A(var v: Int) {
     fun f(x: Int) = x * v
 }

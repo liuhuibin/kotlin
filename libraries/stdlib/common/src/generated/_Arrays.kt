@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license 
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 @file:kotlin.jvm.JvmMultifileClass
@@ -13,12 +13,15 @@ package kotlin.collections
 // See: https://github.com/JetBrains/kotlin/tree/master/libraries/stdlib
 //
 
-import kotlin.*
-import kotlin.text.*
-import kotlin.comparisons.*
+import kotlin.random.*
+import kotlin.ranges.contains
+import kotlin.ranges.reversed
 
 /**
- * Returns 1st *element* from the collection.
+ * Returns 1st *element* from the array.
+ * 
+ * If the size of this array is less than 1, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun <T> Array<out T>.component1(): T {
@@ -26,7 +29,10 @@ public inline operator fun <T> Array<out T>.component1(): T {
 }
 
 /**
- * Returns 1st *element* from the collection.
+ * Returns 1st *element* from the array.
+ * 
+ * If the size of this array is less than 1, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun ByteArray.component1(): Byte {
@@ -34,7 +40,10 @@ public inline operator fun ByteArray.component1(): Byte {
 }
 
 /**
- * Returns 1st *element* from the collection.
+ * Returns 1st *element* from the array.
+ * 
+ * If the size of this array is less than 1, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun ShortArray.component1(): Short {
@@ -42,7 +51,10 @@ public inline operator fun ShortArray.component1(): Short {
 }
 
 /**
- * Returns 1st *element* from the collection.
+ * Returns 1st *element* from the array.
+ * 
+ * If the size of this array is less than 1, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun IntArray.component1(): Int {
@@ -50,7 +62,10 @@ public inline operator fun IntArray.component1(): Int {
 }
 
 /**
- * Returns 1st *element* from the collection.
+ * Returns 1st *element* from the array.
+ * 
+ * If the size of this array is less than 1, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun LongArray.component1(): Long {
@@ -58,7 +73,10 @@ public inline operator fun LongArray.component1(): Long {
 }
 
 /**
- * Returns 1st *element* from the collection.
+ * Returns 1st *element* from the array.
+ * 
+ * If the size of this array is less than 1, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun FloatArray.component1(): Float {
@@ -66,7 +84,10 @@ public inline operator fun FloatArray.component1(): Float {
 }
 
 /**
- * Returns 1st *element* from the collection.
+ * Returns 1st *element* from the array.
+ * 
+ * If the size of this array is less than 1, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun DoubleArray.component1(): Double {
@@ -74,7 +95,10 @@ public inline operator fun DoubleArray.component1(): Double {
 }
 
 /**
- * Returns 1st *element* from the collection.
+ * Returns 1st *element* from the array.
+ * 
+ * If the size of this array is less than 1, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun BooleanArray.component1(): Boolean {
@@ -82,7 +106,10 @@ public inline operator fun BooleanArray.component1(): Boolean {
 }
 
 /**
- * Returns 1st *element* from the collection.
+ * Returns 1st *element* from the array.
+ * 
+ * If the size of this array is less than 1, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun CharArray.component1(): Char {
@@ -90,7 +117,10 @@ public inline operator fun CharArray.component1(): Char {
 }
 
 /**
- * Returns 2nd *element* from the collection.
+ * Returns 2nd *element* from the array.
+ * 
+ * If the size of this array is less than 2, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun <T> Array<out T>.component2(): T {
@@ -98,7 +128,10 @@ public inline operator fun <T> Array<out T>.component2(): T {
 }
 
 /**
- * Returns 2nd *element* from the collection.
+ * Returns 2nd *element* from the array.
+ * 
+ * If the size of this array is less than 2, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun ByteArray.component2(): Byte {
@@ -106,7 +139,10 @@ public inline operator fun ByteArray.component2(): Byte {
 }
 
 /**
- * Returns 2nd *element* from the collection.
+ * Returns 2nd *element* from the array.
+ * 
+ * If the size of this array is less than 2, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun ShortArray.component2(): Short {
@@ -114,7 +150,10 @@ public inline operator fun ShortArray.component2(): Short {
 }
 
 /**
- * Returns 2nd *element* from the collection.
+ * Returns 2nd *element* from the array.
+ * 
+ * If the size of this array is less than 2, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun IntArray.component2(): Int {
@@ -122,7 +161,10 @@ public inline operator fun IntArray.component2(): Int {
 }
 
 /**
- * Returns 2nd *element* from the collection.
+ * Returns 2nd *element* from the array.
+ * 
+ * If the size of this array is less than 2, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun LongArray.component2(): Long {
@@ -130,7 +172,10 @@ public inline operator fun LongArray.component2(): Long {
 }
 
 /**
- * Returns 2nd *element* from the collection.
+ * Returns 2nd *element* from the array.
+ * 
+ * If the size of this array is less than 2, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun FloatArray.component2(): Float {
@@ -138,7 +183,10 @@ public inline operator fun FloatArray.component2(): Float {
 }
 
 /**
- * Returns 2nd *element* from the collection.
+ * Returns 2nd *element* from the array.
+ * 
+ * If the size of this array is less than 2, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun DoubleArray.component2(): Double {
@@ -146,7 +194,10 @@ public inline operator fun DoubleArray.component2(): Double {
 }
 
 /**
- * Returns 2nd *element* from the collection.
+ * Returns 2nd *element* from the array.
+ * 
+ * If the size of this array is less than 2, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun BooleanArray.component2(): Boolean {
@@ -154,7 +205,10 @@ public inline operator fun BooleanArray.component2(): Boolean {
 }
 
 /**
- * Returns 2nd *element* from the collection.
+ * Returns 2nd *element* from the array.
+ * 
+ * If the size of this array is less than 2, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun CharArray.component2(): Char {
@@ -162,7 +216,10 @@ public inline operator fun CharArray.component2(): Char {
 }
 
 /**
- * Returns 3rd *element* from the collection.
+ * Returns 3rd *element* from the array.
+ * 
+ * If the size of this array is less than 3, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun <T> Array<out T>.component3(): T {
@@ -170,7 +227,10 @@ public inline operator fun <T> Array<out T>.component3(): T {
 }
 
 /**
- * Returns 3rd *element* from the collection.
+ * Returns 3rd *element* from the array.
+ * 
+ * If the size of this array is less than 3, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun ByteArray.component3(): Byte {
@@ -178,7 +238,10 @@ public inline operator fun ByteArray.component3(): Byte {
 }
 
 /**
- * Returns 3rd *element* from the collection.
+ * Returns 3rd *element* from the array.
+ * 
+ * If the size of this array is less than 3, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun ShortArray.component3(): Short {
@@ -186,7 +249,10 @@ public inline operator fun ShortArray.component3(): Short {
 }
 
 /**
- * Returns 3rd *element* from the collection.
+ * Returns 3rd *element* from the array.
+ * 
+ * If the size of this array is less than 3, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun IntArray.component3(): Int {
@@ -194,7 +260,10 @@ public inline operator fun IntArray.component3(): Int {
 }
 
 /**
- * Returns 3rd *element* from the collection.
+ * Returns 3rd *element* from the array.
+ * 
+ * If the size of this array is less than 3, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun LongArray.component3(): Long {
@@ -202,7 +271,10 @@ public inline operator fun LongArray.component3(): Long {
 }
 
 /**
- * Returns 3rd *element* from the collection.
+ * Returns 3rd *element* from the array.
+ * 
+ * If the size of this array is less than 3, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun FloatArray.component3(): Float {
@@ -210,7 +282,10 @@ public inline operator fun FloatArray.component3(): Float {
 }
 
 /**
- * Returns 3rd *element* from the collection.
+ * Returns 3rd *element* from the array.
+ * 
+ * If the size of this array is less than 3, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun DoubleArray.component3(): Double {
@@ -218,7 +293,10 @@ public inline operator fun DoubleArray.component3(): Double {
 }
 
 /**
- * Returns 3rd *element* from the collection.
+ * Returns 3rd *element* from the array.
+ * 
+ * If the size of this array is less than 3, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun BooleanArray.component3(): Boolean {
@@ -226,7 +304,10 @@ public inline operator fun BooleanArray.component3(): Boolean {
 }
 
 /**
- * Returns 3rd *element* from the collection.
+ * Returns 3rd *element* from the array.
+ * 
+ * If the size of this array is less than 3, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun CharArray.component3(): Char {
@@ -234,7 +315,10 @@ public inline operator fun CharArray.component3(): Char {
 }
 
 /**
- * Returns 4th *element* from the collection.
+ * Returns 4th *element* from the array.
+ * 
+ * If the size of this array is less than 4, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun <T> Array<out T>.component4(): T {
@@ -242,7 +326,10 @@ public inline operator fun <T> Array<out T>.component4(): T {
 }
 
 /**
- * Returns 4th *element* from the collection.
+ * Returns 4th *element* from the array.
+ * 
+ * If the size of this array is less than 4, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun ByteArray.component4(): Byte {
@@ -250,7 +337,10 @@ public inline operator fun ByteArray.component4(): Byte {
 }
 
 /**
- * Returns 4th *element* from the collection.
+ * Returns 4th *element* from the array.
+ * 
+ * If the size of this array is less than 4, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun ShortArray.component4(): Short {
@@ -258,7 +348,10 @@ public inline operator fun ShortArray.component4(): Short {
 }
 
 /**
- * Returns 4th *element* from the collection.
+ * Returns 4th *element* from the array.
+ * 
+ * If the size of this array is less than 4, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun IntArray.component4(): Int {
@@ -266,7 +359,10 @@ public inline operator fun IntArray.component4(): Int {
 }
 
 /**
- * Returns 4th *element* from the collection.
+ * Returns 4th *element* from the array.
+ * 
+ * If the size of this array is less than 4, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun LongArray.component4(): Long {
@@ -274,7 +370,10 @@ public inline operator fun LongArray.component4(): Long {
 }
 
 /**
- * Returns 4th *element* from the collection.
+ * Returns 4th *element* from the array.
+ * 
+ * If the size of this array is less than 4, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun FloatArray.component4(): Float {
@@ -282,7 +381,10 @@ public inline operator fun FloatArray.component4(): Float {
 }
 
 /**
- * Returns 4th *element* from the collection.
+ * Returns 4th *element* from the array.
+ * 
+ * If the size of this array is less than 4, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun DoubleArray.component4(): Double {
@@ -290,7 +392,10 @@ public inline operator fun DoubleArray.component4(): Double {
 }
 
 /**
- * Returns 4th *element* from the collection.
+ * Returns 4th *element* from the array.
+ * 
+ * If the size of this array is less than 4, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun BooleanArray.component4(): Boolean {
@@ -298,7 +403,10 @@ public inline operator fun BooleanArray.component4(): Boolean {
 }
 
 /**
- * Returns 4th *element* from the collection.
+ * Returns 4th *element* from the array.
+ * 
+ * If the size of this array is less than 4, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun CharArray.component4(): Char {
@@ -306,7 +414,10 @@ public inline operator fun CharArray.component4(): Char {
 }
 
 /**
- * Returns 5th *element* from the collection.
+ * Returns 5th *element* from the array.
+ * 
+ * If the size of this array is less than 5, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun <T> Array<out T>.component5(): T {
@@ -314,7 +425,10 @@ public inline operator fun <T> Array<out T>.component5(): T {
 }
 
 /**
- * Returns 5th *element* from the collection.
+ * Returns 5th *element* from the array.
+ * 
+ * If the size of this array is less than 5, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun ByteArray.component5(): Byte {
@@ -322,7 +436,10 @@ public inline operator fun ByteArray.component5(): Byte {
 }
 
 /**
- * Returns 5th *element* from the collection.
+ * Returns 5th *element* from the array.
+ * 
+ * If the size of this array is less than 5, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun ShortArray.component5(): Short {
@@ -330,7 +447,10 @@ public inline operator fun ShortArray.component5(): Short {
 }
 
 /**
- * Returns 5th *element* from the collection.
+ * Returns 5th *element* from the array.
+ * 
+ * If the size of this array is less than 5, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun IntArray.component5(): Int {
@@ -338,7 +458,10 @@ public inline operator fun IntArray.component5(): Int {
 }
 
 /**
- * Returns 5th *element* from the collection.
+ * Returns 5th *element* from the array.
+ * 
+ * If the size of this array is less than 5, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun LongArray.component5(): Long {
@@ -346,7 +469,10 @@ public inline operator fun LongArray.component5(): Long {
 }
 
 /**
- * Returns 5th *element* from the collection.
+ * Returns 5th *element* from the array.
+ * 
+ * If the size of this array is less than 5, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun FloatArray.component5(): Float {
@@ -354,7 +480,10 @@ public inline operator fun FloatArray.component5(): Float {
 }
 
 /**
- * Returns 5th *element* from the collection.
+ * Returns 5th *element* from the array.
+ * 
+ * If the size of this array is less than 5, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun DoubleArray.component5(): Double {
@@ -362,7 +491,10 @@ public inline operator fun DoubleArray.component5(): Double {
 }
 
 /**
- * Returns 5th *element* from the collection.
+ * Returns 5th *element* from the array.
+ * 
+ * If the size of this array is less than 5, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun BooleanArray.component5(): Boolean {
@@ -370,7 +502,10 @@ public inline operator fun BooleanArray.component5(): Boolean {
 }
 
 /**
- * Returns 5th *element* from the collection.
+ * Returns 5th *element* from the array.
+ * 
+ * If the size of this array is less than 5, throws an [IndexOutOfBoundsException] except in Kotlin/JS
+ * where the behavior is unspecified.
  */
 @kotlin.internal.InlineOnly
 public inline operator fun CharArray.component5(): Char {
@@ -442,78 +577,71 @@ public operator fun CharArray.contains(element: Char): Boolean {
 
 /**
  * Returns an element at the given [index] or throws an [IndexOutOfBoundsException] if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAt
  */
-@kotlin.internal.InlineOnly
-public inline fun <T> Array<out T>.elementAt(index: Int): T {
-    return get(index)
-}
+public expect fun <T> Array<out T>.elementAt(index: Int): T
 
 /**
  * Returns an element at the given [index] or throws an [IndexOutOfBoundsException] if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAt
  */
-@kotlin.internal.InlineOnly
-public inline fun ByteArray.elementAt(index: Int): Byte {
-    return get(index)
-}
+public expect fun ByteArray.elementAt(index: Int): Byte
 
 /**
  * Returns an element at the given [index] or throws an [IndexOutOfBoundsException] if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAt
  */
-@kotlin.internal.InlineOnly
-public inline fun ShortArray.elementAt(index: Int): Short {
-    return get(index)
-}
+public expect fun ShortArray.elementAt(index: Int): Short
 
 /**
  * Returns an element at the given [index] or throws an [IndexOutOfBoundsException] if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAt
  */
-@kotlin.internal.InlineOnly
-public inline fun IntArray.elementAt(index: Int): Int {
-    return get(index)
-}
+public expect fun IntArray.elementAt(index: Int): Int
 
 /**
  * Returns an element at the given [index] or throws an [IndexOutOfBoundsException] if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAt
  */
-@kotlin.internal.InlineOnly
-public inline fun LongArray.elementAt(index: Int): Long {
-    return get(index)
-}
+public expect fun LongArray.elementAt(index: Int): Long
 
 /**
  * Returns an element at the given [index] or throws an [IndexOutOfBoundsException] if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAt
  */
-@kotlin.internal.InlineOnly
-public inline fun FloatArray.elementAt(index: Int): Float {
-    return get(index)
-}
+public expect fun FloatArray.elementAt(index: Int): Float
 
 /**
  * Returns an element at the given [index] or throws an [IndexOutOfBoundsException] if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAt
  */
-@kotlin.internal.InlineOnly
-public inline fun DoubleArray.elementAt(index: Int): Double {
-    return get(index)
-}
+public expect fun DoubleArray.elementAt(index: Int): Double
 
 /**
  * Returns an element at the given [index] or throws an [IndexOutOfBoundsException] if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAt
  */
-@kotlin.internal.InlineOnly
-public inline fun BooleanArray.elementAt(index: Int): Boolean {
-    return get(index)
-}
+public expect fun BooleanArray.elementAt(index: Int): Boolean
 
 /**
  * Returns an element at the given [index] or throws an [IndexOutOfBoundsException] if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAt
  */
-@kotlin.internal.InlineOnly
-public inline fun CharArray.elementAt(index: Int): Char {
-    return get(index)
-}
+public expect fun CharArray.elementAt(index: Int): Char
 
 /**
  * Returns an element at the given [index] or the result of calling the [defaultValue] function if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrElse
  */
 @kotlin.internal.InlineOnly
 public inline fun <T> Array<out T>.elementAtOrElse(index: Int, defaultValue: (Int) -> T): T {
@@ -522,6 +650,8 @@ public inline fun <T> Array<out T>.elementAtOrElse(index: Int, defaultValue: (In
 
 /**
  * Returns an element at the given [index] or the result of calling the [defaultValue] function if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrElse
  */
 @kotlin.internal.InlineOnly
 public inline fun ByteArray.elementAtOrElse(index: Int, defaultValue: (Int) -> Byte): Byte {
@@ -530,6 +660,8 @@ public inline fun ByteArray.elementAtOrElse(index: Int, defaultValue: (Int) -> B
 
 /**
  * Returns an element at the given [index] or the result of calling the [defaultValue] function if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrElse
  */
 @kotlin.internal.InlineOnly
 public inline fun ShortArray.elementAtOrElse(index: Int, defaultValue: (Int) -> Short): Short {
@@ -538,6 +670,8 @@ public inline fun ShortArray.elementAtOrElse(index: Int, defaultValue: (Int) -> 
 
 /**
  * Returns an element at the given [index] or the result of calling the [defaultValue] function if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrElse
  */
 @kotlin.internal.InlineOnly
 public inline fun IntArray.elementAtOrElse(index: Int, defaultValue: (Int) -> Int): Int {
@@ -546,6 +680,8 @@ public inline fun IntArray.elementAtOrElse(index: Int, defaultValue: (Int) -> In
 
 /**
  * Returns an element at the given [index] or the result of calling the [defaultValue] function if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrElse
  */
 @kotlin.internal.InlineOnly
 public inline fun LongArray.elementAtOrElse(index: Int, defaultValue: (Int) -> Long): Long {
@@ -554,6 +690,8 @@ public inline fun LongArray.elementAtOrElse(index: Int, defaultValue: (Int) -> L
 
 /**
  * Returns an element at the given [index] or the result of calling the [defaultValue] function if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrElse
  */
 @kotlin.internal.InlineOnly
 public inline fun FloatArray.elementAtOrElse(index: Int, defaultValue: (Int) -> Float): Float {
@@ -562,6 +700,8 @@ public inline fun FloatArray.elementAtOrElse(index: Int, defaultValue: (Int) -> 
 
 /**
  * Returns an element at the given [index] or the result of calling the [defaultValue] function if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrElse
  */
 @kotlin.internal.InlineOnly
 public inline fun DoubleArray.elementAtOrElse(index: Int, defaultValue: (Int) -> Double): Double {
@@ -570,6 +710,8 @@ public inline fun DoubleArray.elementAtOrElse(index: Int, defaultValue: (Int) ->
 
 /**
  * Returns an element at the given [index] or the result of calling the [defaultValue] function if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrElse
  */
 @kotlin.internal.InlineOnly
 public inline fun BooleanArray.elementAtOrElse(index: Int, defaultValue: (Int) -> Boolean): Boolean {
@@ -578,6 +720,8 @@ public inline fun BooleanArray.elementAtOrElse(index: Int, defaultValue: (Int) -
 
 /**
  * Returns an element at the given [index] or the result of calling the [defaultValue] function if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrElse
  */
 @kotlin.internal.InlineOnly
 public inline fun CharArray.elementAtOrElse(index: Int, defaultValue: (Int) -> Char): Char {
@@ -586,6 +730,8 @@ public inline fun CharArray.elementAtOrElse(index: Int, defaultValue: (Int) -> C
 
 /**
  * Returns an element at the given [index] or `null` if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrNull
  */
 @kotlin.internal.InlineOnly
 public inline fun <T> Array<out T>.elementAtOrNull(index: Int): T? {
@@ -594,6 +740,8 @@ public inline fun <T> Array<out T>.elementAtOrNull(index: Int): T? {
 
 /**
  * Returns an element at the given [index] or `null` if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrNull
  */
 @kotlin.internal.InlineOnly
 public inline fun ByteArray.elementAtOrNull(index: Int): Byte? {
@@ -602,6 +750,8 @@ public inline fun ByteArray.elementAtOrNull(index: Int): Byte? {
 
 /**
  * Returns an element at the given [index] or `null` if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrNull
  */
 @kotlin.internal.InlineOnly
 public inline fun ShortArray.elementAtOrNull(index: Int): Short? {
@@ -610,6 +760,8 @@ public inline fun ShortArray.elementAtOrNull(index: Int): Short? {
 
 /**
  * Returns an element at the given [index] or `null` if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrNull
  */
 @kotlin.internal.InlineOnly
 public inline fun IntArray.elementAtOrNull(index: Int): Int? {
@@ -618,6 +770,8 @@ public inline fun IntArray.elementAtOrNull(index: Int): Int? {
 
 /**
  * Returns an element at the given [index] or `null` if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrNull
  */
 @kotlin.internal.InlineOnly
 public inline fun LongArray.elementAtOrNull(index: Int): Long? {
@@ -626,6 +780,8 @@ public inline fun LongArray.elementAtOrNull(index: Int): Long? {
 
 /**
  * Returns an element at the given [index] or `null` if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrNull
  */
 @kotlin.internal.InlineOnly
 public inline fun FloatArray.elementAtOrNull(index: Int): Float? {
@@ -634,6 +790,8 @@ public inline fun FloatArray.elementAtOrNull(index: Int): Float? {
 
 /**
  * Returns an element at the given [index] or `null` if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrNull
  */
 @kotlin.internal.InlineOnly
 public inline fun DoubleArray.elementAtOrNull(index: Int): Double? {
@@ -642,6 +800,8 @@ public inline fun DoubleArray.elementAtOrNull(index: Int): Double? {
 
 /**
  * Returns an element at the given [index] or `null` if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrNull
  */
 @kotlin.internal.InlineOnly
 public inline fun BooleanArray.elementAtOrNull(index: Int): Boolean? {
@@ -650,6 +810,8 @@ public inline fun BooleanArray.elementAtOrNull(index: Int): Boolean? {
 
 /**
  * Returns an element at the given [index] or `null` if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Collections.Elements.elementAtOrNull
  */
 @kotlin.internal.InlineOnly
 public inline fun CharArray.elementAtOrNull(index: Int): Char? {
@@ -2050,6 +2212,213 @@ public inline fun CharArray.lastOrNull(predicate: (Char) -> Boolean): Char? {
 }
 
 /**
+ * Returns a random element from this array.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+@kotlin.internal.InlineOnly
+public inline fun <T> Array<out T>.random(): T {
+    return random(Random)
+}
+
+/**
+ * Returns a random element from this array.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+@kotlin.internal.InlineOnly
+public inline fun ByteArray.random(): Byte {
+    return random(Random)
+}
+
+/**
+ * Returns a random element from this array.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+@kotlin.internal.InlineOnly
+public inline fun ShortArray.random(): Short {
+    return random(Random)
+}
+
+/**
+ * Returns a random element from this array.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+@kotlin.internal.InlineOnly
+public inline fun IntArray.random(): Int {
+    return random(Random)
+}
+
+/**
+ * Returns a random element from this array.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+@kotlin.internal.InlineOnly
+public inline fun LongArray.random(): Long {
+    return random(Random)
+}
+
+/**
+ * Returns a random element from this array.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+@kotlin.internal.InlineOnly
+public inline fun FloatArray.random(): Float {
+    return random(Random)
+}
+
+/**
+ * Returns a random element from this array.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+@kotlin.internal.InlineOnly
+public inline fun DoubleArray.random(): Double {
+    return random(Random)
+}
+
+/**
+ * Returns a random element from this array.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+@kotlin.internal.InlineOnly
+public inline fun BooleanArray.random(): Boolean {
+    return random(Random)
+}
+
+/**
+ * Returns a random element from this array.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+@kotlin.internal.InlineOnly
+public inline fun CharArray.random(): Char {
+    return random(Random)
+}
+
+/**
+ * Returns a random element from this array using the specified source of randomness.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+public fun <T> Array<out T>.random(random: Random): T {
+    if (isEmpty())
+        throw NoSuchElementException("Array is empty.")
+    return get(random.nextInt(size))
+}
+
+/**
+ * Returns a random element from this array using the specified source of randomness.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+public fun ByteArray.random(random: Random): Byte {
+    if (isEmpty())
+        throw NoSuchElementException("Array is empty.")
+    return get(random.nextInt(size))
+}
+
+/**
+ * Returns a random element from this array using the specified source of randomness.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+public fun ShortArray.random(random: Random): Short {
+    if (isEmpty())
+        throw NoSuchElementException("Array is empty.")
+    return get(random.nextInt(size))
+}
+
+/**
+ * Returns a random element from this array using the specified source of randomness.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+public fun IntArray.random(random: Random): Int {
+    if (isEmpty())
+        throw NoSuchElementException("Array is empty.")
+    return get(random.nextInt(size))
+}
+
+/**
+ * Returns a random element from this array using the specified source of randomness.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+public fun LongArray.random(random: Random): Long {
+    if (isEmpty())
+        throw NoSuchElementException("Array is empty.")
+    return get(random.nextInt(size))
+}
+
+/**
+ * Returns a random element from this array using the specified source of randomness.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+public fun FloatArray.random(random: Random): Float {
+    if (isEmpty())
+        throw NoSuchElementException("Array is empty.")
+    return get(random.nextInt(size))
+}
+
+/**
+ * Returns a random element from this array using the specified source of randomness.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+public fun DoubleArray.random(random: Random): Double {
+    if (isEmpty())
+        throw NoSuchElementException("Array is empty.")
+    return get(random.nextInt(size))
+}
+
+/**
+ * Returns a random element from this array using the specified source of randomness.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+public fun BooleanArray.random(random: Random): Boolean {
+    if (isEmpty())
+        throw NoSuchElementException("Array is empty.")
+    return get(random.nextInt(size))
+}
+
+/**
+ * Returns a random element from this array using the specified source of randomness.
+ * 
+ * @throws NoSuchElementException if this array is empty.
+ */
+@SinceKotlin("1.3")
+public fun CharArray.random(random: Random): Char {
+    if (isEmpty())
+        throw NoSuchElementException("Array is empty.")
+    return get(random.nextInt(size))
+}
+
+/**
  * Returns the single element, or throws an exception if the array is empty or has more than one element.
  */
 public fun <T> Array<out T>.single(): T {
@@ -2529,6 +2898,8 @@ public inline fun CharArray.singleOrNull(predicate: (Char) -> Boolean): Char? {
 /**
  * Returns a list containing all elements except first [n] elements.
  * 
+ * @throws IllegalArgumentException if [n] is negative.
+ * 
  * @sample samples.collections.Collections.Transformations.drop
  */
 public fun <T> Array<out T>.drop(n: Int): List<T> {
@@ -2538,6 +2909,8 @@ public fun <T> Array<out T>.drop(n: Int): List<T> {
 
 /**
  * Returns a list containing all elements except first [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.drop
  */
@@ -2549,6 +2922,8 @@ public fun ByteArray.drop(n: Int): List<Byte> {
 /**
  * Returns a list containing all elements except first [n] elements.
  * 
+ * @throws IllegalArgumentException if [n] is negative.
+ * 
  * @sample samples.collections.Collections.Transformations.drop
  */
 public fun ShortArray.drop(n: Int): List<Short> {
@@ -2558,6 +2933,8 @@ public fun ShortArray.drop(n: Int): List<Short> {
 
 /**
  * Returns a list containing all elements except first [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.drop
  */
@@ -2569,6 +2946,8 @@ public fun IntArray.drop(n: Int): List<Int> {
 /**
  * Returns a list containing all elements except first [n] elements.
  * 
+ * @throws IllegalArgumentException if [n] is negative.
+ * 
  * @sample samples.collections.Collections.Transformations.drop
  */
 public fun LongArray.drop(n: Int): List<Long> {
@@ -2578,6 +2957,8 @@ public fun LongArray.drop(n: Int): List<Long> {
 
 /**
  * Returns a list containing all elements except first [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.drop
  */
@@ -2589,6 +2970,8 @@ public fun FloatArray.drop(n: Int): List<Float> {
 /**
  * Returns a list containing all elements except first [n] elements.
  * 
+ * @throws IllegalArgumentException if [n] is negative.
+ * 
  * @sample samples.collections.Collections.Transformations.drop
  */
 public fun DoubleArray.drop(n: Int): List<Double> {
@@ -2598,6 +2981,8 @@ public fun DoubleArray.drop(n: Int): List<Double> {
 
 /**
  * Returns a list containing all elements except first [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.drop
  */
@@ -2609,6 +2994,8 @@ public fun BooleanArray.drop(n: Int): List<Boolean> {
 /**
  * Returns a list containing all elements except first [n] elements.
  * 
+ * @throws IllegalArgumentException if [n] is negative.
+ * 
  * @sample samples.collections.Collections.Transformations.drop
  */
 public fun CharArray.drop(n: Int): List<Char> {
@@ -2618,6 +3005,8 @@ public fun CharArray.drop(n: Int): List<Char> {
 
 /**
  * Returns a list containing all elements except last [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.drop
  */
@@ -2629,6 +3018,8 @@ public fun <T> Array<out T>.dropLast(n: Int): List<T> {
 /**
  * Returns a list containing all elements except last [n] elements.
  * 
+ * @throws IllegalArgumentException if [n] is negative.
+ * 
  * @sample samples.collections.Collections.Transformations.drop
  */
 public fun ByteArray.dropLast(n: Int): List<Byte> {
@@ -2638,6 +3029,8 @@ public fun ByteArray.dropLast(n: Int): List<Byte> {
 
 /**
  * Returns a list containing all elements except last [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.drop
  */
@@ -2649,6 +3042,8 @@ public fun ShortArray.dropLast(n: Int): List<Short> {
 /**
  * Returns a list containing all elements except last [n] elements.
  * 
+ * @throws IllegalArgumentException if [n] is negative.
+ * 
  * @sample samples.collections.Collections.Transformations.drop
  */
 public fun IntArray.dropLast(n: Int): List<Int> {
@@ -2658,6 +3053,8 @@ public fun IntArray.dropLast(n: Int): List<Int> {
 
 /**
  * Returns a list containing all elements except last [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.drop
  */
@@ -2669,6 +3066,8 @@ public fun LongArray.dropLast(n: Int): List<Long> {
 /**
  * Returns a list containing all elements except last [n] elements.
  * 
+ * @throws IllegalArgumentException if [n] is negative.
+ * 
  * @sample samples.collections.Collections.Transformations.drop
  */
 public fun FloatArray.dropLast(n: Int): List<Float> {
@@ -2678,6 +3077,8 @@ public fun FloatArray.dropLast(n: Int): List<Float> {
 
 /**
  * Returns a list containing all elements except last [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.drop
  */
@@ -2689,6 +3090,8 @@ public fun DoubleArray.dropLast(n: Int): List<Double> {
 /**
  * Returns a list containing all elements except last [n] elements.
  * 
+ * @throws IllegalArgumentException if [n] is negative.
+ * 
  * @sample samples.collections.Collections.Transformations.drop
  */
 public fun BooleanArray.dropLast(n: Int): List<Boolean> {
@@ -2698,6 +3101,8 @@ public fun BooleanArray.dropLast(n: Int): List<Boolean> {
 
 /**
  * Returns a list containing all elements except last [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.drop
  */
@@ -3781,7 +4186,7 @@ public fun CharArray.sliceArray(indices: Collection<Int>): CharArray {
 }
 
 /**
- * Returns a list containing elements at indices in the specified [indices] range.
+ * Returns an array containing elements at indices in the specified [indices] range.
  */
 public fun <T> Array<T>.sliceArray(indices: IntRange): Array<T> {
     if (indices.isEmpty()) return copyOfRange(0, 0)
@@ -3789,7 +4194,7 @@ public fun <T> Array<T>.sliceArray(indices: IntRange): Array<T> {
 }
 
 /**
- * Returns a list containing elements at indices in the specified [indices] range.
+ * Returns an array containing elements at indices in the specified [indices] range.
  */
 public fun ByteArray.sliceArray(indices: IntRange): ByteArray {
     if (indices.isEmpty()) return ByteArray(0)
@@ -3797,7 +4202,7 @@ public fun ByteArray.sliceArray(indices: IntRange): ByteArray {
 }
 
 /**
- * Returns a list containing elements at indices in the specified [indices] range.
+ * Returns an array containing elements at indices in the specified [indices] range.
  */
 public fun ShortArray.sliceArray(indices: IntRange): ShortArray {
     if (indices.isEmpty()) return ShortArray(0)
@@ -3805,7 +4210,7 @@ public fun ShortArray.sliceArray(indices: IntRange): ShortArray {
 }
 
 /**
- * Returns a list containing elements at indices in the specified [indices] range.
+ * Returns an array containing elements at indices in the specified [indices] range.
  */
 public fun IntArray.sliceArray(indices: IntRange): IntArray {
     if (indices.isEmpty()) return IntArray(0)
@@ -3813,7 +4218,7 @@ public fun IntArray.sliceArray(indices: IntRange): IntArray {
 }
 
 /**
- * Returns a list containing elements at indices in the specified [indices] range.
+ * Returns an array containing elements at indices in the specified [indices] range.
  */
 public fun LongArray.sliceArray(indices: IntRange): LongArray {
     if (indices.isEmpty()) return LongArray(0)
@@ -3821,7 +4226,7 @@ public fun LongArray.sliceArray(indices: IntRange): LongArray {
 }
 
 /**
- * Returns a list containing elements at indices in the specified [indices] range.
+ * Returns an array containing elements at indices in the specified [indices] range.
  */
 public fun FloatArray.sliceArray(indices: IntRange): FloatArray {
     if (indices.isEmpty()) return FloatArray(0)
@@ -3829,7 +4234,7 @@ public fun FloatArray.sliceArray(indices: IntRange): FloatArray {
 }
 
 /**
- * Returns a list containing elements at indices in the specified [indices] range.
+ * Returns an array containing elements at indices in the specified [indices] range.
  */
 public fun DoubleArray.sliceArray(indices: IntRange): DoubleArray {
     if (indices.isEmpty()) return DoubleArray(0)
@@ -3837,7 +4242,7 @@ public fun DoubleArray.sliceArray(indices: IntRange): DoubleArray {
 }
 
 /**
- * Returns a list containing elements at indices in the specified [indices] range.
+ * Returns an array containing elements at indices in the specified [indices] range.
  */
 public fun BooleanArray.sliceArray(indices: IntRange): BooleanArray {
     if (indices.isEmpty()) return BooleanArray(0)
@@ -3845,7 +4250,7 @@ public fun BooleanArray.sliceArray(indices: IntRange): BooleanArray {
 }
 
 /**
- * Returns a list containing elements at indices in the specified [indices] range.
+ * Returns an array containing elements at indices in the specified [indices] range.
  */
 public fun CharArray.sliceArray(indices: IntRange): CharArray {
     if (indices.isEmpty()) return CharArray(0)
@@ -3854,6 +4259,8 @@ public fun CharArray.sliceArray(indices: IntRange): CharArray {
 
 /**
  * Returns a list containing first [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.take
  */
@@ -3865,15 +4272,17 @@ public fun <T> Array<out T>.take(n: Int): List<T> {
     var count = 0
     val list = ArrayList<T>(n)
     for (item in this) {
-        if (count++ == n)
-            break
         list.add(item)
+        if (++count == n)
+            break
     }
     return list
 }
 
 /**
  * Returns a list containing first [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.take
  */
@@ -3885,15 +4294,17 @@ public fun ByteArray.take(n: Int): List<Byte> {
     var count = 0
     val list = ArrayList<Byte>(n)
     for (item in this) {
-        if (count++ == n)
-            break
         list.add(item)
+        if (++count == n)
+            break
     }
     return list
 }
 
 /**
  * Returns a list containing first [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.take
  */
@@ -3905,15 +4316,17 @@ public fun ShortArray.take(n: Int): List<Short> {
     var count = 0
     val list = ArrayList<Short>(n)
     for (item in this) {
-        if (count++ == n)
-            break
         list.add(item)
+        if (++count == n)
+            break
     }
     return list
 }
 
 /**
  * Returns a list containing first [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.take
  */
@@ -3925,15 +4338,17 @@ public fun IntArray.take(n: Int): List<Int> {
     var count = 0
     val list = ArrayList<Int>(n)
     for (item in this) {
-        if (count++ == n)
-            break
         list.add(item)
+        if (++count == n)
+            break
     }
     return list
 }
 
 /**
  * Returns a list containing first [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.take
  */
@@ -3945,15 +4360,17 @@ public fun LongArray.take(n: Int): List<Long> {
     var count = 0
     val list = ArrayList<Long>(n)
     for (item in this) {
-        if (count++ == n)
-            break
         list.add(item)
+        if (++count == n)
+            break
     }
     return list
 }
 
 /**
  * Returns a list containing first [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.take
  */
@@ -3965,15 +4382,17 @@ public fun FloatArray.take(n: Int): List<Float> {
     var count = 0
     val list = ArrayList<Float>(n)
     for (item in this) {
-        if (count++ == n)
-            break
         list.add(item)
+        if (++count == n)
+            break
     }
     return list
 }
 
 /**
  * Returns a list containing first [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.take
  */
@@ -3985,15 +4404,17 @@ public fun DoubleArray.take(n: Int): List<Double> {
     var count = 0
     val list = ArrayList<Double>(n)
     for (item in this) {
-        if (count++ == n)
-            break
         list.add(item)
+        if (++count == n)
+            break
     }
     return list
 }
 
 /**
  * Returns a list containing first [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.take
  */
@@ -4005,15 +4426,17 @@ public fun BooleanArray.take(n: Int): List<Boolean> {
     var count = 0
     val list = ArrayList<Boolean>(n)
     for (item in this) {
-        if (count++ == n)
-            break
         list.add(item)
+        if (++count == n)
+            break
     }
     return list
 }
 
 /**
  * Returns a list containing first [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.take
  */
@@ -4025,15 +4448,17 @@ public fun CharArray.take(n: Int): List<Char> {
     var count = 0
     val list = ArrayList<Char>(n)
     for (item in this) {
-        if (count++ == n)
-            break
         list.add(item)
+        if (++count == n)
+            break
     }
     return list
 }
 
 /**
  * Returns a list containing last [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.take
  */
@@ -4052,6 +4477,8 @@ public fun <T> Array<out T>.takeLast(n: Int): List<T> {
 /**
  * Returns a list containing last [n] elements.
  * 
+ * @throws IllegalArgumentException if [n] is negative.
+ * 
  * @sample samples.collections.Collections.Transformations.take
  */
 public fun ByteArray.takeLast(n: Int): List<Byte> {
@@ -4068,6 +4495,8 @@ public fun ByteArray.takeLast(n: Int): List<Byte> {
 
 /**
  * Returns a list containing last [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.take
  */
@@ -4086,6 +4515,8 @@ public fun ShortArray.takeLast(n: Int): List<Short> {
 /**
  * Returns a list containing last [n] elements.
  * 
+ * @throws IllegalArgumentException if [n] is negative.
+ * 
  * @sample samples.collections.Collections.Transformations.take
  */
 public fun IntArray.takeLast(n: Int): List<Int> {
@@ -4102,6 +4533,8 @@ public fun IntArray.takeLast(n: Int): List<Int> {
 
 /**
  * Returns a list containing last [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.take
  */
@@ -4120,6 +4553,8 @@ public fun LongArray.takeLast(n: Int): List<Long> {
 /**
  * Returns a list containing last [n] elements.
  * 
+ * @throws IllegalArgumentException if [n] is negative.
+ * 
  * @sample samples.collections.Collections.Transformations.take
  */
 public fun FloatArray.takeLast(n: Int): List<Float> {
@@ -4136,6 +4571,8 @@ public fun FloatArray.takeLast(n: Int): List<Float> {
 
 /**
  * Returns a list containing last [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.take
  */
@@ -4154,6 +4591,8 @@ public fun DoubleArray.takeLast(n: Int): List<Double> {
 /**
  * Returns a list containing last [n] elements.
  * 
+ * @throws IllegalArgumentException if [n] is negative.
+ * 
  * @sample samples.collections.Collections.Transformations.take
  */
 public fun BooleanArray.takeLast(n: Int): List<Boolean> {
@@ -4170,6 +4609,8 @@ public fun BooleanArray.takeLast(n: Int): List<Boolean> {
 
 /**
  * Returns a list containing last [n] elements.
+ * 
+ * @throws IllegalArgumentException if [n] is negative.
  * 
  * @sample samples.collections.Collections.Transformations.take
  */
@@ -4781,6 +5222,8 @@ public fun CharArray.reversedArray(): CharArray {
 
 /**
  * Sorts elements in the array in-place according to natural sort order of the value returned by specified [selector] function.
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
  */
 public inline fun <T, R : Comparable<R>> Array<out T>.sortBy(crossinline selector: (T) -> R?): Unit {
     if (size > 1) sortWith(compareBy(selector))
@@ -4788,6 +5231,8 @@ public inline fun <T, R : Comparable<R>> Array<out T>.sortBy(crossinline selecto
 
 /**
  * Sorts elements in the array in-place descending according to natural sort order of the value returned by specified [selector] function.
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
  */
 public inline fun <T, R : Comparable<R>> Array<out T>.sortByDescending(crossinline selector: (T) -> R?): Unit {
     if (size > 1) sortWith(compareByDescending(selector))
@@ -4795,6 +5240,8 @@ public inline fun <T, R : Comparable<R>> Array<out T>.sortByDescending(crossinli
 
 /**
  * Sorts elements in the array in-place descending according to their natural sort order.
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
  */
 public fun <T : Comparable<T>> Array<out T>.sortDescending(): Unit {
     sortWith(reverseOrder())
@@ -4872,6 +5319,8 @@ public fun CharArray.sortDescending(): Unit {
 
 /**
  * Returns a list of all elements sorted according to their natural sort order.
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
  */
 public fun <T : Comparable<T>> Array<out T>.sorted(): List<T> {
     return sortedArray().asList()
@@ -4928,6 +5377,8 @@ public fun CharArray.sorted(): List<Char> {
 
 /**
  * Returns an array with all elements of this array sorted according to their natural sort order.
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
  */
 public fun <T : Comparable<T>> Array<T>.sortedArray(): Array<T> {
     if (isEmpty()) return this
@@ -4992,6 +5443,8 @@ public fun CharArray.sortedArray(): CharArray {
 
 /**
  * Returns an array with all elements of this array sorted descending according to their natural sort order.
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
  */
 public fun <T : Comparable<T>> Array<T>.sortedArrayDescending(): Array<T> {
     if (isEmpty()) return this
@@ -5056,6 +5509,8 @@ public fun CharArray.sortedArrayDescending(): CharArray {
 
 /**
  * Returns an array with all elements of this array sorted according the specified [comparator].
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
  */
 public fun <T> Array<out T>.sortedArrayWith(comparator: Comparator<in T>): Array<out T> {
     if (isEmpty()) return this
@@ -5064,6 +5519,8 @@ public fun <T> Array<out T>.sortedArrayWith(comparator: Comparator<in T>): Array
 
 /**
  * Returns a list of all elements sorted according to natural sort order of the value returned by specified [selector] function.
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
  */
 public inline fun <T, R : Comparable<R>> Array<out T>.sortedBy(crossinline selector: (T) -> R?): List<T> {
     return sortedWith(compareBy(selector))
@@ -5127,6 +5584,8 @@ public inline fun <R : Comparable<R>> CharArray.sortedBy(crossinline selector: (
 
 /**
  * Returns a list of all elements sorted descending according to natural sort order of the value returned by specified [selector] function.
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
  */
 public inline fun <T, R : Comparable<R>> Array<out T>.sortedByDescending(crossinline selector: (T) -> R?): List<T> {
     return sortedWith(compareByDescending(selector))
@@ -5190,6 +5649,8 @@ public inline fun <R : Comparable<R>> CharArray.sortedByDescending(crossinline s
 
 /**
  * Returns a list of all elements sorted descending according to their natural sort order.
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
  */
 public fun <T : Comparable<T>> Array<out T>.sortedDescending(): List<T> {
     return sortedWith(reverseOrder())
@@ -5246,6 +5707,8 @@ public fun CharArray.sortedDescending(): List<Char> {
 
 /**
  * Returns a list of all elements sorted according to the specified [comparator].
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
  */
 public fun <T> Array<out T>.sortedWith(comparator: Comparator<in T>): List<T> {
     return sortedArrayWith(comparator).asList()
@@ -5358,6 +5821,9 @@ public expect fun CharArray.asList(): List<Char>
  * 
  * If two corresponding elements are nested arrays, they are also compared deeply.
  * If any of arrays contains itself on any nesting level the behavior is undefined.
+ * 
+ * The elements of other types are compared for equality with the [equals][Any.equals] function.
+ * For floating point numbers it means that `NaN` is equal to itself and `-0.0` is not equal to `0.0`.
  */
 @SinceKotlin("1.1")
 public expect infix fun <T> Array<out T>.contentDeepEquals(other: Array<out T>): Boolean
@@ -5386,6 +5852,9 @@ public expect fun <T> Array<out T>.contentDeepToString(): String
 /**
  * Returns `true` if the two specified arrays are *structurally* equal to one another,
  * i.e. contain the same number of the same elements in the same order.
+ * 
+ * The elements are compared for equality with the [equals][Any.equals] function.
+ * For floating point numbers it means that `NaN` is equal to itself and `-0.0` is not equal to `0.0`.
  */
 @SinceKotlin("1.1")
 public expect infix fun <T> Array<out T>.contentEquals(other: Array<out T>): Boolean
@@ -5393,6 +5862,9 @@ public expect infix fun <T> Array<out T>.contentEquals(other: Array<out T>): Boo
 /**
  * Returns `true` if the two specified arrays are *structurally* equal to one another,
  * i.e. contain the same number of the same elements in the same order.
+ * 
+ * The elements are compared for equality with the [equals][Any.equals] function.
+ * For floating point numbers it means that `NaN` is equal to itself and `-0.0` is not equal to `0.0`.
  */
 @SinceKotlin("1.1")
 public expect infix fun ByteArray.contentEquals(other: ByteArray): Boolean
@@ -5400,6 +5872,9 @@ public expect infix fun ByteArray.contentEquals(other: ByteArray): Boolean
 /**
  * Returns `true` if the two specified arrays are *structurally* equal to one another,
  * i.e. contain the same number of the same elements in the same order.
+ * 
+ * The elements are compared for equality with the [equals][Any.equals] function.
+ * For floating point numbers it means that `NaN` is equal to itself and `-0.0` is not equal to `0.0`.
  */
 @SinceKotlin("1.1")
 public expect infix fun ShortArray.contentEquals(other: ShortArray): Boolean
@@ -5407,6 +5882,9 @@ public expect infix fun ShortArray.contentEquals(other: ShortArray): Boolean
 /**
  * Returns `true` if the two specified arrays are *structurally* equal to one another,
  * i.e. contain the same number of the same elements in the same order.
+ * 
+ * The elements are compared for equality with the [equals][Any.equals] function.
+ * For floating point numbers it means that `NaN` is equal to itself and `-0.0` is not equal to `0.0`.
  */
 @SinceKotlin("1.1")
 public expect infix fun IntArray.contentEquals(other: IntArray): Boolean
@@ -5414,6 +5892,9 @@ public expect infix fun IntArray.contentEquals(other: IntArray): Boolean
 /**
  * Returns `true` if the two specified arrays are *structurally* equal to one another,
  * i.e. contain the same number of the same elements in the same order.
+ * 
+ * The elements are compared for equality with the [equals][Any.equals] function.
+ * For floating point numbers it means that `NaN` is equal to itself and `-0.0` is not equal to `0.0`.
  */
 @SinceKotlin("1.1")
 public expect infix fun LongArray.contentEquals(other: LongArray): Boolean
@@ -5421,6 +5902,9 @@ public expect infix fun LongArray.contentEquals(other: LongArray): Boolean
 /**
  * Returns `true` if the two specified arrays are *structurally* equal to one another,
  * i.e. contain the same number of the same elements in the same order.
+ * 
+ * The elements are compared for equality with the [equals][Any.equals] function.
+ * For floating point numbers it means that `NaN` is equal to itself and `-0.0` is not equal to `0.0`.
  */
 @SinceKotlin("1.1")
 public expect infix fun FloatArray.contentEquals(other: FloatArray): Boolean
@@ -5428,6 +5912,9 @@ public expect infix fun FloatArray.contentEquals(other: FloatArray): Boolean
 /**
  * Returns `true` if the two specified arrays are *structurally* equal to one another,
  * i.e. contain the same number of the same elements in the same order.
+ * 
+ * The elements are compared for equality with the [equals][Any.equals] function.
+ * For floating point numbers it means that `NaN` is equal to itself and `-0.0` is not equal to `0.0`.
  */
 @SinceKotlin("1.1")
 public expect infix fun DoubleArray.contentEquals(other: DoubleArray): Boolean
@@ -5435,6 +5922,9 @@ public expect infix fun DoubleArray.contentEquals(other: DoubleArray): Boolean
 /**
  * Returns `true` if the two specified arrays are *structurally* equal to one another,
  * i.e. contain the same number of the same elements in the same order.
+ * 
+ * The elements are compared for equality with the [equals][Any.equals] function.
+ * For floating point numbers it means that `NaN` is equal to itself and `-0.0` is not equal to `0.0`.
  */
 @SinceKotlin("1.1")
 public expect infix fun BooleanArray.contentEquals(other: BooleanArray): Boolean
@@ -5442,6 +5932,9 @@ public expect infix fun BooleanArray.contentEquals(other: BooleanArray): Boolean
 /**
  * Returns `true` if the two specified arrays are *structurally* equal to one another,
  * i.e. contain the same number of the same elements in the same order.
+ * 
+ * The elements are compared for equality with the [equals][Any.equals] function.
+ * For floating point numbers it means that `NaN` is equal to itself and `-0.0` is not equal to `0.0`.
  */
 @SinceKotlin("1.1")
 public expect infix fun CharArray.contentEquals(other: CharArray): Boolean
@@ -5571,6 +6064,177 @@ public expect fun BooleanArray.contentToString(): String
  */
 @SinceKotlin("1.1")
 public expect fun CharArray.contentToString(): String
+
+/**
+ * Copies this array or its subrange into the [destination] array and returns that array.
+ * 
+ * It's allowed to pass the same array in the [destination] and even specify the subrange so that it overlaps with the destination range.
+ * 
+ * @param destination the array to copy to.
+ * @param destinationOffset the position in the [destination] array to copy to, 0 by default.
+ * @param startIndex the beginning (inclusive) of the subrange to copy, 0 by default.
+ * @param endIndex the end (exclusive) of the subrange to copy, size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException or [IllegalArgumentException] when [startIndex] or [endIndex] is out of range of this array indices or when `startIndex > endIndex`.
+ * @throws IndexOutOfBoundsException when the subrange doesn't fit into the [destination] array starting at the specified [destinationOffset],
+ * or when that index is out of the [destination] array indices range.
+ * 
+ * @return the [destination] array.
+ */
+@SinceKotlin("1.3")
+public expect fun <T> Array<out T>.copyInto(destination: Array<T>, destinationOffset: Int = 0, startIndex: Int = 0, endIndex: Int = size): Array<T>
+
+/**
+ * Copies this array or its subrange into the [destination] array and returns that array.
+ * 
+ * It's allowed to pass the same array in the [destination] and even specify the subrange so that it overlaps with the destination range.
+ * 
+ * @param destination the array to copy to.
+ * @param destinationOffset the position in the [destination] array to copy to, 0 by default.
+ * @param startIndex the beginning (inclusive) of the subrange to copy, 0 by default.
+ * @param endIndex the end (exclusive) of the subrange to copy, size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException or [IllegalArgumentException] when [startIndex] or [endIndex] is out of range of this array indices or when `startIndex > endIndex`.
+ * @throws IndexOutOfBoundsException when the subrange doesn't fit into the [destination] array starting at the specified [destinationOffset],
+ * or when that index is out of the [destination] array indices range.
+ * 
+ * @return the [destination] array.
+ */
+@SinceKotlin("1.3")
+public expect fun ByteArray.copyInto(destination: ByteArray, destinationOffset: Int = 0, startIndex: Int = 0, endIndex: Int = size): ByteArray
+
+/**
+ * Copies this array or its subrange into the [destination] array and returns that array.
+ * 
+ * It's allowed to pass the same array in the [destination] and even specify the subrange so that it overlaps with the destination range.
+ * 
+ * @param destination the array to copy to.
+ * @param destinationOffset the position in the [destination] array to copy to, 0 by default.
+ * @param startIndex the beginning (inclusive) of the subrange to copy, 0 by default.
+ * @param endIndex the end (exclusive) of the subrange to copy, size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException or [IllegalArgumentException] when [startIndex] or [endIndex] is out of range of this array indices or when `startIndex > endIndex`.
+ * @throws IndexOutOfBoundsException when the subrange doesn't fit into the [destination] array starting at the specified [destinationOffset],
+ * or when that index is out of the [destination] array indices range.
+ * 
+ * @return the [destination] array.
+ */
+@SinceKotlin("1.3")
+public expect fun ShortArray.copyInto(destination: ShortArray, destinationOffset: Int = 0, startIndex: Int = 0, endIndex: Int = size): ShortArray
+
+/**
+ * Copies this array or its subrange into the [destination] array and returns that array.
+ * 
+ * It's allowed to pass the same array in the [destination] and even specify the subrange so that it overlaps with the destination range.
+ * 
+ * @param destination the array to copy to.
+ * @param destinationOffset the position in the [destination] array to copy to, 0 by default.
+ * @param startIndex the beginning (inclusive) of the subrange to copy, 0 by default.
+ * @param endIndex the end (exclusive) of the subrange to copy, size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException or [IllegalArgumentException] when [startIndex] or [endIndex] is out of range of this array indices or when `startIndex > endIndex`.
+ * @throws IndexOutOfBoundsException when the subrange doesn't fit into the [destination] array starting at the specified [destinationOffset],
+ * or when that index is out of the [destination] array indices range.
+ * 
+ * @return the [destination] array.
+ */
+@SinceKotlin("1.3")
+public expect fun IntArray.copyInto(destination: IntArray, destinationOffset: Int = 0, startIndex: Int = 0, endIndex: Int = size): IntArray
+
+/**
+ * Copies this array or its subrange into the [destination] array and returns that array.
+ * 
+ * It's allowed to pass the same array in the [destination] and even specify the subrange so that it overlaps with the destination range.
+ * 
+ * @param destination the array to copy to.
+ * @param destinationOffset the position in the [destination] array to copy to, 0 by default.
+ * @param startIndex the beginning (inclusive) of the subrange to copy, 0 by default.
+ * @param endIndex the end (exclusive) of the subrange to copy, size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException or [IllegalArgumentException] when [startIndex] or [endIndex] is out of range of this array indices or when `startIndex > endIndex`.
+ * @throws IndexOutOfBoundsException when the subrange doesn't fit into the [destination] array starting at the specified [destinationOffset],
+ * or when that index is out of the [destination] array indices range.
+ * 
+ * @return the [destination] array.
+ */
+@SinceKotlin("1.3")
+public expect fun LongArray.copyInto(destination: LongArray, destinationOffset: Int = 0, startIndex: Int = 0, endIndex: Int = size): LongArray
+
+/**
+ * Copies this array or its subrange into the [destination] array and returns that array.
+ * 
+ * It's allowed to pass the same array in the [destination] and even specify the subrange so that it overlaps with the destination range.
+ * 
+ * @param destination the array to copy to.
+ * @param destinationOffset the position in the [destination] array to copy to, 0 by default.
+ * @param startIndex the beginning (inclusive) of the subrange to copy, 0 by default.
+ * @param endIndex the end (exclusive) of the subrange to copy, size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException or [IllegalArgumentException] when [startIndex] or [endIndex] is out of range of this array indices or when `startIndex > endIndex`.
+ * @throws IndexOutOfBoundsException when the subrange doesn't fit into the [destination] array starting at the specified [destinationOffset],
+ * or when that index is out of the [destination] array indices range.
+ * 
+ * @return the [destination] array.
+ */
+@SinceKotlin("1.3")
+public expect fun FloatArray.copyInto(destination: FloatArray, destinationOffset: Int = 0, startIndex: Int = 0, endIndex: Int = size): FloatArray
+
+/**
+ * Copies this array or its subrange into the [destination] array and returns that array.
+ * 
+ * It's allowed to pass the same array in the [destination] and even specify the subrange so that it overlaps with the destination range.
+ * 
+ * @param destination the array to copy to.
+ * @param destinationOffset the position in the [destination] array to copy to, 0 by default.
+ * @param startIndex the beginning (inclusive) of the subrange to copy, 0 by default.
+ * @param endIndex the end (exclusive) of the subrange to copy, size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException or [IllegalArgumentException] when [startIndex] or [endIndex] is out of range of this array indices or when `startIndex > endIndex`.
+ * @throws IndexOutOfBoundsException when the subrange doesn't fit into the [destination] array starting at the specified [destinationOffset],
+ * or when that index is out of the [destination] array indices range.
+ * 
+ * @return the [destination] array.
+ */
+@SinceKotlin("1.3")
+public expect fun DoubleArray.copyInto(destination: DoubleArray, destinationOffset: Int = 0, startIndex: Int = 0, endIndex: Int = size): DoubleArray
+
+/**
+ * Copies this array or its subrange into the [destination] array and returns that array.
+ * 
+ * It's allowed to pass the same array in the [destination] and even specify the subrange so that it overlaps with the destination range.
+ * 
+ * @param destination the array to copy to.
+ * @param destinationOffset the position in the [destination] array to copy to, 0 by default.
+ * @param startIndex the beginning (inclusive) of the subrange to copy, 0 by default.
+ * @param endIndex the end (exclusive) of the subrange to copy, size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException or [IllegalArgumentException] when [startIndex] or [endIndex] is out of range of this array indices or when `startIndex > endIndex`.
+ * @throws IndexOutOfBoundsException when the subrange doesn't fit into the [destination] array starting at the specified [destinationOffset],
+ * or when that index is out of the [destination] array indices range.
+ * 
+ * @return the [destination] array.
+ */
+@SinceKotlin("1.3")
+public expect fun BooleanArray.copyInto(destination: BooleanArray, destinationOffset: Int = 0, startIndex: Int = 0, endIndex: Int = size): BooleanArray
+
+/**
+ * Copies this array or its subrange into the [destination] array and returns that array.
+ * 
+ * It's allowed to pass the same array in the [destination] and even specify the subrange so that it overlaps with the destination range.
+ * 
+ * @param destination the array to copy to.
+ * @param destinationOffset the position in the [destination] array to copy to, 0 by default.
+ * @param startIndex the beginning (inclusive) of the subrange to copy, 0 by default.
+ * @param endIndex the end (exclusive) of the subrange to copy, size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException or [IllegalArgumentException] when [startIndex] or [endIndex] is out of range of this array indices or when `startIndex > endIndex`.
+ * @throws IndexOutOfBoundsException when the subrange doesn't fit into the [destination] array starting at the specified [destinationOffset],
+ * or when that index is out of the [destination] array indices range.
+ * 
+ * @return the [destination] array.
+ */
+@SinceKotlin("1.3")
+public expect fun CharArray.copyInto(destination: CharArray, destinationOffset: Int = 0, startIndex: Int = 0, endIndex: Int = size): CharArray
 
 /**
  * Returns new array which is a copy of the original array.
@@ -5737,50 +6401,185 @@ public expect fun CharArray.copyOf(newSize: Int): CharArray
 public expect fun <T> Array<T>.copyOf(newSize: Int): Array<T?>
 
 /**
- * Returns new array which is a copy of range of original array.
+ * Returns a new array which is a copy of the specified range of the original array.
+ * 
+ * @param fromIndex the start of the range (inclusive), must be in `0..array.size`
+ * @param toIndex the end of the range (exclusive), must be in `fromIndex..array.size`
  */
 @Suppress("NO_ACTUAL_FOR_EXPECT")
 public expect fun <T> Array<T>.copyOfRange(fromIndex: Int, toIndex: Int): Array<T>
 
 /**
- * Returns new array which is a copy of range of original array.
+ * Returns a new array which is a copy of the specified range of the original array.
+ * 
+ * @param fromIndex the start of the range (inclusive), must be in `0..array.size`
+ * @param toIndex the end of the range (exclusive), must be in `fromIndex..array.size`
  */
 public expect fun ByteArray.copyOfRange(fromIndex: Int, toIndex: Int): ByteArray
 
 /**
- * Returns new array which is a copy of range of original array.
+ * Returns a new array which is a copy of the specified range of the original array.
+ * 
+ * @param fromIndex the start of the range (inclusive), must be in `0..array.size`
+ * @param toIndex the end of the range (exclusive), must be in `fromIndex..array.size`
  */
 public expect fun ShortArray.copyOfRange(fromIndex: Int, toIndex: Int): ShortArray
 
 /**
- * Returns new array which is a copy of range of original array.
+ * Returns a new array which is a copy of the specified range of the original array.
+ * 
+ * @param fromIndex the start of the range (inclusive), must be in `0..array.size`
+ * @param toIndex the end of the range (exclusive), must be in `fromIndex..array.size`
  */
 public expect fun IntArray.copyOfRange(fromIndex: Int, toIndex: Int): IntArray
 
 /**
- * Returns new array which is a copy of range of original array.
+ * Returns a new array which is a copy of the specified range of the original array.
+ * 
+ * @param fromIndex the start of the range (inclusive), must be in `0..array.size`
+ * @param toIndex the end of the range (exclusive), must be in `fromIndex..array.size`
  */
 public expect fun LongArray.copyOfRange(fromIndex: Int, toIndex: Int): LongArray
 
 /**
- * Returns new array which is a copy of range of original array.
+ * Returns a new array which is a copy of the specified range of the original array.
+ * 
+ * @param fromIndex the start of the range (inclusive), must be in `0..array.size`
+ * @param toIndex the end of the range (exclusive), must be in `fromIndex..array.size`
  */
 public expect fun FloatArray.copyOfRange(fromIndex: Int, toIndex: Int): FloatArray
 
 /**
- * Returns new array which is a copy of range of original array.
+ * Returns a new array which is a copy of the specified range of the original array.
+ * 
+ * @param fromIndex the start of the range (inclusive), must be in `0..array.size`
+ * @param toIndex the end of the range (exclusive), must be in `fromIndex..array.size`
  */
 public expect fun DoubleArray.copyOfRange(fromIndex: Int, toIndex: Int): DoubleArray
 
 /**
- * Returns new array which is a copy of range of original array.
+ * Returns a new array which is a copy of the specified range of the original array.
+ * 
+ * @param fromIndex the start of the range (inclusive), must be in `0..array.size`
+ * @param toIndex the end of the range (exclusive), must be in `fromIndex..array.size`
  */
 public expect fun BooleanArray.copyOfRange(fromIndex: Int, toIndex: Int): BooleanArray
 
 /**
- * Returns new array which is a copy of range of original array.
+ * Returns a new array which is a copy of the specified range of the original array.
+ * 
+ * @param fromIndex the start of the range (inclusive), must be in `0..array.size`
+ * @param toIndex the end of the range (exclusive), must be in `fromIndex..array.size`
  */
 public expect fun CharArray.copyOfRange(fromIndex: Int, toIndex: Int): CharArray
+
+/**
+ * Fills this array or its subrange with the specified [element] value.
+ * 
+ * @param fromIndex the start of the range (inclusive), 0 by default.
+ * @param toIndex the end of the range (exclusive), size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException if [fromIndex] is less than zero or [toIndex] is greater than the size of this array.
+ * @throws IllegalArgumentException if [fromIndex] is greater than [toIndex].
+ */
+@SinceKotlin("1.3")
+public expect fun <T> Array<T>.fill(element: T, fromIndex: Int = 0, toIndex: Int = size): Unit
+
+/**
+ * Fills this array or its subrange with the specified [element] value.
+ * 
+ * @param fromIndex the start of the range (inclusive), 0 by default.
+ * @param toIndex the end of the range (exclusive), size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException if [fromIndex] is less than zero or [toIndex] is greater than the size of this array.
+ * @throws IllegalArgumentException if [fromIndex] is greater than [toIndex].
+ */
+@SinceKotlin("1.3")
+public expect fun ByteArray.fill(element: Byte, fromIndex: Int = 0, toIndex: Int = size): Unit
+
+/**
+ * Fills this array or its subrange with the specified [element] value.
+ * 
+ * @param fromIndex the start of the range (inclusive), 0 by default.
+ * @param toIndex the end of the range (exclusive), size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException if [fromIndex] is less than zero or [toIndex] is greater than the size of this array.
+ * @throws IllegalArgumentException if [fromIndex] is greater than [toIndex].
+ */
+@SinceKotlin("1.3")
+public expect fun ShortArray.fill(element: Short, fromIndex: Int = 0, toIndex: Int = size): Unit
+
+/**
+ * Fills this array or its subrange with the specified [element] value.
+ * 
+ * @param fromIndex the start of the range (inclusive), 0 by default.
+ * @param toIndex the end of the range (exclusive), size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException if [fromIndex] is less than zero or [toIndex] is greater than the size of this array.
+ * @throws IllegalArgumentException if [fromIndex] is greater than [toIndex].
+ */
+@SinceKotlin("1.3")
+public expect fun IntArray.fill(element: Int, fromIndex: Int = 0, toIndex: Int = size): Unit
+
+/**
+ * Fills this array or its subrange with the specified [element] value.
+ * 
+ * @param fromIndex the start of the range (inclusive), 0 by default.
+ * @param toIndex the end of the range (exclusive), size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException if [fromIndex] is less than zero or [toIndex] is greater than the size of this array.
+ * @throws IllegalArgumentException if [fromIndex] is greater than [toIndex].
+ */
+@SinceKotlin("1.3")
+public expect fun LongArray.fill(element: Long, fromIndex: Int = 0, toIndex: Int = size): Unit
+
+/**
+ * Fills this array or its subrange with the specified [element] value.
+ * 
+ * @param fromIndex the start of the range (inclusive), 0 by default.
+ * @param toIndex the end of the range (exclusive), size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException if [fromIndex] is less than zero or [toIndex] is greater than the size of this array.
+ * @throws IllegalArgumentException if [fromIndex] is greater than [toIndex].
+ */
+@SinceKotlin("1.3")
+public expect fun FloatArray.fill(element: Float, fromIndex: Int = 0, toIndex: Int = size): Unit
+
+/**
+ * Fills this array or its subrange with the specified [element] value.
+ * 
+ * @param fromIndex the start of the range (inclusive), 0 by default.
+ * @param toIndex the end of the range (exclusive), size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException if [fromIndex] is less than zero or [toIndex] is greater than the size of this array.
+ * @throws IllegalArgumentException if [fromIndex] is greater than [toIndex].
+ */
+@SinceKotlin("1.3")
+public expect fun DoubleArray.fill(element: Double, fromIndex: Int = 0, toIndex: Int = size): Unit
+
+/**
+ * Fills this array or its subrange with the specified [element] value.
+ * 
+ * @param fromIndex the start of the range (inclusive), 0 by default.
+ * @param toIndex the end of the range (exclusive), size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException if [fromIndex] is less than zero or [toIndex] is greater than the size of this array.
+ * @throws IllegalArgumentException if [fromIndex] is greater than [toIndex].
+ */
+@SinceKotlin("1.3")
+public expect fun BooleanArray.fill(element: Boolean, fromIndex: Int = 0, toIndex: Int = size): Unit
+
+/**
+ * Fills this array or its subrange with the specified [element] value.
+ * 
+ * @param fromIndex the start of the range (inclusive), 0 by default.
+ * @param toIndex the end of the range (exclusive), size of this array by default.
+ * 
+ * @throws IndexOutOfBoundsException if [fromIndex] is less than zero or [toIndex] is greater than the size of this array.
+ * @throws IllegalArgumentException if [fromIndex] is greater than [toIndex].
+ */
+@SinceKotlin("1.3")
+public expect fun CharArray.fill(element: Char, fromIndex: Int = 0, toIndex: Int = size): Unit
 
 /**
  * Returns the range of valid indices for the array.
@@ -6180,46 +6979,66 @@ public expect fun <T> Array<T>.plusElement(element: T): Array<T>
 
 /**
  * Sorts the array in-place.
+ * 
+ * @sample samples.collections.Arrays.Sorting.sortArray
  */
 public expect fun IntArray.sort(): Unit
 
 /**
  * Sorts the array in-place.
+ * 
+ * @sample samples.collections.Arrays.Sorting.sortArray
  */
 public expect fun LongArray.sort(): Unit
 
 /**
  * Sorts the array in-place.
+ * 
+ * @sample samples.collections.Arrays.Sorting.sortArray
  */
 public expect fun ByteArray.sort(): Unit
 
 /**
  * Sorts the array in-place.
+ * 
+ * @sample samples.collections.Arrays.Sorting.sortArray
  */
 public expect fun ShortArray.sort(): Unit
 
 /**
  * Sorts the array in-place.
+ * 
+ * @sample samples.collections.Arrays.Sorting.sortArray
  */
 public expect fun DoubleArray.sort(): Unit
 
 /**
  * Sorts the array in-place.
+ * 
+ * @sample samples.collections.Arrays.Sorting.sortArray
  */
 public expect fun FloatArray.sort(): Unit
 
 /**
  * Sorts the array in-place.
+ * 
+ * @sample samples.collections.Arrays.Sorting.sortArray
  */
 public expect fun CharArray.sort(): Unit
 
 /**
  * Sorts the array in-place according to the natural order of its elements.
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
+ * 
+ * @sample samples.collections.Arrays.Sorting.sortArrayOfComparable
  */
 public expect fun <T : Comparable<T>> Array<out T>.sort(): Unit
 
 /**
  * Sorts the array in-place according to the order specified by the given [comparator].
+ * 
+ * The sort is _stable_. It means that equal elements preserve their order relative to each other after sorting.
  */
 public expect fun <T> Array<out T>.sortWith(comparator: Comparator<in T>): Unit
 
@@ -6227,80 +7046,56 @@ public expect fun <T> Array<out T>.sortWith(comparator: Comparator<in T>): Unit
  * Returns an array of Boolean containing all of the elements of this generic array.
  */
 public fun Array<out Boolean>.toBooleanArray(): BooleanArray {
-    val result = BooleanArray(size)
-    for (index in indices)
-        result[index] = this[index]
-    return result
+    return BooleanArray(size) { index -> this[index] }
 }
 
 /**
  * Returns an array of Byte containing all of the elements of this generic array.
  */
 public fun Array<out Byte>.toByteArray(): ByteArray {
-    val result = ByteArray(size)
-    for (index in indices)
-        result[index] = this[index]
-    return result
+    return ByteArray(size) { index -> this[index] }
 }
 
 /**
  * Returns an array of Char containing all of the elements of this generic array.
  */
 public fun Array<out Char>.toCharArray(): CharArray {
-    val result = CharArray(size)
-    for (index in indices)
-        result[index] = this[index]
-    return result
+    return CharArray(size) { index -> this[index] }
 }
 
 /**
  * Returns an array of Double containing all of the elements of this generic array.
  */
 public fun Array<out Double>.toDoubleArray(): DoubleArray {
-    val result = DoubleArray(size)
-    for (index in indices)
-        result[index] = this[index]
-    return result
+    return DoubleArray(size) { index -> this[index] }
 }
 
 /**
  * Returns an array of Float containing all of the elements of this generic array.
  */
 public fun Array<out Float>.toFloatArray(): FloatArray {
-    val result = FloatArray(size)
-    for (index in indices)
-        result[index] = this[index]
-    return result
+    return FloatArray(size) { index -> this[index] }
 }
 
 /**
  * Returns an array of Int containing all of the elements of this generic array.
  */
 public fun Array<out Int>.toIntArray(): IntArray {
-    val result = IntArray(size)
-    for (index in indices)
-        result[index] = this[index]
-    return result
+    return IntArray(size) { index -> this[index] }
 }
 
 /**
  * Returns an array of Long containing all of the elements of this generic array.
  */
 public fun Array<out Long>.toLongArray(): LongArray {
-    val result = LongArray(size)
-    for (index in indices)
-        result[index] = this[index]
-    return result
+    return LongArray(size) { index -> this[index] }
 }
 
 /**
  * Returns an array of Short containing all of the elements of this generic array.
  */
 public fun Array<out Short>.toShortArray(): ShortArray {
-    val result = ShortArray(size)
-    for (index in indices)
-        result[index] = this[index]
-    return result
+    return ShortArray(size) { index -> this[index] }
 }
 
 /**
@@ -6350,6 +7145,8 @@ public expect fun CharArray.toTypedArray(): Array<Char>
  * If any of two pairs would have the same key the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitives
  */
 public inline fun <T, K, V> Array<out T>.associate(transform: (T) -> Pair<K, V>): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6363,6 +7160,8 @@ public inline fun <T, K, V> Array<out T>.associate(transform: (T) -> Pair<K, V>)
  * If any of two pairs would have the same key the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitives
  */
 public inline fun <K, V> ByteArray.associate(transform: (Byte) -> Pair<K, V>): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6376,6 +7175,8 @@ public inline fun <K, V> ByteArray.associate(transform: (Byte) -> Pair<K, V>): M
  * If any of two pairs would have the same key the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitives
  */
 public inline fun <K, V> ShortArray.associate(transform: (Short) -> Pair<K, V>): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6389,6 +7190,8 @@ public inline fun <K, V> ShortArray.associate(transform: (Short) -> Pair<K, V>):
  * If any of two pairs would have the same key the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitives
  */
 public inline fun <K, V> IntArray.associate(transform: (Int) -> Pair<K, V>): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6402,6 +7205,8 @@ public inline fun <K, V> IntArray.associate(transform: (Int) -> Pair<K, V>): Map
  * If any of two pairs would have the same key the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitives
  */
 public inline fun <K, V> LongArray.associate(transform: (Long) -> Pair<K, V>): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6415,6 +7220,8 @@ public inline fun <K, V> LongArray.associate(transform: (Long) -> Pair<K, V>): M
  * If any of two pairs would have the same key the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitives
  */
 public inline fun <K, V> FloatArray.associate(transform: (Float) -> Pair<K, V>): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6428,6 +7235,8 @@ public inline fun <K, V> FloatArray.associate(transform: (Float) -> Pair<K, V>):
  * If any of two pairs would have the same key the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitives
  */
 public inline fun <K, V> DoubleArray.associate(transform: (Double) -> Pair<K, V>): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6441,6 +7250,8 @@ public inline fun <K, V> DoubleArray.associate(transform: (Double) -> Pair<K, V>
  * If any of two pairs would have the same key the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitives
  */
 public inline fun <K, V> BooleanArray.associate(transform: (Boolean) -> Pair<K, V>): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6454,6 +7265,8 @@ public inline fun <K, V> BooleanArray.associate(transform: (Boolean) -> Pair<K, 
  * If any of two pairs would have the same key the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitives
  */
 public inline fun <K, V> CharArray.associate(transform: (Char) -> Pair<K, V>): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6467,6 +7280,8 @@ public inline fun <K, V> CharArray.associate(transform: (Char) -> Pair<K, V>): M
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesBy
  */
 public inline fun <T, K> Array<out T>.associateBy(keySelector: (T) -> K): Map<K, T> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6480,6 +7295,8 @@ public inline fun <T, K> Array<out T>.associateBy(keySelector: (T) -> K): Map<K,
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesBy
  */
 public inline fun <K> ByteArray.associateBy(keySelector: (Byte) -> K): Map<K, Byte> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6493,6 +7310,8 @@ public inline fun <K> ByteArray.associateBy(keySelector: (Byte) -> K): Map<K, By
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesBy
  */
 public inline fun <K> ShortArray.associateBy(keySelector: (Short) -> K): Map<K, Short> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6506,6 +7325,8 @@ public inline fun <K> ShortArray.associateBy(keySelector: (Short) -> K): Map<K, 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesBy
  */
 public inline fun <K> IntArray.associateBy(keySelector: (Int) -> K): Map<K, Int> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6519,6 +7340,8 @@ public inline fun <K> IntArray.associateBy(keySelector: (Int) -> K): Map<K, Int>
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesBy
  */
 public inline fun <K> LongArray.associateBy(keySelector: (Long) -> K): Map<K, Long> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6532,6 +7355,8 @@ public inline fun <K> LongArray.associateBy(keySelector: (Long) -> K): Map<K, Lo
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesBy
  */
 public inline fun <K> FloatArray.associateBy(keySelector: (Float) -> K): Map<K, Float> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6545,6 +7370,8 @@ public inline fun <K> FloatArray.associateBy(keySelector: (Float) -> K): Map<K, 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesBy
  */
 public inline fun <K> DoubleArray.associateBy(keySelector: (Double) -> K): Map<K, Double> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6558,6 +7385,8 @@ public inline fun <K> DoubleArray.associateBy(keySelector: (Double) -> K): Map<K
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesBy
  */
 public inline fun <K> BooleanArray.associateBy(keySelector: (Boolean) -> K): Map<K, Boolean> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6571,6 +7400,8 @@ public inline fun <K> BooleanArray.associateBy(keySelector: (Boolean) -> K): Map
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesBy
  */
 public inline fun <K> CharArray.associateBy(keySelector: (Char) -> K): Map<K, Char> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6583,6 +7414,8 @@ public inline fun <K> CharArray.associateBy(keySelector: (Char) -> K): Map<K, Ch
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByWithValueTransform
  */
 public inline fun <T, K, V> Array<out T>.associateBy(keySelector: (T) -> K, valueTransform: (T) -> V): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6595,6 +7428,8 @@ public inline fun <T, K, V> Array<out T>.associateBy(keySelector: (T) -> K, valu
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByWithValueTransform
  */
 public inline fun <K, V> ByteArray.associateBy(keySelector: (Byte) -> K, valueTransform: (Byte) -> V): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6607,6 +7442,8 @@ public inline fun <K, V> ByteArray.associateBy(keySelector: (Byte) -> K, valueTr
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByWithValueTransform
  */
 public inline fun <K, V> ShortArray.associateBy(keySelector: (Short) -> K, valueTransform: (Short) -> V): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6619,6 +7456,8 @@ public inline fun <K, V> ShortArray.associateBy(keySelector: (Short) -> K, value
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByWithValueTransform
  */
 public inline fun <K, V> IntArray.associateBy(keySelector: (Int) -> K, valueTransform: (Int) -> V): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6631,6 +7470,8 @@ public inline fun <K, V> IntArray.associateBy(keySelector: (Int) -> K, valueTran
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByWithValueTransform
  */
 public inline fun <K, V> LongArray.associateBy(keySelector: (Long) -> K, valueTransform: (Long) -> V): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6643,6 +7484,8 @@ public inline fun <K, V> LongArray.associateBy(keySelector: (Long) -> K, valueTr
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByWithValueTransform
  */
 public inline fun <K, V> FloatArray.associateBy(keySelector: (Float) -> K, valueTransform: (Float) -> V): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6655,6 +7498,8 @@ public inline fun <K, V> FloatArray.associateBy(keySelector: (Float) -> K, value
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByWithValueTransform
  */
 public inline fun <K, V> DoubleArray.associateBy(keySelector: (Double) -> K, valueTransform: (Double) -> V): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6667,6 +7512,8 @@ public inline fun <K, V> DoubleArray.associateBy(keySelector: (Double) -> K, val
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByWithValueTransform
  */
 public inline fun <K, V> BooleanArray.associateBy(keySelector: (Boolean) -> K, valueTransform: (Boolean) -> V): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6679,6 +7526,8 @@ public inline fun <K, V> BooleanArray.associateBy(keySelector: (Boolean) -> K, v
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
  * 
  * The returned map preserves the entry iteration order of the original array.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByWithValueTransform
  */
 public inline fun <K, V> CharArray.associateBy(keySelector: (Char) -> K, valueTransform: (Char) -> V): Map<K, V> {
     val capacity = mapCapacity(size).coerceAtLeast(16)
@@ -6691,6 +7540,8 @@ public inline fun <K, V> CharArray.associateBy(keySelector: (Char) -> K, valueTr
  * and value is the element itself.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByTo
  */
 public inline fun <T, K, M : MutableMap<in K, in T>> Array<out T>.associateByTo(destination: M, keySelector: (T) -> K): M {
     for (element in this) {
@@ -6705,6 +7556,8 @@ public inline fun <T, K, M : MutableMap<in K, in T>> Array<out T>.associateByTo(
  * and value is the element itself.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByTo
  */
 public inline fun <K, M : MutableMap<in K, in Byte>> ByteArray.associateByTo(destination: M, keySelector: (Byte) -> K): M {
     for (element in this) {
@@ -6719,6 +7572,8 @@ public inline fun <K, M : MutableMap<in K, in Byte>> ByteArray.associateByTo(des
  * and value is the element itself.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByTo
  */
 public inline fun <K, M : MutableMap<in K, in Short>> ShortArray.associateByTo(destination: M, keySelector: (Short) -> K): M {
     for (element in this) {
@@ -6733,6 +7588,8 @@ public inline fun <K, M : MutableMap<in K, in Short>> ShortArray.associateByTo(d
  * and value is the element itself.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByTo
  */
 public inline fun <K, M : MutableMap<in K, in Int>> IntArray.associateByTo(destination: M, keySelector: (Int) -> K): M {
     for (element in this) {
@@ -6747,6 +7604,8 @@ public inline fun <K, M : MutableMap<in K, in Int>> IntArray.associateByTo(desti
  * and value is the element itself.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByTo
  */
 public inline fun <K, M : MutableMap<in K, in Long>> LongArray.associateByTo(destination: M, keySelector: (Long) -> K): M {
     for (element in this) {
@@ -6761,6 +7620,8 @@ public inline fun <K, M : MutableMap<in K, in Long>> LongArray.associateByTo(des
  * and value is the element itself.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByTo
  */
 public inline fun <K, M : MutableMap<in K, in Float>> FloatArray.associateByTo(destination: M, keySelector: (Float) -> K): M {
     for (element in this) {
@@ -6775,6 +7636,8 @@ public inline fun <K, M : MutableMap<in K, in Float>> FloatArray.associateByTo(d
  * and value is the element itself.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByTo
  */
 public inline fun <K, M : MutableMap<in K, in Double>> DoubleArray.associateByTo(destination: M, keySelector: (Double) -> K): M {
     for (element in this) {
@@ -6789,6 +7652,8 @@ public inline fun <K, M : MutableMap<in K, in Double>> DoubleArray.associateByTo
  * and value is the element itself.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByTo
  */
 public inline fun <K, M : MutableMap<in K, in Boolean>> BooleanArray.associateByTo(destination: M, keySelector: (Boolean) -> K): M {
     for (element in this) {
@@ -6803,6 +7668,8 @@ public inline fun <K, M : MutableMap<in K, in Boolean>> BooleanArray.associateBy
  * and value is the element itself.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByTo
  */
 public inline fun <K, M : MutableMap<in K, in Char>> CharArray.associateByTo(destination: M, keySelector: (Char) -> K): M {
     for (element in this) {
@@ -6817,6 +7684,8 @@ public inline fun <K, M : MutableMap<in K, in Char>> CharArray.associateByTo(des
  * and value is provided by the [valueTransform] function applied to elements of the given array.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByToWithValueTransform
  */
 public inline fun <T, K, V, M : MutableMap<in K, in V>> Array<out T>.associateByTo(destination: M, keySelector: (T) -> K, valueTransform: (T) -> V): M {
     for (element in this) {
@@ -6831,6 +7700,8 @@ public inline fun <T, K, V, M : MutableMap<in K, in V>> Array<out T>.associateBy
  * and value is provided by the [valueTransform] function applied to elements of the given array.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByToWithValueTransform
  */
 public inline fun <K, V, M : MutableMap<in K, in V>> ByteArray.associateByTo(destination: M, keySelector: (Byte) -> K, valueTransform: (Byte) -> V): M {
     for (element in this) {
@@ -6845,6 +7716,8 @@ public inline fun <K, V, M : MutableMap<in K, in V>> ByteArray.associateByTo(des
  * and value is provided by the [valueTransform] function applied to elements of the given array.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByToWithValueTransform
  */
 public inline fun <K, V, M : MutableMap<in K, in V>> ShortArray.associateByTo(destination: M, keySelector: (Short) -> K, valueTransform: (Short) -> V): M {
     for (element in this) {
@@ -6859,6 +7732,8 @@ public inline fun <K, V, M : MutableMap<in K, in V>> ShortArray.associateByTo(de
  * and value is provided by the [valueTransform] function applied to elements of the given array.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByToWithValueTransform
  */
 public inline fun <K, V, M : MutableMap<in K, in V>> IntArray.associateByTo(destination: M, keySelector: (Int) -> K, valueTransform: (Int) -> V): M {
     for (element in this) {
@@ -6873,6 +7748,8 @@ public inline fun <K, V, M : MutableMap<in K, in V>> IntArray.associateByTo(dest
  * and value is provided by the [valueTransform] function applied to elements of the given array.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByToWithValueTransform
  */
 public inline fun <K, V, M : MutableMap<in K, in V>> LongArray.associateByTo(destination: M, keySelector: (Long) -> K, valueTransform: (Long) -> V): M {
     for (element in this) {
@@ -6887,6 +7764,8 @@ public inline fun <K, V, M : MutableMap<in K, in V>> LongArray.associateByTo(des
  * and value is provided by the [valueTransform] function applied to elements of the given array.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByToWithValueTransform
  */
 public inline fun <K, V, M : MutableMap<in K, in V>> FloatArray.associateByTo(destination: M, keySelector: (Float) -> K, valueTransform: (Float) -> V): M {
     for (element in this) {
@@ -6901,6 +7780,8 @@ public inline fun <K, V, M : MutableMap<in K, in V>> FloatArray.associateByTo(de
  * and value is provided by the [valueTransform] function applied to elements of the given array.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByToWithValueTransform
  */
 public inline fun <K, V, M : MutableMap<in K, in V>> DoubleArray.associateByTo(destination: M, keySelector: (Double) -> K, valueTransform: (Double) -> V): M {
     for (element in this) {
@@ -6915,6 +7796,8 @@ public inline fun <K, V, M : MutableMap<in K, in V>> DoubleArray.associateByTo(d
  * and value is provided by the [valueTransform] function applied to elements of the given array.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByToWithValueTransform
  */
 public inline fun <K, V, M : MutableMap<in K, in V>> BooleanArray.associateByTo(destination: M, keySelector: (Boolean) -> K, valueTransform: (Boolean) -> V): M {
     for (element in this) {
@@ -6929,6 +7812,8 @@ public inline fun <K, V, M : MutableMap<in K, in V>> BooleanArray.associateByTo(
  * and value is provided by the [valueTransform] function applied to elements of the given array.
  * 
  * If any two elements would have the same key returned by [keySelector] the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesByToWithValueTransform
  */
 public inline fun <K, V, M : MutableMap<in K, in V>> CharArray.associateByTo(destination: M, keySelector: (Char) -> K, valueTransform: (Char) -> V): M {
     for (element in this) {
@@ -6942,6 +7827,8 @@ public inline fun <K, V, M : MutableMap<in K, in V>> CharArray.associateByTo(des
  * provided by [transform] function applied to each element of the given array.
  * 
  * If any of two pairs would have the same key the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesTo
  */
 public inline fun <T, K, V, M : MutableMap<in K, in V>> Array<out T>.associateTo(destination: M, transform: (T) -> Pair<K, V>): M {
     for (element in this) {
@@ -6955,6 +7842,8 @@ public inline fun <T, K, V, M : MutableMap<in K, in V>> Array<out T>.associateTo
  * provided by [transform] function applied to each element of the given array.
  * 
  * If any of two pairs would have the same key the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesTo
  */
 public inline fun <K, V, M : MutableMap<in K, in V>> ByteArray.associateTo(destination: M, transform: (Byte) -> Pair<K, V>): M {
     for (element in this) {
@@ -6968,6 +7857,8 @@ public inline fun <K, V, M : MutableMap<in K, in V>> ByteArray.associateTo(desti
  * provided by [transform] function applied to each element of the given array.
  * 
  * If any of two pairs would have the same key the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesTo
  */
 public inline fun <K, V, M : MutableMap<in K, in V>> ShortArray.associateTo(destination: M, transform: (Short) -> Pair<K, V>): M {
     for (element in this) {
@@ -6981,6 +7872,8 @@ public inline fun <K, V, M : MutableMap<in K, in V>> ShortArray.associateTo(dest
  * provided by [transform] function applied to each element of the given array.
  * 
  * If any of two pairs would have the same key the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesTo
  */
 public inline fun <K, V, M : MutableMap<in K, in V>> IntArray.associateTo(destination: M, transform: (Int) -> Pair<K, V>): M {
     for (element in this) {
@@ -6994,6 +7887,8 @@ public inline fun <K, V, M : MutableMap<in K, in V>> IntArray.associateTo(destin
  * provided by [transform] function applied to each element of the given array.
  * 
  * If any of two pairs would have the same key the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesTo
  */
 public inline fun <K, V, M : MutableMap<in K, in V>> LongArray.associateTo(destination: M, transform: (Long) -> Pair<K, V>): M {
     for (element in this) {
@@ -7007,6 +7902,8 @@ public inline fun <K, V, M : MutableMap<in K, in V>> LongArray.associateTo(desti
  * provided by [transform] function applied to each element of the given array.
  * 
  * If any of two pairs would have the same key the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesTo
  */
 public inline fun <K, V, M : MutableMap<in K, in V>> FloatArray.associateTo(destination: M, transform: (Float) -> Pair<K, V>): M {
     for (element in this) {
@@ -7020,6 +7917,8 @@ public inline fun <K, V, M : MutableMap<in K, in V>> FloatArray.associateTo(dest
  * provided by [transform] function applied to each element of the given array.
  * 
  * If any of two pairs would have the same key the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesTo
  */
 public inline fun <K, V, M : MutableMap<in K, in V>> DoubleArray.associateTo(destination: M, transform: (Double) -> Pair<K, V>): M {
     for (element in this) {
@@ -7033,6 +7932,8 @@ public inline fun <K, V, M : MutableMap<in K, in V>> DoubleArray.associateTo(des
  * provided by [transform] function applied to each element of the given array.
  * 
  * If any of two pairs would have the same key the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesTo
  */
 public inline fun <K, V, M : MutableMap<in K, in V>> BooleanArray.associateTo(destination: M, transform: (Boolean) -> Pair<K, V>): M {
     for (element in this) {
@@ -7046,6 +7947,8 @@ public inline fun <K, V, M : MutableMap<in K, in V>> BooleanArray.associateTo(de
  * provided by [transform] function applied to each element of the given array.
  * 
  * If any of two pairs would have the same key the last one gets added to the map.
+ * 
+ * @sample samples.collections.Arrays.Transformations.associateArrayOfPrimitivesTo
  */
 public inline fun <K, V, M : MutableMap<in K, in V>> CharArray.associateTo(destination: M, transform: (Char) -> Pair<K, V>): M {
     for (element in this) {
@@ -7504,6 +8407,8 @@ public fun CharArray.toSet(): Set<Char> {
 
 /**
  * Returns a single list of all elements yielded from results of [transform] function being invoked on each element of original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.flatMap
  */
 public inline fun <T, R> Array<out T>.flatMap(transform: (T) -> Iterable<R>): List<R> {
     return flatMapTo(ArrayList<R>(), transform)
@@ -7511,6 +8416,8 @@ public inline fun <T, R> Array<out T>.flatMap(transform: (T) -> Iterable<R>): Li
 
 /**
  * Returns a single list of all elements yielded from results of [transform] function being invoked on each element of original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.flatMap
  */
 public inline fun <R> ByteArray.flatMap(transform: (Byte) -> Iterable<R>): List<R> {
     return flatMapTo(ArrayList<R>(), transform)
@@ -7518,6 +8425,8 @@ public inline fun <R> ByteArray.flatMap(transform: (Byte) -> Iterable<R>): List<
 
 /**
  * Returns a single list of all elements yielded from results of [transform] function being invoked on each element of original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.flatMap
  */
 public inline fun <R> ShortArray.flatMap(transform: (Short) -> Iterable<R>): List<R> {
     return flatMapTo(ArrayList<R>(), transform)
@@ -7525,6 +8434,8 @@ public inline fun <R> ShortArray.flatMap(transform: (Short) -> Iterable<R>): Lis
 
 /**
  * Returns a single list of all elements yielded from results of [transform] function being invoked on each element of original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.flatMap
  */
 public inline fun <R> IntArray.flatMap(transform: (Int) -> Iterable<R>): List<R> {
     return flatMapTo(ArrayList<R>(), transform)
@@ -7532,6 +8443,8 @@ public inline fun <R> IntArray.flatMap(transform: (Int) -> Iterable<R>): List<R>
 
 /**
  * Returns a single list of all elements yielded from results of [transform] function being invoked on each element of original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.flatMap
  */
 public inline fun <R> LongArray.flatMap(transform: (Long) -> Iterable<R>): List<R> {
     return flatMapTo(ArrayList<R>(), transform)
@@ -7539,6 +8452,8 @@ public inline fun <R> LongArray.flatMap(transform: (Long) -> Iterable<R>): List<
 
 /**
  * Returns a single list of all elements yielded from results of [transform] function being invoked on each element of original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.flatMap
  */
 public inline fun <R> FloatArray.flatMap(transform: (Float) -> Iterable<R>): List<R> {
     return flatMapTo(ArrayList<R>(), transform)
@@ -7546,6 +8461,8 @@ public inline fun <R> FloatArray.flatMap(transform: (Float) -> Iterable<R>): Lis
 
 /**
  * Returns a single list of all elements yielded from results of [transform] function being invoked on each element of original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.flatMap
  */
 public inline fun <R> DoubleArray.flatMap(transform: (Double) -> Iterable<R>): List<R> {
     return flatMapTo(ArrayList<R>(), transform)
@@ -7553,6 +8470,8 @@ public inline fun <R> DoubleArray.flatMap(transform: (Double) -> Iterable<R>): L
 
 /**
  * Returns a single list of all elements yielded from results of [transform] function being invoked on each element of original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.flatMap
  */
 public inline fun <R> BooleanArray.flatMap(transform: (Boolean) -> Iterable<R>): List<R> {
     return flatMapTo(ArrayList<R>(), transform)
@@ -7560,6 +8479,8 @@ public inline fun <R> BooleanArray.flatMap(transform: (Boolean) -> Iterable<R>):
 
 /**
  * Returns a single list of all elements yielded from results of [transform] function being invoked on each element of original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.flatMap
  */
 public inline fun <R> CharArray.flatMap(transform: (Char) -> Iterable<R>): List<R> {
     return flatMapTo(ArrayList<R>(), transform)
@@ -8208,7 +9129,7 @@ public inline fun <K, V, M : MutableMap<in K, MutableList<V>>> CharArray.groupBy
  * Creates a [Grouping] source from an array to be used later with one of group-and-fold operations
  * using the specified [keySelector] function to extract a key from each element.
  * 
- * @sample samples.collections.Collections.Transformations.groupingByEachCount
+ * @sample samples.collections.Grouping.groupingByEachCount
  */
 @SinceKotlin("1.1")
 public inline fun <T, K> Array<out T>.groupingBy(crossinline keySelector: (T) -> K): Grouping<T, K> {
@@ -8221,6 +9142,8 @@ public inline fun <T, K> Array<out T>.groupingBy(crossinline keySelector: (T) ->
 /**
  * Returns a list containing the results of applying the given [transform] function
  * to each element in the original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.map
  */
 public inline fun <T, R> Array<out T>.map(transform: (T) -> R): List<R> {
     return mapTo(ArrayList<R>(size), transform)
@@ -8229,6 +9152,8 @@ public inline fun <T, R> Array<out T>.map(transform: (T) -> R): List<R> {
 /**
  * Returns a list containing the results of applying the given [transform] function
  * to each element in the original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.map
  */
 public inline fun <R> ByteArray.map(transform: (Byte) -> R): List<R> {
     return mapTo(ArrayList<R>(size), transform)
@@ -8237,6 +9162,8 @@ public inline fun <R> ByteArray.map(transform: (Byte) -> R): List<R> {
 /**
  * Returns a list containing the results of applying the given [transform] function
  * to each element in the original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.map
  */
 public inline fun <R> ShortArray.map(transform: (Short) -> R): List<R> {
     return mapTo(ArrayList<R>(size), transform)
@@ -8245,6 +9172,8 @@ public inline fun <R> ShortArray.map(transform: (Short) -> R): List<R> {
 /**
  * Returns a list containing the results of applying the given [transform] function
  * to each element in the original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.map
  */
 public inline fun <R> IntArray.map(transform: (Int) -> R): List<R> {
     return mapTo(ArrayList<R>(size), transform)
@@ -8253,6 +9182,8 @@ public inline fun <R> IntArray.map(transform: (Int) -> R): List<R> {
 /**
  * Returns a list containing the results of applying the given [transform] function
  * to each element in the original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.map
  */
 public inline fun <R> LongArray.map(transform: (Long) -> R): List<R> {
     return mapTo(ArrayList<R>(size), transform)
@@ -8261,6 +9192,8 @@ public inline fun <R> LongArray.map(transform: (Long) -> R): List<R> {
 /**
  * Returns a list containing the results of applying the given [transform] function
  * to each element in the original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.map
  */
 public inline fun <R> FloatArray.map(transform: (Float) -> R): List<R> {
     return mapTo(ArrayList<R>(size), transform)
@@ -8269,6 +9202,8 @@ public inline fun <R> FloatArray.map(transform: (Float) -> R): List<R> {
 /**
  * Returns a list containing the results of applying the given [transform] function
  * to each element in the original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.map
  */
 public inline fun <R> DoubleArray.map(transform: (Double) -> R): List<R> {
     return mapTo(ArrayList<R>(size), transform)
@@ -8277,6 +9212,8 @@ public inline fun <R> DoubleArray.map(transform: (Double) -> R): List<R> {
 /**
  * Returns a list containing the results of applying the given [transform] function
  * to each element in the original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.map
  */
 public inline fun <R> BooleanArray.map(transform: (Boolean) -> R): List<R> {
     return mapTo(ArrayList<R>(size), transform)
@@ -8285,6 +9222,8 @@ public inline fun <R> BooleanArray.map(transform: (Boolean) -> R): List<R> {
 /**
  * Returns a list containing the results of applying the given [transform] function
  * to each element in the original array.
+ * 
+ * @sample samples.collections.Collections.Transformations.map
  */
 public inline fun <R> CharArray.map(transform: (Char) -> R): List<R> {
     return mapTo(ArrayList<R>(size), transform)
@@ -8626,63 +9565,72 @@ public inline fun <R, C : MutableCollection<in R>> CharArray.mapTo(destination: 
 }
 
 /**
- * Returns a lazy [Iterable] of [IndexedValue] for each element of the original array.
+ * Returns a lazy [Iterable] that wraps each element of the original array
+ * into an [IndexedValue] containing the index of that element and the element itself.
  */
 public fun <T> Array<out T>.withIndex(): Iterable<IndexedValue<T>> {
     return IndexingIterable { iterator() }
 }
 
 /**
- * Returns a lazy [Iterable] of [IndexedValue] for each element of the original array.
+ * Returns a lazy [Iterable] that wraps each element of the original array
+ * into an [IndexedValue] containing the index of that element and the element itself.
  */
 public fun ByteArray.withIndex(): Iterable<IndexedValue<Byte>> {
     return IndexingIterable { iterator() }
 }
 
 /**
- * Returns a lazy [Iterable] of [IndexedValue] for each element of the original array.
+ * Returns a lazy [Iterable] that wraps each element of the original array
+ * into an [IndexedValue] containing the index of that element and the element itself.
  */
 public fun ShortArray.withIndex(): Iterable<IndexedValue<Short>> {
     return IndexingIterable { iterator() }
 }
 
 /**
- * Returns a lazy [Iterable] of [IndexedValue] for each element of the original array.
+ * Returns a lazy [Iterable] that wraps each element of the original array
+ * into an [IndexedValue] containing the index of that element and the element itself.
  */
 public fun IntArray.withIndex(): Iterable<IndexedValue<Int>> {
     return IndexingIterable { iterator() }
 }
 
 /**
- * Returns a lazy [Iterable] of [IndexedValue] for each element of the original array.
+ * Returns a lazy [Iterable] that wraps each element of the original array
+ * into an [IndexedValue] containing the index of that element and the element itself.
  */
 public fun LongArray.withIndex(): Iterable<IndexedValue<Long>> {
     return IndexingIterable { iterator() }
 }
 
 /**
- * Returns a lazy [Iterable] of [IndexedValue] for each element of the original array.
+ * Returns a lazy [Iterable] that wraps each element of the original array
+ * into an [IndexedValue] containing the index of that element and the element itself.
  */
 public fun FloatArray.withIndex(): Iterable<IndexedValue<Float>> {
     return IndexingIterable { iterator() }
 }
 
 /**
- * Returns a lazy [Iterable] of [IndexedValue] for each element of the original array.
+ * Returns a lazy [Iterable] that wraps each element of the original array
+ * into an [IndexedValue] containing the index of that element and the element itself.
  */
 public fun DoubleArray.withIndex(): Iterable<IndexedValue<Double>> {
     return IndexingIterable { iterator() }
 }
 
 /**
- * Returns a lazy [Iterable] of [IndexedValue] for each element of the original array.
+ * Returns a lazy [Iterable] that wraps each element of the original array
+ * into an [IndexedValue] containing the index of that element and the element itself.
  */
 public fun BooleanArray.withIndex(): Iterable<IndexedValue<Boolean>> {
     return IndexingIterable { iterator() }
 }
 
 /**
- * Returns a lazy [Iterable] of [IndexedValue] for each element of the original array.
+ * Returns a lazy [Iterable] that wraps each element of the original array
+ * into an [IndexedValue] containing the index of that element and the element itself.
  */
 public fun CharArray.withIndex(): Iterable<IndexedValue<Char>> {
     return IndexingIterable { iterator() }
@@ -8692,6 +9640,8 @@ public fun CharArray.withIndex(): Iterable<IndexedValue<Char>> {
  * Returns a list containing only distinct elements from the given array.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public fun <T> Array<out T>.distinct(): List<T> {
     return this.toMutableSet().toList()
@@ -8701,6 +9651,8 @@ public fun <T> Array<out T>.distinct(): List<T> {
  * Returns a list containing only distinct elements from the given array.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public fun ByteArray.distinct(): List<Byte> {
     return this.toMutableSet().toList()
@@ -8710,6 +9662,8 @@ public fun ByteArray.distinct(): List<Byte> {
  * Returns a list containing only distinct elements from the given array.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public fun ShortArray.distinct(): List<Short> {
     return this.toMutableSet().toList()
@@ -8719,6 +9673,8 @@ public fun ShortArray.distinct(): List<Short> {
  * Returns a list containing only distinct elements from the given array.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public fun IntArray.distinct(): List<Int> {
     return this.toMutableSet().toList()
@@ -8728,6 +9684,8 @@ public fun IntArray.distinct(): List<Int> {
  * Returns a list containing only distinct elements from the given array.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public fun LongArray.distinct(): List<Long> {
     return this.toMutableSet().toList()
@@ -8737,6 +9695,8 @@ public fun LongArray.distinct(): List<Long> {
  * Returns a list containing only distinct elements from the given array.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public fun FloatArray.distinct(): List<Float> {
     return this.toMutableSet().toList()
@@ -8746,6 +9706,8 @@ public fun FloatArray.distinct(): List<Float> {
  * Returns a list containing only distinct elements from the given array.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public fun DoubleArray.distinct(): List<Double> {
     return this.toMutableSet().toList()
@@ -8755,6 +9717,8 @@ public fun DoubleArray.distinct(): List<Double> {
  * Returns a list containing only distinct elements from the given array.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public fun BooleanArray.distinct(): List<Boolean> {
     return this.toMutableSet().toList()
@@ -8764,6 +9728,8 @@ public fun BooleanArray.distinct(): List<Boolean> {
  * Returns a list containing only distinct elements from the given array.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public fun CharArray.distinct(): List<Char> {
     return this.toMutableSet().toList()
@@ -8774,6 +9740,8 @@ public fun CharArray.distinct(): List<Char> {
  * having distinct keys returned by the given [selector] function.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public inline fun <T, K> Array<out T>.distinctBy(selector: (T) -> K): List<T> {
     val set = HashSet<K>()
@@ -8791,6 +9759,8 @@ public inline fun <T, K> Array<out T>.distinctBy(selector: (T) -> K): List<T> {
  * having distinct keys returned by the given [selector] function.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public inline fun <K> ByteArray.distinctBy(selector: (Byte) -> K): List<Byte> {
     val set = HashSet<K>()
@@ -8808,6 +9778,8 @@ public inline fun <K> ByteArray.distinctBy(selector: (Byte) -> K): List<Byte> {
  * having distinct keys returned by the given [selector] function.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public inline fun <K> ShortArray.distinctBy(selector: (Short) -> K): List<Short> {
     val set = HashSet<K>()
@@ -8825,6 +9797,8 @@ public inline fun <K> ShortArray.distinctBy(selector: (Short) -> K): List<Short>
  * having distinct keys returned by the given [selector] function.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public inline fun <K> IntArray.distinctBy(selector: (Int) -> K): List<Int> {
     val set = HashSet<K>()
@@ -8842,6 +9816,8 @@ public inline fun <K> IntArray.distinctBy(selector: (Int) -> K): List<Int> {
  * having distinct keys returned by the given [selector] function.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public inline fun <K> LongArray.distinctBy(selector: (Long) -> K): List<Long> {
     val set = HashSet<K>()
@@ -8859,6 +9835,8 @@ public inline fun <K> LongArray.distinctBy(selector: (Long) -> K): List<Long> {
  * having distinct keys returned by the given [selector] function.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public inline fun <K> FloatArray.distinctBy(selector: (Float) -> K): List<Float> {
     val set = HashSet<K>()
@@ -8876,6 +9854,8 @@ public inline fun <K> FloatArray.distinctBy(selector: (Float) -> K): List<Float>
  * having distinct keys returned by the given [selector] function.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public inline fun <K> DoubleArray.distinctBy(selector: (Double) -> K): List<Double> {
     val set = HashSet<K>()
@@ -8893,6 +9873,8 @@ public inline fun <K> DoubleArray.distinctBy(selector: (Double) -> K): List<Doub
  * having distinct keys returned by the given [selector] function.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public inline fun <K> BooleanArray.distinctBy(selector: (Boolean) -> K): List<Boolean> {
     val set = HashSet<K>()
@@ -8910,6 +9892,8 @@ public inline fun <K> BooleanArray.distinctBy(selector: (Boolean) -> K): List<Bo
  * having distinct keys returned by the given [selector] function.
  * 
  * The elements in the resulting list are in the same order as they were in the source array.
+ * 
+ * @sample samples.collections.Collections.Transformations.distinctAndDistinctBy
  */
 public inline fun <K> CharArray.distinctBy(selector: (Char) -> K): List<Char> {
     val set = HashSet<K>()
@@ -8923,9 +9907,11 @@ public inline fun <K> CharArray.distinctBy(selector: (Char) -> K): List<Char> {
 }
 
 /**
- * Returns a set containing all elements that are contained by both this set and the specified collection.
+ * Returns a set containing all elements that are contained by both this array and the specified collection.
  * 
  * The returned set preserves the element iteration order of the original array.
+ * 
+ * To get a set containing all elements that are contained at least in one of these collections use [union].
  */
 public infix fun <T> Array<out T>.intersect(other: Iterable<T>): Set<T> {
     val set = this.toMutableSet()
@@ -8934,9 +9920,11 @@ public infix fun <T> Array<out T>.intersect(other: Iterable<T>): Set<T> {
 }
 
 /**
- * Returns a set containing all elements that are contained by both this set and the specified collection.
+ * Returns a set containing all elements that are contained by both this array and the specified collection.
  * 
  * The returned set preserves the element iteration order of the original array.
+ * 
+ * To get a set containing all elements that are contained at least in one of these collections use [union].
  */
 public infix fun ByteArray.intersect(other: Iterable<Byte>): Set<Byte> {
     val set = this.toMutableSet()
@@ -8945,9 +9933,11 @@ public infix fun ByteArray.intersect(other: Iterable<Byte>): Set<Byte> {
 }
 
 /**
- * Returns a set containing all elements that are contained by both this set and the specified collection.
+ * Returns a set containing all elements that are contained by both this array and the specified collection.
  * 
  * The returned set preserves the element iteration order of the original array.
+ * 
+ * To get a set containing all elements that are contained at least in one of these collections use [union].
  */
 public infix fun ShortArray.intersect(other: Iterable<Short>): Set<Short> {
     val set = this.toMutableSet()
@@ -8956,9 +9946,11 @@ public infix fun ShortArray.intersect(other: Iterable<Short>): Set<Short> {
 }
 
 /**
- * Returns a set containing all elements that are contained by both this set and the specified collection.
+ * Returns a set containing all elements that are contained by both this array and the specified collection.
  * 
  * The returned set preserves the element iteration order of the original array.
+ * 
+ * To get a set containing all elements that are contained at least in one of these collections use [union].
  */
 public infix fun IntArray.intersect(other: Iterable<Int>): Set<Int> {
     val set = this.toMutableSet()
@@ -8967,9 +9959,11 @@ public infix fun IntArray.intersect(other: Iterable<Int>): Set<Int> {
 }
 
 /**
- * Returns a set containing all elements that are contained by both this set and the specified collection.
+ * Returns a set containing all elements that are contained by both this array and the specified collection.
  * 
  * The returned set preserves the element iteration order of the original array.
+ * 
+ * To get a set containing all elements that are contained at least in one of these collections use [union].
  */
 public infix fun LongArray.intersect(other: Iterable<Long>): Set<Long> {
     val set = this.toMutableSet()
@@ -8978,9 +9972,11 @@ public infix fun LongArray.intersect(other: Iterable<Long>): Set<Long> {
 }
 
 /**
- * Returns a set containing all elements that are contained by both this set and the specified collection.
+ * Returns a set containing all elements that are contained by both this array and the specified collection.
  * 
  * The returned set preserves the element iteration order of the original array.
+ * 
+ * To get a set containing all elements that are contained at least in one of these collections use [union].
  */
 public infix fun FloatArray.intersect(other: Iterable<Float>): Set<Float> {
     val set = this.toMutableSet()
@@ -8989,9 +9985,11 @@ public infix fun FloatArray.intersect(other: Iterable<Float>): Set<Float> {
 }
 
 /**
- * Returns a set containing all elements that are contained by both this set and the specified collection.
+ * Returns a set containing all elements that are contained by both this array and the specified collection.
  * 
  * The returned set preserves the element iteration order of the original array.
+ * 
+ * To get a set containing all elements that are contained at least in one of these collections use [union].
  */
 public infix fun DoubleArray.intersect(other: Iterable<Double>): Set<Double> {
     val set = this.toMutableSet()
@@ -9000,9 +9998,11 @@ public infix fun DoubleArray.intersect(other: Iterable<Double>): Set<Double> {
 }
 
 /**
- * Returns a set containing all elements that are contained by both this set and the specified collection.
+ * Returns a set containing all elements that are contained by both this array and the specified collection.
  * 
  * The returned set preserves the element iteration order of the original array.
+ * 
+ * To get a set containing all elements that are contained at least in one of these collections use [union].
  */
 public infix fun BooleanArray.intersect(other: Iterable<Boolean>): Set<Boolean> {
     val set = this.toMutableSet()
@@ -9011,9 +10011,11 @@ public infix fun BooleanArray.intersect(other: Iterable<Boolean>): Set<Boolean> 
 }
 
 /**
- * Returns a set containing all elements that are contained by both this set and the specified collection.
+ * Returns a set containing all elements that are contained by both this array and the specified collection.
  * 
  * The returned set preserves the element iteration order of the original array.
+ * 
+ * To get a set containing all elements that are contained at least in one of these collections use [union].
  */
 public infix fun CharArray.intersect(other: Iterable<Char>): Set<Char> {
     val set = this.toMutableSet()
@@ -9225,6 +10227,8 @@ public fun CharArray.toMutableSet(): MutableSet<Char> {
  * The returned set preserves the element iteration order of the original array.
  * Those elements of the [other] collection that are unique are iterated in the end
  * in the order of the [other] collection.
+ * 
+ * To get a set containing all elements that are contained in both collections use [intersect].
  */
 public infix fun <T> Array<out T>.union(other: Iterable<T>): Set<T> {
     val set = this.toMutableSet()
@@ -9238,6 +10242,8 @@ public infix fun <T> Array<out T>.union(other: Iterable<T>): Set<T> {
  * The returned set preserves the element iteration order of the original array.
  * Those elements of the [other] collection that are unique are iterated in the end
  * in the order of the [other] collection.
+ * 
+ * To get a set containing all elements that are contained in both collections use [intersect].
  */
 public infix fun ByteArray.union(other: Iterable<Byte>): Set<Byte> {
     val set = this.toMutableSet()
@@ -9251,6 +10257,8 @@ public infix fun ByteArray.union(other: Iterable<Byte>): Set<Byte> {
  * The returned set preserves the element iteration order of the original array.
  * Those elements of the [other] collection that are unique are iterated in the end
  * in the order of the [other] collection.
+ * 
+ * To get a set containing all elements that are contained in both collections use [intersect].
  */
 public infix fun ShortArray.union(other: Iterable<Short>): Set<Short> {
     val set = this.toMutableSet()
@@ -9264,6 +10272,8 @@ public infix fun ShortArray.union(other: Iterable<Short>): Set<Short> {
  * The returned set preserves the element iteration order of the original array.
  * Those elements of the [other] collection that are unique are iterated in the end
  * in the order of the [other] collection.
+ * 
+ * To get a set containing all elements that are contained in both collections use [intersect].
  */
 public infix fun IntArray.union(other: Iterable<Int>): Set<Int> {
     val set = this.toMutableSet()
@@ -9277,6 +10287,8 @@ public infix fun IntArray.union(other: Iterable<Int>): Set<Int> {
  * The returned set preserves the element iteration order of the original array.
  * Those elements of the [other] collection that are unique are iterated in the end
  * in the order of the [other] collection.
+ * 
+ * To get a set containing all elements that are contained in both collections use [intersect].
  */
 public infix fun LongArray.union(other: Iterable<Long>): Set<Long> {
     val set = this.toMutableSet()
@@ -9290,6 +10302,8 @@ public infix fun LongArray.union(other: Iterable<Long>): Set<Long> {
  * The returned set preserves the element iteration order of the original array.
  * Those elements of the [other] collection that are unique are iterated in the end
  * in the order of the [other] collection.
+ * 
+ * To get a set containing all elements that are contained in both collections use [intersect].
  */
 public infix fun FloatArray.union(other: Iterable<Float>): Set<Float> {
     val set = this.toMutableSet()
@@ -9303,6 +10317,8 @@ public infix fun FloatArray.union(other: Iterable<Float>): Set<Float> {
  * The returned set preserves the element iteration order of the original array.
  * Those elements of the [other] collection that are unique are iterated in the end
  * in the order of the [other] collection.
+ * 
+ * To get a set containing all elements that are contained in both collections use [intersect].
  */
 public infix fun DoubleArray.union(other: Iterable<Double>): Set<Double> {
     val set = this.toMutableSet()
@@ -9316,6 +10332,8 @@ public infix fun DoubleArray.union(other: Iterable<Double>): Set<Double> {
  * The returned set preserves the element iteration order of the original array.
  * Those elements of the [other] collection that are unique are iterated in the end
  * in the order of the [other] collection.
+ * 
+ * To get a set containing all elements that are contained in both collections use [intersect].
  */
 public infix fun BooleanArray.union(other: Iterable<Boolean>): Set<Boolean> {
     val set = this.toMutableSet()
@@ -9329,6 +10347,8 @@ public infix fun BooleanArray.union(other: Iterable<Boolean>): Set<Boolean> {
  * The returned set preserves the element iteration order of the original array.
  * Those elements of the [other] collection that are unique are iterated in the end
  * in the order of the [other] collection.
+ * 
+ * To get a set containing all elements that are contained in both collections use [intersect].
  */
 public infix fun CharArray.union(other: Iterable<Char>): Set<Char> {
     val set = this.toMutableSet()
@@ -9674,7 +10694,7 @@ public inline fun CharArray.count(): Int {
  */
 public inline fun <T> Array<out T>.count(predicate: (T) -> Boolean): Int {
     var count = 0
-    for (element in this) if (predicate(element)) count++
+    for (element in this) if (predicate(element)) ++count
     return count
 }
 
@@ -9683,7 +10703,7 @@ public inline fun <T> Array<out T>.count(predicate: (T) -> Boolean): Int {
  */
 public inline fun ByteArray.count(predicate: (Byte) -> Boolean): Int {
     var count = 0
-    for (element in this) if (predicate(element)) count++
+    for (element in this) if (predicate(element)) ++count
     return count
 }
 
@@ -9692,7 +10712,7 @@ public inline fun ByteArray.count(predicate: (Byte) -> Boolean): Int {
  */
 public inline fun ShortArray.count(predicate: (Short) -> Boolean): Int {
     var count = 0
-    for (element in this) if (predicate(element)) count++
+    for (element in this) if (predicate(element)) ++count
     return count
 }
 
@@ -9701,7 +10721,7 @@ public inline fun ShortArray.count(predicate: (Short) -> Boolean): Int {
  */
 public inline fun IntArray.count(predicate: (Int) -> Boolean): Int {
     var count = 0
-    for (element in this) if (predicate(element)) count++
+    for (element in this) if (predicate(element)) ++count
     return count
 }
 
@@ -9710,7 +10730,7 @@ public inline fun IntArray.count(predicate: (Int) -> Boolean): Int {
  */
 public inline fun LongArray.count(predicate: (Long) -> Boolean): Int {
     var count = 0
-    for (element in this) if (predicate(element)) count++
+    for (element in this) if (predicate(element)) ++count
     return count
 }
 
@@ -9719,7 +10739,7 @@ public inline fun LongArray.count(predicate: (Long) -> Boolean): Int {
  */
 public inline fun FloatArray.count(predicate: (Float) -> Boolean): Int {
     var count = 0
-    for (element in this) if (predicate(element)) count++
+    for (element in this) if (predicate(element)) ++count
     return count
 }
 
@@ -9728,7 +10748,7 @@ public inline fun FloatArray.count(predicate: (Float) -> Boolean): Int {
  */
 public inline fun DoubleArray.count(predicate: (Double) -> Boolean): Int {
     var count = 0
-    for (element in this) if (predicate(element)) count++
+    for (element in this) if (predicate(element)) ++count
     return count
 }
 
@@ -9737,7 +10757,7 @@ public inline fun DoubleArray.count(predicate: (Double) -> Boolean): Int {
  */
 public inline fun BooleanArray.count(predicate: (Boolean) -> Boolean): Int {
     var count = 0
-    for (element in this) if (predicate(element)) count++
+    for (element in this) if (predicate(element)) ++count
     return count
 }
 
@@ -9746,7 +10766,7 @@ public inline fun BooleanArray.count(predicate: (Boolean) -> Boolean): Int {
  */
 public inline fun CharArray.count(predicate: (Char) -> Boolean): Int {
     var count = 0
-    for (element in this) if (predicate(element)) count++
+    for (element in this) if (predicate(element)) ++count
     return count
 }
 
@@ -10503,10 +11523,14 @@ public fun CharArray.max(): Char? {
 
 /**
  * Returns the first element yielding the largest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.maxBy
  */
 public inline fun <T, R : Comparable<R>> Array<out T>.maxBy(selector: (T) -> R): T? {
     if (isEmpty()) return null
     var maxElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return maxElem
     var maxValue = selector(maxElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -10521,10 +11545,14 @@ public inline fun <T, R : Comparable<R>> Array<out T>.maxBy(selector: (T) -> R):
 
 /**
  * Returns the first element yielding the largest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.maxBy
  */
 public inline fun <R : Comparable<R>> ByteArray.maxBy(selector: (Byte) -> R): Byte? {
     if (isEmpty()) return null
     var maxElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return maxElem
     var maxValue = selector(maxElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -10539,10 +11567,14 @@ public inline fun <R : Comparable<R>> ByteArray.maxBy(selector: (Byte) -> R): By
 
 /**
  * Returns the first element yielding the largest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.maxBy
  */
 public inline fun <R : Comparable<R>> ShortArray.maxBy(selector: (Short) -> R): Short? {
     if (isEmpty()) return null
     var maxElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return maxElem
     var maxValue = selector(maxElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -10557,10 +11589,14 @@ public inline fun <R : Comparable<R>> ShortArray.maxBy(selector: (Short) -> R): 
 
 /**
  * Returns the first element yielding the largest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.maxBy
  */
 public inline fun <R : Comparable<R>> IntArray.maxBy(selector: (Int) -> R): Int? {
     if (isEmpty()) return null
     var maxElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return maxElem
     var maxValue = selector(maxElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -10575,10 +11611,14 @@ public inline fun <R : Comparable<R>> IntArray.maxBy(selector: (Int) -> R): Int?
 
 /**
  * Returns the first element yielding the largest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.maxBy
  */
 public inline fun <R : Comparable<R>> LongArray.maxBy(selector: (Long) -> R): Long? {
     if (isEmpty()) return null
     var maxElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return maxElem
     var maxValue = selector(maxElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -10593,10 +11633,14 @@ public inline fun <R : Comparable<R>> LongArray.maxBy(selector: (Long) -> R): Lo
 
 /**
  * Returns the first element yielding the largest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.maxBy
  */
 public inline fun <R : Comparable<R>> FloatArray.maxBy(selector: (Float) -> R): Float? {
     if (isEmpty()) return null
     var maxElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return maxElem
     var maxValue = selector(maxElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -10611,10 +11655,14 @@ public inline fun <R : Comparable<R>> FloatArray.maxBy(selector: (Float) -> R): 
 
 /**
  * Returns the first element yielding the largest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.maxBy
  */
 public inline fun <R : Comparable<R>> DoubleArray.maxBy(selector: (Double) -> R): Double? {
     if (isEmpty()) return null
     var maxElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return maxElem
     var maxValue = selector(maxElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -10629,10 +11677,14 @@ public inline fun <R : Comparable<R>> DoubleArray.maxBy(selector: (Double) -> R)
 
 /**
  * Returns the first element yielding the largest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.maxBy
  */
 public inline fun <R : Comparable<R>> BooleanArray.maxBy(selector: (Boolean) -> R): Boolean? {
     if (isEmpty()) return null
     var maxElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return maxElem
     var maxValue = selector(maxElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -10647,10 +11699,14 @@ public inline fun <R : Comparable<R>> BooleanArray.maxBy(selector: (Boolean) -> 
 
 /**
  * Returns the first element yielding the largest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.maxBy
  */
 public inline fun <R : Comparable<R>> CharArray.maxBy(selector: (Char) -> R): Char? {
     if (isEmpty()) return null
     var maxElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return maxElem
     var maxValue = selector(maxElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -10930,10 +11986,14 @@ public fun CharArray.min(): Char? {
 
 /**
  * Returns the first element yielding the smallest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.minBy
  */
 public inline fun <T, R : Comparable<R>> Array<out T>.minBy(selector: (T) -> R): T? {
     if (isEmpty()) return null
     var minElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return minElem
     var minValue = selector(minElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -10948,10 +12008,14 @@ public inline fun <T, R : Comparable<R>> Array<out T>.minBy(selector: (T) -> R):
 
 /**
  * Returns the first element yielding the smallest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.minBy
  */
 public inline fun <R : Comparable<R>> ByteArray.minBy(selector: (Byte) -> R): Byte? {
     if (isEmpty()) return null
     var minElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return minElem
     var minValue = selector(minElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -10966,10 +12030,14 @@ public inline fun <R : Comparable<R>> ByteArray.minBy(selector: (Byte) -> R): By
 
 /**
  * Returns the first element yielding the smallest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.minBy
  */
 public inline fun <R : Comparable<R>> ShortArray.minBy(selector: (Short) -> R): Short? {
     if (isEmpty()) return null
     var minElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return minElem
     var minValue = selector(minElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -10984,10 +12052,14 @@ public inline fun <R : Comparable<R>> ShortArray.minBy(selector: (Short) -> R): 
 
 /**
  * Returns the first element yielding the smallest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.minBy
  */
 public inline fun <R : Comparable<R>> IntArray.minBy(selector: (Int) -> R): Int? {
     if (isEmpty()) return null
     var minElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return minElem
     var minValue = selector(minElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -11002,10 +12074,14 @@ public inline fun <R : Comparable<R>> IntArray.minBy(selector: (Int) -> R): Int?
 
 /**
  * Returns the first element yielding the smallest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.minBy
  */
 public inline fun <R : Comparable<R>> LongArray.minBy(selector: (Long) -> R): Long? {
     if (isEmpty()) return null
     var minElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return minElem
     var minValue = selector(minElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -11020,10 +12096,14 @@ public inline fun <R : Comparable<R>> LongArray.minBy(selector: (Long) -> R): Lo
 
 /**
  * Returns the first element yielding the smallest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.minBy
  */
 public inline fun <R : Comparable<R>> FloatArray.minBy(selector: (Float) -> R): Float? {
     if (isEmpty()) return null
     var minElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return minElem
     var minValue = selector(minElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -11038,10 +12118,14 @@ public inline fun <R : Comparable<R>> FloatArray.minBy(selector: (Float) -> R): 
 
 /**
  * Returns the first element yielding the smallest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.minBy
  */
 public inline fun <R : Comparable<R>> DoubleArray.minBy(selector: (Double) -> R): Double? {
     if (isEmpty()) return null
     var minElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return minElem
     var minValue = selector(minElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -11056,10 +12140,14 @@ public inline fun <R : Comparable<R>> DoubleArray.minBy(selector: (Double) -> R)
 
 /**
  * Returns the first element yielding the smallest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.minBy
  */
 public inline fun <R : Comparable<R>> BooleanArray.minBy(selector: (Boolean) -> R): Boolean? {
     if (isEmpty()) return null
     var minElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return minElem
     var minValue = selector(minElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -11074,10 +12162,14 @@ public inline fun <R : Comparable<R>> BooleanArray.minBy(selector: (Boolean) -> 
 
 /**
  * Returns the first element yielding the smallest value of the given function or `null` if there are no elements.
+ * 
+ * @sample samples.collections.Collections.Aggregates.minBy
  */
 public inline fun <R : Comparable<R>> CharArray.minBy(selector: (Char) -> R): Char? {
     if (isEmpty()) return null
     var minElem = this[0]
+    val lastIndex = this.lastIndex
+    if (lastIndex == 0) return minElem
     var minValue = selector(minElem)
     for (i in 1..lastIndex) {
         val e = this[i]
@@ -13477,7 +14569,7 @@ public fun Array<out Byte>.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        ++count
     }
     return if (count == 0) Double.NaN else sum / count
 }
@@ -13491,7 +14583,7 @@ public fun Array<out Short>.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        ++count
     }
     return if (count == 0) Double.NaN else sum / count
 }
@@ -13505,7 +14597,7 @@ public fun Array<out Int>.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        ++count
     }
     return if (count == 0) Double.NaN else sum / count
 }
@@ -13519,7 +14611,7 @@ public fun Array<out Long>.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        ++count
     }
     return if (count == 0) Double.NaN else sum / count
 }
@@ -13533,7 +14625,7 @@ public fun Array<out Float>.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        ++count
     }
     return if (count == 0) Double.NaN else sum / count
 }
@@ -13547,7 +14639,7 @@ public fun Array<out Double>.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        ++count
     }
     return if (count == 0) Double.NaN else sum / count
 }
@@ -13560,7 +14652,7 @@ public fun ByteArray.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        ++count
     }
     return if (count == 0) Double.NaN else sum / count
 }
@@ -13573,7 +14665,7 @@ public fun ShortArray.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        ++count
     }
     return if (count == 0) Double.NaN else sum / count
 }
@@ -13586,7 +14678,7 @@ public fun IntArray.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        ++count
     }
     return if (count == 0) Double.NaN else sum / count
 }
@@ -13599,7 +14691,7 @@ public fun LongArray.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        ++count
     }
     return if (count == 0) Double.NaN else sum / count
 }
@@ -13612,7 +14704,7 @@ public fun FloatArray.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        ++count
     }
     return if (count == 0) Double.NaN else sum / count
 }
@@ -13625,7 +14717,7 @@ public fun DoubleArray.average(): Double {
     var count: Int = 0
     for (element in this) {
         sum += element
-        count += 1
+        ++count
     }
     return if (count == 0) Double.NaN else sum / count
 }

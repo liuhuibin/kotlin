@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.formatter
@@ -34,7 +34,7 @@ class KotlinSaveStylePanel(settings: CodeStyleSettings) : CodeStyleAbstractPanel
     private val saveDefaultsComboBox = ComboBox<SaveItem>()
     private val saveDefaultsItems = listOf(
         SaveItem("<ide defaults>", null),
-        SaveItem("Current set of defaults", "KOTLIN_OLD_DEFAULTS"),
+        SaveItem(KotlinObsoleteCodeStyle.CODE_STYLE_TITLE, KotlinObsoleteCodeStyle.CODE_STYLE_ID),
         SaveItem(KotlinStyleGuideCodeStyle.CODE_STYLE_TITLE, KotlinStyleGuideCodeStyle.CODE_STYLE_ID)
     )
 

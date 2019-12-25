@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.inspections
@@ -12,7 +12,6 @@ import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElementVisitor
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
-import org.jetbrains.kotlin.idea.caches.resolve.analyze
 import org.jetbrains.kotlin.idea.caches.resolve.resolveToCall
 import org.jetbrains.kotlin.idea.intentions.callExpression
 import org.jetbrains.kotlin.idea.intentions.calleeName
@@ -20,8 +19,6 @@ import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.createExpressionByPattern
 import org.jetbrains.kotlin.psi.dotQualifiedExpressionVisitor
-import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall
-import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 
 class ReplaceToWithInfixFormInspection : AbstractKotlinInspection() {
     private val compatibleNames = setOf("to")
@@ -53,7 +50,11 @@ class ReplaceToWithInfixFormQuickfix : LocalQuickFix {
 
     override fun applyFix(project: Project, descriptor: ProblemDescriptor) {
         val element = descriptor.psiElement as KtDotQualifiedExpression
-        element.replace(KtPsiFactory(element).createExpressionByPattern("$0 to $1", element.receiverExpression,
-                                                                        element.callExpression?.valueArguments?.get(0)?.getArgumentExpression() ?: return))
+        element.replace(
+            KtPsiFactory(element).createExpressionByPattern(
+                "$0 to $1", element.receiverExpression,
+                element.callExpression?.valueArguments?.get(0)?.getArgumentExpression() ?: return
+            )
+        )
     }
 }

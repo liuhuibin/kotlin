@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.config
@@ -15,7 +15,7 @@ enum class LanguageFeature(
     val sinceApiVersion: ApiVersion = ApiVersion.KOTLIN_1_0,
     val hintUrl: String? = null,
     val defaultState: State = State.ENABLED,
-    val kind: Kind = OTHER // NB: default value OTHER doesn't forces pre-releaseness (see KDoc)
+    val kind: Kind = OTHER // NB: default value OTHER doesn't force pre-releaseness (see KDoc)
 ) {
     // Note: names of these entries are also used in diagnostic tests and in user-visible messages (see presentableText below)
     TypeAliases(KOTLIN_1_1),
@@ -57,29 +57,76 @@ enum class LanguageFeature(
     ExpectedTypeFromCast(KOTLIN_1_2),
     DefaultMethodsCallFromJava6TargetError(KOTLIN_1_2),
 
-    BooleanElvisBoundSmartCasts(KOTLIN_1_3),
     RestrictionOfValReassignmentViaBackingField(KOTLIN_1_3, kind = BUG_FIX),
     NestedClassesInEnumEntryShouldBeInner(KOTLIN_1_3, kind = BUG_FIX),
     ProhibitDataClassesOverridingCopy(KOTLIN_1_3, kind = BUG_FIX),
     RestrictionOfWrongAnnotationsWithUseSiteTargetsOnTypes(KOTLIN_1_3, kind = BUG_FIX),
     ProhibitInnerClassesOfGenericClassExtendingThrowable(KOTLIN_1_3, kind = BUG_FIX),
-    ProperVisibilityForCompanionObjectInstanceField(KOTLIN_1_3, kind = BUG_FIX),
     ProperForInArrayLoopRangeVariableAssignmentSemantic(KOTLIN_1_3, kind = BUG_FIX),
     NestedClassesInAnnotations(KOTLIN_1_3),
     JvmStaticInInterface(KOTLIN_1_3, kind = UNSTABLE_FEATURE),
+    JvmFieldInInterface(KOTLIN_1_3, kind = UNSTABLE_FEATURE),
     ProhibitVisibilityOfNestedClassifiersFromSupertypesOfCompanion(KOTLIN_1_3, kind = BUG_FIX),
     ProhibitNonConstValuesAsVarargsInAnnotations(KOTLIN_1_3, kind = BUG_FIX),
     ReleaseCoroutines(KOTLIN_1_3, kind = UNSTABLE_FEATURE),
     ReadDeserializedContracts(KOTLIN_1_3),
     UseReturnsEffect(KOTLIN_1_3),
     UseCallsInPlaceEffect(KOTLIN_1_3),
+    AllowContractsForCustomFunctions(KOTLIN_1_3),
     VariableDeclarationInWhenSubject(KOTLIN_1_3),
-    AllowContractsForCustomFunctions(KOTLIN_1_3, kind = UNSTABLE_FEATURE),
     ProhibitLocalAnnotations(KOTLIN_1_3, kind = BUG_FIX),
     ProhibitSmartcastsOnLocalDelegatedProperty(KOTLIN_1_3, kind = BUG_FIX),
+    ProhibitOperatorMod(KOTLIN_1_3, kind = BUG_FIX),
+    ProhibitAssigningSingleElementsToVarargsInNamedForm(KOTLIN_1_3, kind = BUG_FIX),
+    FunctionTypesWithBigArity(KOTLIN_1_3, sinceApiVersion = ApiVersion.KOTLIN_1_3),
+    RestrictRetentionForExpressionAnnotations(KOTLIN_1_3, kind = BUG_FIX),
+    NormalizeConstructorCalls(KOTLIN_1_3),
+    StrictJavaNullabilityAssertions(KOTLIN_1_3, kind = BUG_FIX),
+    SoundSmartcastForEnumEntries(KOTLIN_1_3, kind = BUG_FIX),
+    ProhibitErroneousExpressionsInAnnotationsWithUseSiteTargets(KOTLIN_1_3, kind = BUG_FIX),
+    NewCapturedReceiverFieldNamingConvention(KOTLIN_1_3, kind = BUG_FIX),
+    ExtendedMainConvention(KOTLIN_1_3),
+    ExperimentalBuilderInference(KOTLIN_1_3),
 
-    StrictJavaNullabilityAssertions(sinceVersion = null, defaultState = State.DISABLED),
-    ProperIeee754Comparisons(sinceVersion = null, defaultState = State.DISABLED),
+    DslMarkerOnFunctionTypeReceiver(KOTLIN_1_4, kind = BUG_FIX),
+    RestrictReturnStatementTarget(KOTLIN_1_4, kind = BUG_FIX),
+    NoConstantValueAttributeForNonConstVals(KOTLIN_1_4, kind = BUG_FIX),
+    WarningOnMainUnusedParameter(KOTLIN_1_4),
+    PolymorphicSignature(KOTLIN_1_4),
+    ProhibitConcurrentHashMapContains(KOTLIN_1_4, kind = BUG_FIX),
+    ProhibitTypeParametersForLocalVariables(KOTLIN_1_4, kind = BUG_FIX),
+    ProhibitJvmOverloadsOnConstructorsOfAnnotationClasses(KOTLIN_1_4, kind = BUG_FIX),
+    ProhibitTypeParametersInAnonymousObjects(KOTLIN_1_4, kind = BUG_FIX),
+    ProperInlineFromHigherPlatformDiagnostic(KOTLIN_1_4, kind = BUG_FIX),
+    ProhibitRepeatedUseSiteTargetAnnotations(KOTLIN_1_4, kind = BUG_FIX),
+    ProhibitUseSiteTargetAnnotationsOnSuperTypes(KOTLIN_1_4, kind = BUG_FIX),
+    ProhibitTypeParametersInClassLiteralsInAnnotationArguments(KOTLIN_1_4, kind = BUG_FIX),
+    ProhibitComparisonOfIncompatibleEnums(KOTLIN_1_4, kind = BUG_FIX),
+    BareArrayClassLiteral(KOTLIN_1_4),
+    ProhibitGenericArrayClassLiteral(KOTLIN_1_4),
+    NonParenthesizedAnnotationsOnFunctionalTypes(KOTLIN_1_4),
+    UseGetterNameForPropertyAnnotationsMethodOnJvm(KOTLIN_1_4),
+    AllowBreakAndContinueInsideWhen(KOTLIN_1_4),
+    MixedNamedArgumentsInTheirOwnPosition(KOTLIN_1_4),
+    ProhibitTailrecOnVirtualMember(KOTLIN_1_4, kind = BUG_FIX),
+    ProperComputationOrderOfTailrecDefaultParameters(KOTLIN_1_4),
+    AllowNullableArrayArgsInMain(KOTLIN_1_4),
+    TrailingCommas(KOTLIN_1_4),
+    ProhibitInvisibleAbstractMethodsInSuperclasses(KOTLIN_1_4, kind = BUG_FIX),
+    ProhibitNonReifiedArraysAsReifiedTypeArguments(KOTLIN_1_4, kind = BUG_FIX),
+    ProhibitProtectedCallFromInline(KOTLIN_1_4, kind = BUG_FIX),
+    ProperFinally(KOTLIN_1_4, kind = BUG_FIX),
+    ProhibitVarargAsArrayAfterSamArgument(KOTLIN_1_4, kind = BUG_FIX),
+    AllowAssigningArrayElementsToVarargsInNamedFormForFunctions(KOTLIN_1_4),
+    AllowNullOperatorsForResult(KOTLIN_1_4),
+    AllowResultInReturnType(KOTLIN_1_4),
+    PreferJavaFieldOverload(KOTLIN_1_4),
+
+    ProperVisibilityForCompanionObjectInstanceField(sinceVersion = null, kind = BUG_FIX),
+    // Temporarily disabled, see KT-27084/KT-22379
+    SoundSmartcastFromLoopConditionForLoopAssignedVariables(sinceVersion = null, kind = BUG_FIX),
+
+    ProperIeee754Comparisons(sinceVersion = null, defaultState = State.DISABLED, kind = BUG_FIX),
 
     // Experimental features
 
@@ -92,11 +139,18 @@ enum class LanguageFeature(
     MultiPlatformProjects(sinceVersion = null, defaultState = State.DISABLED),
 
     NewInference(sinceVersion = KOTLIN_1_3, defaultState = State.DISABLED),
-
+    // In the next block, features can be enabled only along with new inference
+    BooleanElvisBoundSmartCasts(sinceVersion = KOTLIN_1_3, defaultState = State.DISABLED), // see KT-26357 for details
     SamConversionForKotlinFunctions(sinceVersion = KOTLIN_1_3, defaultState = State.DISABLED),
+    SamConversionPerArgument(sinceVersion = KOTLIN_1_3, defaultState = State.DISABLED),
+    NewDataFlowForTryExpressions(sinceVersion = KOTLIN_1_3, defaultState = State.DISABLED),
+    FunctionReferenceWithDefaultValueAsOtherType(sinceVersion = KOTLIN_1_3, defaultState = State.DISABLED),
+    // ------
+    // Next features can be enabled regardless of new inference
 
     InlineClasses(sinceVersion = KOTLIN_1_3, defaultState = State.ENABLED_WITH_WARNING, kind = UNSTABLE_FEATURE),
 
+    ContractsOnCallsWithImplicitReceiver(sinceVersion = KOTLIN_1_3, defaultState = State.DISABLED),
     ;
 
     val presentableName: String
@@ -113,7 +167,7 @@ enum class LanguageFeature(
     }
 
     /**
-     * # [enabledInProgressiveMode]
+     * # [forcesPreReleaseBinaries]
      * If 'true', then enabling this feature (e.g. by '-XXLanguage:', or dedicated '-X'-flag)
      * will force generation of pre-release binaries (given that [sinceVersion] > [LanguageVersion.LATEST_STABLE]).
      * Use it for features that involve generation of non-trivial low-level code with non-finalized design.
@@ -124,8 +178,8 @@ enum class LanguageFeature(
      * generate 'kotlin-compiler' as pre-release.
      *
      *
-     * # [forcesPreReleaseBinaries]
-     * If 'true', then this feature will be automatically enabled under '-Xprogressive' mode.
+     * # [enabledInProgressiveMode]
+     * If 'true', then this feature will be automatically enabled under '-progressive' mode.
      *
      * Restrictions for using this flag for particular feature follow from restrictions of the progressive mode:
      * - enabling it *must not* break compatibility with non-progressive compiler, i.e. code written under progressive
@@ -178,7 +232,8 @@ enum class LanguageVersion(val major: Int, val minor: Int) : DescriptionAware {
     KOTLIN_1_0(1, 0),
     KOTLIN_1_1(1, 1),
     KOTLIN_1_2(1, 2),
-    KOTLIN_1_3(1, 3);
+    KOTLIN_1_3(1, 3),
+    KOTLIN_1_4(1, 4);
 
     val isStable: Boolean
         get() = this <= LATEST_STABLE
@@ -200,7 +255,10 @@ enum class LanguageVersion(val major: Int, val minor: Int) : DescriptionAware {
             str.split(".", "-").let { if (it.size >= 2) fromVersionString("${it[0]}.${it[1]}") else null }
 
         @JvmField
-        val LATEST_STABLE = KOTLIN_1_2
+        val FIRST_SUPPORTED = KOTLIN_1_2
+
+        @JvmField
+        val LATEST_STABLE = KOTLIN_1_3
     }
 }
 

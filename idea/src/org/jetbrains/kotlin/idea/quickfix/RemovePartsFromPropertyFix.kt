@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.quickfix
@@ -21,29 +10,33 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.diagnostics.Diagnostic
 import org.jetbrains.kotlin.diagnostics.Errors
+import org.jetbrains.kotlin.idea.caches.resolve.getResolutionFacade
 import org.jetbrains.kotlin.idea.core.quickfix.QuickFixUtil
 import org.jetbrains.kotlin.idea.intentions.SpecifyTypeExplicitlyIntention
+import org.jetbrains.kotlin.idea.resolve.frontendService
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.types.checker.KotlinTypeRefiner
 import org.jetbrains.kotlin.types.isError
+import org.jetbrains.kotlin.types.refinement.TypeRefinement
 
 open class RemovePartsFromPropertyFix(
-        element: KtProperty,
-        private val removeInitializer: Boolean,
-        private val removeGetter: Boolean,
-        private val removeSetter: Boolean
+    element: KtProperty,
+    private val removeInitializer: Boolean,
+    private val removeGetter: Boolean,
+    private val removeSetter: Boolean
 ) : KotlinQuickFixAction<KtProperty>(element) {
 
     private constructor(element: KtProperty) : this(
-            element,
-            element.hasInitializer(),
-            element.getter?.bodyExpression != null,
-            element.setter?.bodyExpression != null
+        element,
+        element.hasInitializer(),
+        element.getter?.bodyExpression != null,
+        element.setter?.bodyExpression != null
     )
 
     override fun getText(): String =
-            "Remove ${partsToRemove(removeGetter, removeSetter, removeInitializer)} from property"
+        "Remove ${partsToRemove(removeGetter, removeSetter, removeInitializer)} from property"
 
     override fun getFamilyName(): String = "Remove parts from property"
 
@@ -79,6 +72,18 @@ open class RemovePartsFromPropertyFix(
         }
         val replaceElement = element?.replace(newElement) as? KtProperty
         if (replaceElement != null && typeToAdd != null) {
+            // `refineType` call here is needed to avoid InvalidModuleException exception
+            //
+            // It happens because after refinement KotlinTypes may access ModuleDescriptor content
+            // and that module becomes invalid after replacement two lines above
+            //
+            // The actual problem is that we use a type obtained from the obsolete analysis session
+            // The ideal fix would be using a String that needs to be rendered instead of actual type
+            //
+            // But calling another type refinement also helps because it makes KotlinType instance using new module descriptor
+            @UseExperimental(TypeRefinement::class)
+            typeToAdd = replaceElement.getResolutionFacade().frontendService<KotlinTypeRefiner>().refineType(typeToAdd)
+
             SpecifyTypeExplicitlyIntention.addTypeAnnotation(editor, replaceElement, typeToAdd)
         }
     }

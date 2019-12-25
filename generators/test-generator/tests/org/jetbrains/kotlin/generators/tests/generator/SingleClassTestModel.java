@@ -31,12 +31,15 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
-public class SingleClassTestModel implements TestClassModel {
+public class SingleClassTestModel extends TestClassModel {
     @NotNull
     private final File rootFile;
     @NotNull
     private final Pattern filenamePattern;
+    @Nullable
+    private final Pattern excludePattern;
     @Nullable
     private final Boolean checkFilenameStartsLowerCase;
     @NotNull
@@ -50,25 +53,35 @@ public class SingleClassTestModel implements TestClassModel {
 
     private final boolean skipIgnored;
     private final String testRunnerMethodName;
+    private final List<String> additionalRunnerArguments;
+
+    @NotNull
+    private final List<AnnotationModel> annotations;
 
     public SingleClassTestModel(
             @NotNull File rootFile,
             @NotNull Pattern filenamePattern,
+            @Nullable Pattern excludePattern,
             @Nullable Boolean checkFilenameStartsLowerCase,
             @NotNull String doTestMethodName,
             @NotNull String testClassName,
             @NotNull TargetBackend targetBackend,
             boolean skipIgnored,
-            String testRunnerMethodName
+            String testRunnerMethodName,
+            List<String> additionalRunnerArguments,
+            @NotNull List<AnnotationModel> annotations
     ) {
         this.rootFile = rootFile;
         this.filenamePattern = filenamePattern;
+        this.excludePattern = excludePattern;
         this.checkFilenameStartsLowerCase = checkFilenameStartsLowerCase;
         this.doTestMethodName = doTestMethodName;
         this.testClassName = testClassName;
         this.targetBackend = targetBackend;
         this.skipIgnored = skipIgnored;
         this.testRunnerMethodName = testRunnerMethodName;
+        this.additionalRunnerArguments = additionalRunnerArguments;
+        this.annotations = annotations;
     }
 
     @NotNull
@@ -83,7 +96,7 @@ public class SingleClassTestModel implements TestClassModel {
         if (methods == null) {
             List<MethodModel> result = new ArrayList<>();
 
-            result.add(new RunTestMethodModel(targetBackend, doTestMethodName, testRunnerMethodName));
+            result.add(new RunTestMethodModel(targetBackend, doTestMethodName, testRunnerMethodName, additionalRunnerArguments));
 
             result.add(new TestAllFilesPresentMethodModel());
 
@@ -131,7 +144,13 @@ public class SingleClassTestModel implements TestClassModel {
         return testClassName;
     }
 
-    private class TestAllFilesPresentMethodModel implements TestMethodModel {
+    @NotNull
+    @Override
+    public Collection<AnnotationModel> getAnnotations() {
+        return annotations;
+    }
+
+    private class TestAllFilesPresentMethodModel extends TestMethodModel {
         @NotNull
         @Override
         public String getName() {
@@ -140,22 +159,33 @@ public class SingleClassTestModel implements TestClassModel {
 
         @Override
         public void generateBody(@NotNull Printer p) {
-            String assertTestsPresentStr = String.format(
-                    "KotlinTestUtils.assertAllTestsPresentInSingleGeneratedClass(this.getClass(), new File(\"%s\"), Pattern.compile(\"%s\"), %s.%s);",
-                    KotlinTestUtils.getFilePath(rootFile), StringUtil.escapeStringCharacters(filenamePattern.pattern()),
-                    TargetBackend.class.getSimpleName(), targetBackend.toString()
-            );
+            String assertTestsPresentStr;
+
+            String excludedArgument;
+            if (excludePattern != null) {
+                excludedArgument = String.format("Pattern.compile(\"%s\")", StringUtil.escapeStringCharacters(excludePattern.pattern()));
+            } else {
+                excludedArgument = null;
+            }
+
+            if (targetBackend != TargetBackend.ANY) {
+                assertTestsPresentStr = String.format(
+                        "KotlinTestUtils.assertAllTestsPresentInSingleGeneratedClassWithExcluded(this.getClass(), new File(\"%s\"), Pattern.compile(\"%s\"), %s, %s.%s);",
+                        KotlinTestUtils.getFilePath(rootFile), StringUtil.escapeStringCharacters(filenamePattern.pattern()),
+                        excludedArgument, TargetBackend.class.getSimpleName(), targetBackend.toString()
+                );
+            } else {
+                assertTestsPresentStr = String.format(
+                        "KotlinTestUtils.assertAllTestsPresentInSingleGeneratedClassWithExcluded(this.getClass(), new File(\"%s\"), Pattern.compile(\"%s\"), %s);",
+                        KotlinTestUtils.getFilePath(rootFile), StringUtil.escapeStringCharacters(filenamePattern.pattern()), excludedArgument
+                );
+            }
             p.println(assertTestsPresentStr);
         }
 
         @Override
         public String getDataString() {
             return null;
-        }
-
-        @Override
-        public void generateSignature(@NotNull Printer p) {
-            TestMethodModel.DefaultImpls.generateSignature(this, p);
         }
 
         @Override

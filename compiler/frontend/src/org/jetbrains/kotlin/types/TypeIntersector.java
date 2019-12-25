@@ -23,7 +23,6 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns;
 import org.jetbrains.kotlin.descriptors.ClassifierDescriptor;
 import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor;
-import org.jetbrains.kotlin.descriptors.annotations.Annotations;
 import org.jetbrains.kotlin.resolve.calls.inference.CallHandle;
 import org.jetbrains.kotlin.resolve.calls.inference.ConstraintSystem;
 import org.jetbrains.kotlin.resolve.calls.inference.ConstraintSystemBuilderImpl;
@@ -132,15 +131,7 @@ public class TypeIntersector {
             return TypeUtils.makeNullableAsSpecified(resultingTypes.get(0), allNullable);
         }
 
-        IntersectionTypeConstructor constructor = new IntersectionTypeConstructor(resultingTypes);
-
-        return KotlinTypeFactory.simpleTypeWithNonTrivialMemberScope(
-                Annotations.Companion.getEMPTY(),
-                constructor,
-                Collections.emptyList(),
-                allNullable,
-                constructor.createScopeForKotlinType()
-        );
+        return new IntersectionTypeConstructor(resultingTypes).createType();
     }
 
     /**
@@ -150,7 +141,10 @@ public class TypeIntersector {
      */
     @NotNull
     public static KotlinType getUpperBoundsAsType(@NotNull TypeParameterDescriptor descriptor) {
-        List<KotlinType> upperBounds = descriptor.getUpperBounds();
+        return intersectUpperBounds(descriptor, descriptor.getUpperBounds());
+    }
+
+    public static KotlinType intersectUpperBounds(@NotNull TypeParameterDescriptor descriptor, @NotNull List<KotlinType> upperBounds) {
         assert !upperBounds.isEmpty() : "Upper bound list is empty: " + descriptor;
         KotlinType upperBoundsAsType = intersectTypes(upperBounds);
         return upperBoundsAsType != null ? upperBoundsAsType : getBuiltIns(descriptor).getNothingType();

@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.navigation;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.idea.navigation;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -22,11 +21,16 @@ import java.util.regex.Pattern;
 @RunWith(JUnit3RunnerWithInners.class)
 public class KotlinGotoImplementationMultiModuleTestGenerated extends AbstractKotlinGotoImplementationMultiModuleTest {
     private void runTest(String testDataFilePath) throws Exception {
-        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+    }
+
+    @TestMetadata("actualTypeAliasWithAnonymousSubclass")
+    public void testActualTypeAliasWithAnonymousSubclass() throws Exception {
+        runTest("idea/testData/navigation/implementations/multiModule/actualTypeAliasWithAnonymousSubclass/");
     }
 
     public void testAllFilesPresentInMultiModule() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/navigation/implementations/multiModule"), Pattern.compile("^([^\\.]+)$"), TargetBackend.ANY, false);
+        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/navigation/implementations/multiModule"), Pattern.compile("^([^\\.]+)$"), null, false);
     }
 
     @TestMetadata("expectClass")
@@ -57,6 +61,21 @@ public class KotlinGotoImplementationMultiModuleTestGenerated extends AbstractKo
     @TestMetadata("expectClassSuperclassProperty")
     public void testExpectClassSuperclassProperty() throws Exception {
         runTest("idea/testData/navigation/implementations/multiModule/expectClassSuperclassProperty/");
+    }
+
+    @TestMetadata("expectCompanion")
+    public void testExpectCompanion() throws Exception {
+        runTest("idea/testData/navigation/implementations/multiModule/expectCompanion/");
+    }
+
+    @TestMetadata("expectEnumEntry")
+    public void testExpectEnumEntry() throws Exception {
+        runTest("idea/testData/navigation/implementations/multiModule/expectEnumEntry/");
+    }
+
+    @TestMetadata("expectObject")
+    public void testExpectObject() throws Exception {
+        runTest("idea/testData/navigation/implementations/multiModule/expectObject/");
     }
 
     @TestMetadata("suspendFunImpl")

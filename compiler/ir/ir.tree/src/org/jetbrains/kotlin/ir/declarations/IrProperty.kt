@@ -18,24 +18,24 @@ package org.jetbrains.kotlin.ir.declarations
 
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.PropertyDescriptor
-import org.jetbrains.kotlin.descriptors.Visibility
-import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
 
-interface IrProperty : IrDeclaration {
+interface IrProperty :
+    IrDeclarationWithName,
+    IrDeclarationWithVisibility,
+    IrSymbolOwner {
+
     override val descriptor: PropertyDescriptor
+    override val symbol: IrPropertySymbol
 
-    val name: Name
-    val type: KotlinType
     val modality: Modality
-    val visibility: Visibility
     val isVar: Boolean
     val isConst: Boolean
     val isLateinit: Boolean
     val isDelegated: Boolean
     val isExternal: Boolean
-
-    val typeParameters: MutableList<IrTypeParameter>
+    val isExpect: Boolean
+    val isFakeOverride: Boolean
 
     var backingField: IrField?
     var getter: IrSimpleFunction?

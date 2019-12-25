@@ -20,7 +20,6 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Ref
 import com.intellij.psi.PsiElement
-import com.intellij.refactoring.BaseRefactoringProcessor
 import com.intellij.refactoring.RefactoringBundle
 import com.intellij.refactoring.changeSignature.ChangeSignatureProcessorBase
 import com.intellij.refactoring.changeSignature.ChangeSignatureUsageProcessor
@@ -30,6 +29,7 @@ import com.intellij.refactoring.rename.UnresolvableCollisionUsageInfo
 import com.intellij.usageView.UsageInfo
 import com.intellij.usageView.UsageViewDescriptor
 import com.intellij.util.containers.MultiMap
+import org.jetbrains.kotlin.idea.refactoring.broadcastRefactoringExit
 import org.jetbrains.kotlin.idea.refactoring.changeSignature.usages.KotlinFunctionCallUsage
 import org.jetbrains.kotlin.idea.refactoring.changeSignature.usages.KotlinImplicitReceiverUsage
 import org.jetbrains.kotlin.idea.refactoring.changeSignature.usages.KotlinUsageInfo
@@ -37,12 +37,22 @@ import org.jetbrains.kotlin.idea.refactoring.changeSignature.usages.KotlinWrappe
 import java.util.*
 
 class KotlinChangeSignatureProcessor(
-        project: Project,
-        changeInfo: KotlinChangeInfo,
-        private val commandName: String
+    project: Project,
+    changeInfo: KotlinChangeInfo,
+    private val commandName: String
 ) : ChangeSignatureProcessorBase(project, KotlinChangeInfoWrapper(changeInfo)) {
     val ktChangeInfo
         get() = changeInfo.delegate!!
+
+    override fun setPrepareSuccessfulSwingThreadCallback(callback: Runnable?) {
+        val actualCallback = if (callback != null) {
+            Runnable {
+                callback.run()
+                setPrepareSuccessfulSwingThreadCallback(null)
+            }
+        } else null
+        super.setPrepareSuccessfulSwingThreadCallback(actualCallback)
+    }
 
     override fun createUsageViewDescriptor(usages: Array<UsageInfo>): UsageViewDescriptor {
         val subject = if (ktChangeInfo.kind.isConstructor) "constructor" else "function"
@@ -69,7 +79,7 @@ class KotlinChangeSignatureProcessor(
 
         if (!usageProcessors.all { it.setupDefaultValues(myChangeInfo, refUsages, myProject) }) return false
 
-        val conflictDescriptions = object: MultiMap<PsiElement, String>() {
+        val conflictDescriptions = object : MultiMap<PsiElement, String>() {
             override fun createCollection() = LinkedHashSet<String>()
         }
         usageProcessors.forEach { conflictDescriptions.putAllValues(it.findConflicts(myChangeInfo, refUsages)) }
@@ -81,7 +91,7 @@ class KotlinChangeSignatureProcessor(
         RenameUtil.removeConflictUsages(usagesSet)
         if (!conflictDescriptions.isEmpty) {
             if (ApplicationManager.getApplication().isUnitTestMode) {
-                throw BaseRefactoringProcessor.ConflictsInTestsException(conflictDescriptions.values())
+                throw ConflictsInTestsException(conflictDescriptions.values())
             }
 
             val dialog = prepareConflictsDialog(conflictDescriptions, usages)
@@ -116,9 +126,16 @@ class KotlinChangeSignatureProcessor(
     override fun performRefactoring(usages: Array<out UsageInfo>) {
         try {
             super.performRefactoring(usages)
-        }
-        finally {
+        } finally {
             changeInfo.invalidate()
+        }
+    }
+
+    override fun doRun() {
+        try {
+            super.doRun()
+        } finally {
+            broadcastRefactoringExit(myProject, refactoringId!!)
         }
     }
 }

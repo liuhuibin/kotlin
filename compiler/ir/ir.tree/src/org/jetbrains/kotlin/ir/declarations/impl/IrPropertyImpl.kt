@@ -20,31 +20,59 @@ import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.PropertyDescriptor
 import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.ir.declarations.*
-import org.jetbrains.kotlin.ir.util.transform
+import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
+import org.jetbrains.kotlin.ir.symbols.impl.IrPropertySymbolImpl
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformer
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitor
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.descriptorUtil.isEffectivelyExternal
-import org.jetbrains.kotlin.types.KotlinType
-import org.jetbrains.kotlin.utils.SmartList
 
+@Suppress("DEPRECATION_ERROR")
 class IrPropertyImpl(
     startOffset: Int,
     endOffset: Int,
     origin: IrDeclarationOrigin,
-    override val descriptor: PropertyDescriptor,
-    override val name: Name,
-    override val type: KotlinType,
-    override val visibility: Visibility,
-    override val modality: Modality,
-    override val isVar: Boolean,
-    override val isConst: Boolean,
-    override val isLateinit: Boolean,
-    override val isDelegated: Boolean,
-    override val isExternal: Boolean
+    override val symbol: IrPropertySymbol,
+    override val name: Name = symbol.descriptor.name,
+    override val visibility: Visibility = symbol.descriptor.visibility,
+    override val modality: Modality = symbol.descriptor.modality,
+    override val isVar: Boolean = symbol.descriptor.isVar,
+    override val isConst: Boolean = symbol.descriptor.isConst,
+    override val isLateinit: Boolean = symbol.descriptor.isLateInit,
+    override val isDelegated: Boolean = @Suppress("DEPRECATION") symbol.descriptor.isDelegated,
+    override val isExternal: Boolean = symbol.descriptor.isEffectivelyExternal(),
+    override val isExpect: Boolean = symbol.descriptor.isExpect,
+    override val isFakeOverride: Boolean = origin == IrDeclarationOrigin.FAKE_OVERRIDE
 ) : IrDeclarationBase(startOffset, endOffset, origin),
     IrProperty {
 
+    @Deprecated(message = "Don't use descriptor-based API for IrProperty", level = DeprecationLevel.WARNING)
+    constructor(
+        startOffset: Int,
+        endOffset: Int,
+        origin: IrDeclarationOrigin,
+        descriptor: PropertyDescriptor,
+        name: Name,
+        visibility: Visibility,
+        modality: Modality,
+        isVar: Boolean,
+        isConst: Boolean,
+        isLateinit: Boolean,
+        isDelegated: Boolean,
+        isExternal: Boolean
+    ) : this(
+        startOffset, endOffset, origin,
+        IrPropertySymbolImpl(descriptor),
+        name, visibility, modality,
+        isVar = isVar,
+        isConst = isConst,
+        isLateinit = isLateinit,
+        isDelegated = isDelegated,
+        isExternal = isExternal
+    )
+
+    @Suppress("DEPRECATION")
+    @Deprecated(message = "Don't use descriptor-based API for IrProperty", level = DeprecationLevel.WARNING)
     constructor(
         startOffset: Int,
         endOffset: Int,
@@ -53,7 +81,7 @@ class IrPropertyImpl(
         descriptor: PropertyDescriptor
     ) : this(
         startOffset, endOffset, origin, descriptor,
-        descriptor.name, descriptor.type, descriptor.visibility, descriptor.modality,
+        descriptor.name, descriptor.visibility, descriptor.modality,
         isVar = descriptor.isVar,
         isConst = descriptor.isConst,
         isLateinit = descriptor.isLateInit,
@@ -61,6 +89,8 @@ class IrPropertyImpl(
         isExternal = descriptor.isEffectivelyExternal()
     )
 
+    @Suppress("DEPRECATION")
+    @Deprecated(message = "Don't use descriptor-based API for IrProperty", level = DeprecationLevel.WARNING)
     constructor(
         startOffset: Int,
         endOffset: Int,
@@ -68,6 +98,8 @@ class IrPropertyImpl(
         descriptor: PropertyDescriptor
     ) : this(startOffset, endOffset, origin, descriptor.isDelegated, descriptor)
 
+    @Suppress("DEPRECATION")
+    @Deprecated(message = "Don't use descriptor-based API for IrProperty", level = DeprecationLevel.WARNING)
     constructor(
         startOffset: Int,
         endOffset: Int,
@@ -79,6 +111,8 @@ class IrPropertyImpl(
         this.backingField = backingField
     }
 
+    @Suppress("DEPRECATION")
+    @Deprecated(message = "Don't use descriptor-based API for IrProperty", level = DeprecationLevel.WARNING)
     constructor(
         startOffset: Int,
         endOffset: Int,
@@ -93,7 +127,12 @@ class IrPropertyImpl(
         this.setter = setter
     }
 
-    override val typeParameters: MutableList<IrTypeParameter> = SmartList()
+    init {
+        symbol.bind(this)
+    }
+
+    override val descriptor: PropertyDescriptor = symbol.descriptor
+
     override var backingField: IrField? = null
     override var getter: IrSimpleFunction? = null
     override var setter: IrSimpleFunction? = null
@@ -103,14 +142,14 @@ class IrPropertyImpl(
     }
 
     override fun <D> acceptChildren(visitor: IrElementVisitor<Unit, D>, data: D) {
-        typeParameters.forEach { it.accept(visitor, data) }
         backingField?.accept(visitor, data)
         getter?.accept(visitor, data)
         setter?.accept(visitor, data)
     }
 
+    override var metadata: MetadataSource? = null
+
     override fun <D> transformChildren(transformer: IrElementTransformer<D>, data: D) {
-        typeParameters.transform { it.transform(transformer, data) }
         backingField = backingField?.transform(transformer, data) as? IrField
         getter = getter?.run { transform(transformer, data) as IrSimpleFunction }
         setter = setter?.run { transform(transformer, data) as IrSimpleFunction }

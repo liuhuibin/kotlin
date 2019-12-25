@@ -1,5 +1,4 @@
-// LANGUAGE_VERSION: 1.0
-
+// IGNORE_BACKEND_FIR: JVM_IR
 public interface Base {
     fun test() = "base fail"
 }

@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.jvm.compiler;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.jvm.compiler;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -22,11 +21,11 @@ import java.util.regex.Pattern;
 @RunWith(JUnit3RunnerWithInners.class)
 public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWithTypeTableTest {
     private void runTest(String testDataFilePath) throws Exception {
-        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
 
     public void testAllFilesPresentInCompiledKotlin() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin"), Pattern.compile("^(.+)\\.kt$"), null, true);
     }
 
     @TestMetadata("compiler/testData/loadJava/compiledKotlin/annotations")
@@ -34,11 +33,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Annotations extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInAnnotations() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/annotations"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/annotations"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("AnnotatedAnnotation.kt")
@@ -54,6 +53,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @TestMetadata("AnnotationInAnnotationArguments.kt")
         public void testAnnotationInAnnotationArguments() throws Exception {
             runTest("compiler/testData/loadJava/compiledKotlin/annotations/AnnotationInAnnotationArguments.kt");
+        }
+
+        @TestMetadata("ClassLiteralArguments.kt")
+        public void testClassLiteralArguments() throws Exception {
+            runTest("compiler/testData/loadJava/compiledKotlin/annotations/ClassLiteralArguments.kt");
         }
 
         @TestMetadata("EnumArgumentWithCustomToString.kt")
@@ -86,11 +90,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class ClassMembers extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInClassMembers() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/annotations/classMembers"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/annotations/classMembers"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("ClassObjectPropertyField.kt")
@@ -128,9 +132,19 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
                 runTest("compiler/testData/loadJava/compiledKotlin/annotations/classMembers/Getter.kt");
             }
 
+            @TestMetadata("HiddenConstructorWithInlineClassParameters.kt")
+            public void testHiddenConstructorWithInlineClassParameters() throws Exception {
+                runTest("compiler/testData/loadJava/compiledKotlin/annotations/classMembers/HiddenConstructorWithInlineClassParameters.kt");
+            }
+
             @TestMetadata("PropertyField.kt")
             public void testPropertyField() throws Exception {
                 runTest("compiler/testData/loadJava/compiledKotlin/annotations/classMembers/PropertyField.kt");
+            }
+
+            @TestMetadata("PublishedApiAnnotationOnInlineClassCosntructor.kt")
+            public void testPublishedApiAnnotationOnInlineClassCosntructor() throws Exception {
+                runTest("compiler/testData/loadJava/compiledKotlin/annotations/classMembers/PublishedApiAnnotationOnInlineClassCosntructor.kt");
             }
 
             @TestMetadata("Setter.kt")
@@ -144,11 +158,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class Classes extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInClasses() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/annotations/classes"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/annotations/classes"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("AnnotationInClassObject.kt")
@@ -232,11 +246,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class PackageMembers extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInPackageMembers() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/annotations/packageMembers"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/annotations/packageMembers"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("DelegatedProperty.kt")
@@ -285,11 +299,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class Parameters extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInParameters() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/annotations/parameters"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/annotations/parameters"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("Constructor.kt")
@@ -358,11 +372,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class PropertiesWithoutBackingFields extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInPropertiesWithoutBackingFields() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/annotations/propertiesWithoutBackingFields"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/annotations/propertiesWithoutBackingFields"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("Class.kt")
@@ -411,11 +425,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class Types extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInTypes() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/annotations/types"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/annotations/types"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("ClassLiteralArgument.kt")
@@ -469,11 +483,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class WithUseSiteTarget extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInWithUseSiteTarget() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/annotations/withUseSiteTarget"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/annotations/withUseSiteTarget"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("DelegateTarget.kt")
@@ -484,6 +498,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
             @TestMetadata("FieldTarget.kt")
             public void testFieldTarget() throws Exception {
                 runTest("compiler/testData/loadJava/compiledKotlin/annotations/withUseSiteTarget/FieldTarget.kt");
+            }
+
+            @TestMetadata("PropertyAndAccessor.kt")
+            public void testPropertyAndAccessor() throws Exception {
+                runTest("compiler/testData/loadJava/compiledKotlin/annotations/withUseSiteTarget/PropertyAndAccessor.kt");
             }
 
             @TestMetadata("ReceiverTarget.kt")
@@ -498,11 +517,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Class extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInClass() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/class"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/class"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("Class.kt")
@@ -670,6 +689,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
             runTest("compiler/testData/loadJava/compiledKotlin/class/RecursiveGeneric.kt");
         }
 
+        @TestMetadata("SealedClass.kt")
+        public void testSealedClass() throws Exception {
+            runTest("compiler/testData/loadJava/compiledKotlin/class/SealedClass.kt");
+        }
+
         @TestMetadata("SingleAbstractMethod.kt")
         public void testSingleAbstractMethod() throws Exception {
             runTest("compiler/testData/loadJava/compiledKotlin/class/SingleAbstractMethod.kt");
@@ -685,11 +709,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class JavaBean extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInJavaBean() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/class/javaBean"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/class/javaBean"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("DifferentGetterAndSetter.kt")
@@ -729,11 +753,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class ClassFun extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInClassFun() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/classFun"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/classFun"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("ClassInParamUsedInFun.kt")
@@ -767,11 +791,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class ClassObject extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInClassObject() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/classObject"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/classObject"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("ClassObjectDeclaresVal.kt")
@@ -845,11 +869,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Constructor extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInConstructor() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/constructor"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/constructor"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("Constructor0.kt")
@@ -937,11 +961,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class Vararg extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInVararg() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/constructor/vararg"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/constructor/vararg"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("ConstructorNonLastVararg.kt")
@@ -961,11 +985,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Coroutines extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInCoroutines() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/coroutines"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/coroutines"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("Basic.kt")
@@ -979,11 +1003,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class DataClass extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInDataClass() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/dataClass"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/dataClass"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("MixedComponents.kt")
@@ -1012,11 +1036,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Enum extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInEnum() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/enum"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/enum"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("enumVisibility.kt")
@@ -1055,11 +1079,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class FromLoadJava extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInFromLoadJava() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("ArrayTypeVariance.kt")
@@ -1237,7 +1261,7 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class KotlinSignature extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             @TestMetadata("AllBoundsInWhen.kt")
@@ -1246,7 +1270,7 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
             }
 
             public void testAllFilesPresentInKotlinSignature() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/kotlinSignature"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/kotlinSignature"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("ArrayType.kt")
@@ -1329,7 +1353,7 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
             @RunWith(JUnit3RunnerWithInners.class)
             public static class Error extends AbstractLoadKotlinWithTypeTableTest {
                 private void runTest(String testDataFilePath) throws Exception {
-                    KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
 
                 @TestMetadata("AddingNullability.kt")
@@ -1338,7 +1362,7 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
                 }
 
                 public void testAllFilesPresentInError() throws Exception {
-                    KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/kotlinSignature/error"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                    KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/kotlinSignature/error"), Pattern.compile("^(.+)\\.kt$"), null, true);
                 }
 
                 @TestMetadata("ConflictingProjectionKind.kt")
@@ -1477,11 +1501,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
             @RunWith(JUnit3RunnerWithInners.class)
             public static class Propagation extends AbstractLoadKotlinWithTypeTableTest {
                 private void runTest(String testDataFilePath) throws Exception {
-                    KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
 
                 public void testAllFilesPresentInPropagation() throws Exception {
-                    KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/kotlinSignature/propagation"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                    KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/kotlinSignature/propagation"), Pattern.compile("^(.+)\\.kt$"), null, true);
                 }
 
                 @TestMetadata("PropagateTypeArgumentNullable.kt")
@@ -1494,11 +1518,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
                 @RunWith(JUnit3RunnerWithInners.class)
                 public static class Parameter extends AbstractLoadKotlinWithTypeTableTest {
                     private void runTest(String testDataFilePath) throws Exception {
-                        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                     }
 
                     public void testAllFilesPresentInParameter() throws Exception {
-                        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/kotlinSignature/propagation/parameter"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/kotlinSignature/propagation/parameter"), Pattern.compile("^(.+)\\.kt$"), null, true);
                     }
 
                     @TestMetadata("ChangeProjectionKind1.kt")
@@ -1637,7 +1661,7 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
                 @RunWith(JUnit3RunnerWithInners.class)
                 public static class Return extends AbstractLoadKotlinWithTypeTableTest {
                     private void runTest(String testDataFilePath) throws Exception {
-                        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                     }
 
                     @TestMetadata("AddNotNullJavaSubtype.kt")
@@ -1671,7 +1695,7 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
                     }
 
                     public void testAllFilesPresentInReturn() throws Exception {
-                        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/kotlinSignature/propagation/return"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/kotlinSignature/propagation/return"), Pattern.compile("^(.+)\\.kt$"), null, true);
                     }
 
                     @TestMetadata("CantMakeImmutableInSubclass.kt")
@@ -1820,11 +1844,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
                 @RunWith(JUnit3RunnerWithInners.class)
                 public static class TypeParameter extends AbstractLoadKotlinWithTypeTableTest {
                     private void runTest(String testDataFilePath) throws Exception {
-                        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                     }
 
                     public void testAllFilesPresentInTypeParameter() throws Exception {
-                        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/kotlinSignature/propagation/typeParameter"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/kotlinSignature/propagation/typeParameter"), Pattern.compile("^(.+)\\.kt$"), null, true);
                     }
 
                     @TestMetadata("InheritMutability.kt")
@@ -1880,11 +1904,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class Library extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInLibrary() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/library"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/library"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("LoadIterable.kt")
@@ -1908,11 +1932,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class Modality extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInModality() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/modality"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/modality"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("ModalityOfFakeOverrides.kt")
@@ -1926,11 +1950,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class NotNull extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInNotNull() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/notNull"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fromLoadJava/notNull"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("NotNullField.kt")
@@ -1965,11 +1989,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Fun extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInFun() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fun"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fun"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("Assert.kt")
@@ -2032,11 +2056,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class GenericWithTypeVariables extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInGenericWithTypeVariables() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fun/genericWithTypeVariables"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fun/genericWithTypeVariables"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("FunGenericParam.kt")
@@ -2095,11 +2119,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class GenericWithoutTypeVariables extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInGenericWithoutTypeVariables() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fun/genericWithoutTypeVariables"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fun/genericWithoutTypeVariables"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("FunClassParamNotNull.kt")
@@ -2133,11 +2157,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class NonGeneric extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInNonGeneric() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fun/nonGeneric"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fun/nonGeneric"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("ClassFun.kt")
@@ -2226,11 +2250,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class Vararg extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInVararg() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fun/vararg"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/fun/vararg"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("nonLastVararg.kt")
@@ -2255,11 +2279,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Inline extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInInline() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/inline"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/inline"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("inlineFunction.kt")
@@ -2273,11 +2297,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class MemberOrder extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInMemberOrder() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/memberOrder"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/memberOrder"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("callablesNameClash.kt")
@@ -2316,11 +2340,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Nested extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInNested() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/nested"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/nested"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("deepInnerGeneric.kt")
@@ -2344,11 +2368,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class PlatformTypes extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInPlatformTypes() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/platformTypes"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/platformTypes"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("notnullTypeArgument.kt")
@@ -2367,11 +2391,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Prop extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInProp() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/prop"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/prop"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("ClassVal.kt")
@@ -2494,6 +2518,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
             runTest("compiler/testData/loadJava/compiledKotlin/prop/ExtVarl.kt");
         }
 
+        @TestMetadata("nonConstValWithConstantValueAttribute.kt")
+        public void testNonConstValWithConstantValueAttribute() throws Exception {
+            runTest("compiler/testData/loadJava/compiledKotlin/prop/nonConstValWithConstantValueAttribute.kt");
+        }
+
         @TestMetadata("NsVal.kt")
         public void testNsVal() throws Exception {
             runTest("compiler/testData/loadJava/compiledKotlin/prop/NsVal.kt");
@@ -2544,11 +2573,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
         @RunWith(JUnit3RunnerWithInners.class)
         public static class DefaultAccessors extends AbstractLoadKotlinWithTypeTableTest {
             private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             public void testAllFilesPresentInDefaultAccessors() throws Exception {
-                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/prop/defaultAccessors"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/prop/defaultAccessors"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
             @TestMetadata("ClassVal.kt")
@@ -2608,11 +2637,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Type extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInType() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/type"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/type"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("Any.kt")
@@ -2776,11 +2805,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Typealias extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInTypealias() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/typealias"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/typealias"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("Annotations.kt")
@@ -2809,11 +2838,11 @@ public class LoadKotlinWithTypeTableTestGenerated extends AbstractLoadKotlinWith
     @RunWith(JUnit3RunnerWithInners.class)
     public static class Visibility extends AbstractLoadKotlinWithTypeTableTest {
         private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
         public void testAllFilesPresentInVisibility() throws Exception {
-            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/visibility"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/loadJava/compiledKotlin/visibility"), Pattern.compile("^(.+)\\.kt$"), null, true);
         }
 
         @TestMetadata("InternalClass.kt")

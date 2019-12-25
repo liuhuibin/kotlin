@@ -15,8 +15,6 @@ messages/**)
 -outjars '<kotlin-compiler-jar>'
 
 -dontnote **
--dontwarn com.intellij.util.ui.IsRetina*
--dontwarn com.intellij.util.RetinaImage*
 -dontwarn apple.awt.*
 -dontwarn dk.brics.automaton.*
 -dontwarn org.fusesource.**
@@ -26,6 +24,12 @@ messages/**)
 -dontwarn com.intellij.util.SnappyInitializer
 -dontwarn com.intellij.util.SVGLoader
 -dontwarn com.intellij.util.SVGLoader$MyTranscoder
+-dontwarn com.intellij.util.ImageLoader$ImageDesc
+-dontwarn com.intellij.util.ui.**
+-dontwarn com.intellij.ui.**
+-dontwarn com.intellij.util.IconUtil
+-dontwarn com.intellij.util.ImageLoader
+-dontwarn kotlinx.coroutines.flow.FlowKt__MergeKt
 -dontwarn net.sf.cglib.**
 -dontwarn org.objectweb.asm.** # this is ASM3, the old version that we do not use
 -dontwarn com.sun.jna.NativeString
@@ -50,9 +54,33 @@ messages/**)
 -dontwarn org.jetbrains.annotations.ReadOnly
 -dontwarn org.jetbrains.annotations.Mutable
 -dontwarn com.intellij.util.io.TarUtil
+-dontwarn com.intellij.util.io.Compressor$Tar
 
-# Depends on apache batik which has lots of dependencies
+# Annotations from intellijCore/annotations.jar that not presented in org.jetbrains.annotations
+-dontwarn org.jetbrains.annotations.Async*
+-dontwarn org.jetbrains.annotations.Nls$Capitalization
+
+# Nullability annotations used in Guava
+-dontwarn org.checkerframework.checker.nullness.compatqual.NullableDecl
+-dontwarn org.checkerframework.checker.nullness.compatqual.MonotonicNonNullDecl
+-dontwarn org.checkerframework.checker.nullness.qual.Nullable
+-dontwarn org.checkerframework.checker.nullness.qual.MonotonicNonNull
+-dontwarn org.checkerframework.checker.nullness.qual.NonNull
+
+# Depends on apache batick which has lots of dependencies
 -dontwarn com.intellij.util.SVGLoader*
+-dontwarn org.apache.batik.script.rhino.RhinoInterpreter
+-dontwarn org.apache.batik.script.rhino.RhinoInterpreterFactory
+
+# The appropriate jar is either loaded separately or added explicitly to the classpath then needed
+-dontwarn org.jetbrains.kotlin.scripting.compiler.plugin.ScriptingCompilerConfigurationComponentRegistrar
+
+-dontwarn org.jdom.xpath.jaxen.*
+-dontwarn com.intellij.util.io.Decompressor*
+-dontwarn org.w3c.dom.Location
+-dontwarn org.w3c.dom.Window
+-dontwarn org.slf4j.**
+
 
 #-libraryjars '<rtjar>'
 #-libraryjars '<jssejar>'
@@ -93,8 +121,6 @@ messages/**)
 
 -keep class org.jetbrains.kotlin.container.** { *; }
 
--keep class org.jetbrains.kotlin.codegen.intrinsics.IntrinsicArrayConstructorsKt { *; }
-
 -keep class org.jetbrains.org.objectweb.asm.Opcodes { *; }
 
 -keep class org.jetbrains.kotlin.codegen.extensions.** {
@@ -125,6 +151,8 @@ messages/**)
 # This is needed so that the platform code which parses XML wouldn't fail, see KT-16968
 # This API is used from org.jdom.input.SAXBuilder via reflection.
 -keep class org.jdom.input.JAXPParserFactory { public ** createParser(...); }
+# Without this class PluginManagerCore.loadDescriptorFromJar fails
+-keep class org.jdom.output.XMLOutputter { *; }
 
 # for kdoc & dokka
 -keep class com.intellij.openapi.util.TextRange { *; }
@@ -172,10 +200,6 @@ messages/**)
     void dispose();
 }
 
--keepclassmembers class org.jetbrains.org.objectweb.asm.Opcodes {
-    *** ASM5;
-}
-
 -keep class org.jetbrains.org.objectweb.asm.tree.AnnotationNode { *; }
 -keep class org.jetbrains.org.objectweb.asm.tree.ClassNode { *; }
 -keep class org.jetbrains.org.objectweb.asm.tree.LocalVariableNode { *; }
@@ -183,6 +207,7 @@ messages/**)
 -keep class org.jetbrains.org.objectweb.asm.tree.FieldNode { *; }
 -keep class org.jetbrains.org.objectweb.asm.tree.ParameterNode { *; }
 -keep class org.jetbrains.org.objectweb.asm.tree.TypeAnnotationNode { *; }
+-keep class org.jetbrains.org.objectweb.asm.tree.InsnList { *; }
 
 -keep class org.jetbrains.org.objectweb.asm.signature.SignatureReader { *; }
 -keep class org.jetbrains.org.objectweb.asm.signature.SignatureVisitor { *; }
@@ -219,8 +244,34 @@ messages/**)
 
 # for kapt
 -keep class com.intellij.openapi.project.Project { *; }
+-keepclassmembers class com.intellij.util.PathUtil {
+    public static java.lang.String getJarPathForClass(java.lang.Class);
+}
+
+-keepclassmembers class com.intellij.util.PathUtil {
+    public static java.lang.String getJarPathForClass(java.lang.Class);
+}
 
 # remove when KT-18563 would be fixed
 -keep class org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt { *; }
 
 -keep class net.jpountz.lz4.* { *; }
+
+# used in LazyScriptDescriptor
+-keep class org.jetbrains.kotlin.utils.addToStdlib.AddToStdlibKt { *; }
+
+-keep class com.intellij.openapi.vfs.impl.jar.CoreJarFileSystem { *; }
+
+# used in REPL
+# TODO: pack jline directly to scripting-compiler jars instead
+-keep class org.jline.reader.LineReaderBuilder { *; }
+-keep class org.jline.reader.LineReader { *; }
+-keep class org.jline.reader.History { *; }
+-keep class org.jline.reader.EndOfFileException { *; }
+-keep class org.jline.reader.UserInterruptException { *; }
+-keep class org.jline.terminal.impl.jna.JnaSupportImpl  { *; }
+-keep class org.jline.terminal.impl.jansi.JansiSupportImpl  { *; }
+
+-keepclassmembers class * implements java.io.Serializable {
+    static final long serialVersionUID;
+}

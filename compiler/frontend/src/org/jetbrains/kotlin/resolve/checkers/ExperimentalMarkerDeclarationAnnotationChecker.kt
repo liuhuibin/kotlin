@@ -1,12 +1,13 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.resolve.checkers
 
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
+import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.KotlinTarget
 import org.jetbrains.kotlin.diagnostics.Errors
 import org.jetbrains.kotlin.psi.KtAnnotationEntry
@@ -18,8 +19,9 @@ import org.jetbrains.kotlin.resolve.constants.ArrayValue
 import org.jetbrains.kotlin.resolve.constants.ConstantValue
 import org.jetbrains.kotlin.resolve.constants.KClassValue
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
+import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 
-object ExperimentalMarkerDeclarationAnnotationChecker : AdditionalAnnotationChecker {
+class ExperimentalMarkerDeclarationAnnotationChecker(private val module: ModuleDescriptor) : AdditionalAnnotationChecker {
     private val WRONG_TARGETS_FOR_MARKER = setOf(KotlinTarget.EXPRESSION, KotlinTarget.FILE)
 
     override fun checkEntries(entries: List<KtAnnotationEntry>, actualTargets: List<KotlinTarget>, trace: BindingTrace) {
@@ -28,12 +30,13 @@ object ExperimentalMarkerDeclarationAnnotationChecker : AdditionalAnnotationChec
         for (entry in entries) {
             val annotation = trace.bindingContext.get(BindingContext.ANNOTATION, entry)
             when (annotation?.fqName) {
-                ExperimentalUsageChecker.USE_EXPERIMENTAL_FQ_NAME -> {
+                in ExperimentalUsageChecker.USE_EXPERIMENTAL_FQ_NAMES -> {
                     val annotationClasses =
-                        (annotation.allValueArguments[ExperimentalUsageChecker.USE_EXPERIMENTAL_ANNOTATION_CLASS] as? ArrayValue)?.value.orEmpty()
+                        annotation!!.allValueArguments[ExperimentalUsageChecker.USE_EXPERIMENTAL_ANNOTATION_CLASS]
+                            .safeAs<ArrayValue>()?.value.orEmpty()
                     checkUseExperimentalUsage(annotationClasses, trace, entry)
                 }
-                ExperimentalUsageChecker.EXPERIMENTAL_FQ_NAME -> {
+                in ExperimentalUsageChecker.EXPERIMENTAL_FQ_NAMES -> {
                     isAnnotatedWithExperimental = true
                 }
             }
@@ -52,7 +55,8 @@ object ExperimentalMarkerDeclarationAnnotationChecker : AdditionalAnnotationChec
 
         for (annotationClass in annotationClasses) {
             val classDescriptor =
-                (annotationClass as? KClassValue)?.value?.constructor?.declarationDescriptor as? ClassDescriptor ?: continue
+                (annotationClass as? KClassValue)?.getArgumentType(module)?.constructor?.declarationDescriptor as? ClassDescriptor
+                    ?: continue
             val experimentality = with(ExperimentalUsageChecker) {
                 classDescriptor.loadExperimentalityForMarkerAnnotation()
             }

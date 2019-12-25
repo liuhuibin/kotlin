@@ -17,6 +17,7 @@
 package org.jetbrains.kotlin.resolve
 
 import com.intellij.util.containers.MultiMap
+import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.diagnostics.Errors
 import org.jetbrains.kotlin.diagnostics.reportOnDeclaration
@@ -24,6 +25,7 @@ import org.jetbrains.kotlin.idea.MainFunctionDetector
 import org.jetbrains.kotlin.incremental.components.NoLookupLocation
 import org.jetbrains.kotlin.name.FqNameUnsafe
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.resolve.descriptorUtil.platform
 
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
 import java.util.*
@@ -31,8 +33,11 @@ import java.util.*
 class OverloadResolver(
     private val trace: BindingTrace,
     private val overloadFilter: OverloadFilter,
-    private val overloadChecker: OverloadChecker
+    private val overloadChecker: OverloadChecker,
+    languageVersionSettings: LanguageVersionSettings
 ) {
+
+    private val mainFunctionDetector = MainFunctionDetector(trace.bindingContext, languageVersionSettings)
 
     fun checkOverloads(c: BodiesResolveContext) {
         val inClasses = findConstructorsInNestedClassesAndTypeAliases(c)
@@ -268,7 +273,7 @@ class OverloadResolver(
     }
 
     private fun isTopLevelMainInDifferentFiles(member1: DeclarationDescriptor, member2: DeclarationDescriptor): Boolean {
-        if (!MainFunctionDetector.isMain(member1) || !MainFunctionDetector.isMain(member2)) {
+        if (!mainFunctionDetector.isMain(member1) || !mainFunctionDetector.isMain(member2)) {
             return false
         }
 
@@ -286,7 +291,7 @@ class OverloadResolver(
         if (member1 !is MemberDescriptor || member2 !is MemberDescriptor) return false
 
         return member1.isActual && member2.isActual &&
-                member1.getMultiTargetPlatform() != member2.getMultiTargetPlatform()
+                member1.platform != member2.platform
     }
 
     private fun reportRedeclarations(redeclarations: Collection<DeclarationDescriptorNonRoot>) {

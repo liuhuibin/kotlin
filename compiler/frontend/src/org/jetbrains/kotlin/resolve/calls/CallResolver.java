@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.resolve.calls;
@@ -12,7 +12,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.builtins.FunctionTypesKt;
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns;
-import org.jetbrains.kotlin.config.AnalysisFlag;
+import org.jetbrains.kotlin.config.AnalysisFlags;
 import org.jetbrains.kotlin.config.LanguageFeature;
 import org.jetbrains.kotlin.config.LanguageVersionSettings;
 import org.jetbrains.kotlin.descriptors.*;
@@ -185,8 +185,10 @@ public class CallResolver {
                 NewResolutionOldInference.ResolutionKind.Invoke.INSTANCE);
     }
 
+    // this declaration is used by compiler plugins
+    @SuppressWarnings("WeakerAccess")
     @NotNull
-    private <D extends CallableDescriptor> OverloadResolutionResults<D> computeTasksAndResolveCall(
+    public <D extends CallableDescriptor> OverloadResolutionResults<D> computeTasksAndResolveCall(
             @NotNull BasicCallResolutionContext context,
             @NotNull Name name,
             @NotNull KtReferenceExpression referenceExpression,
@@ -196,8 +198,10 @@ public class CallResolver {
         return computeTasksAndResolveCall(context, name, tracing, kind);
     }
 
+    // this declaration is used by compiler plugins
+    @SuppressWarnings("WeakerAccess")
     @NotNull
-    private <D extends CallableDescriptor> OverloadResolutionResults<D> computeTasksAndResolveCall(
+    public <D extends CallableDescriptor> OverloadResolutionResults<D> computeTasksAndResolveCall(
             @NotNull BasicCallResolutionContext context,
             @NotNull Name name,
             @NotNull TracingStrategy tracing,
@@ -303,6 +307,7 @@ public class CallResolver {
     }
 
     @NotNull
+    @SuppressWarnings("unchecked")
     public OverloadResolutionResults<FunctionDescriptor> resolveFunctionCall(@NotNull BasicCallResolutionContext context) {
         ProgressIndicatorAndCompilationCanceledStatus.checkCanceled();
 
@@ -349,7 +354,7 @@ public class CallResolver {
             );
         }
         KotlinType calleeType = expressionTypingServices.safeGetType(
-                context.scope, calleeExpression, expectedType, context.dataFlowInfo, context.trace);
+                context.scope, calleeExpression, expectedType, context.dataFlowInfo, context.inferenceSession, context.trace);
         ExpressionReceiver expressionReceiver = ExpressionReceiver.Companion.create(calleeExpression, calleeType, context.trace.getBindingContext());
 
         Call call = new CallTransformer.CallForImplicitInvoke(context.call.getExplicitReceiver(), expressionReceiver, context.call,
@@ -572,11 +577,13 @@ public class CallResolver {
         NewResolutionOldInference.ResolutionKind resolutionKind = resolutionTask.resolutionKind;
         if (newInferenceEnabled && PSICallResolver.getDefaultResolutionKinds().contains(resolutionKind)) {
             assert resolutionTask.name != null;
+            BindingContextUtilsKt.recordScope(context.trace, context.scope, context.call.getCalleeExpression());
             return PSICallResolver.runResolutionAndInference(context, resolutionTask.name, resolutionKind, tracing);
         }
 
         if (newInferenceEnabled && resolutionKind instanceof NewResolutionOldInference.ResolutionKind.GivenCandidates) {
             assert resolutionTask.givenCandidates != null;
+            BindingContextUtilsKt.recordScope(context.trace, context.scope, context.call.getCalleeExpression());
             return PSICallResolver.runResolutionAndInferenceForGivenCandidates(context, resolutionTask.givenCandidates, tracing);
         }
 
@@ -690,7 +697,7 @@ public class CallResolver {
         //   a.length
         // we should ignore data flow info from assert argument, since assertions can be disabled and
         // thus it will lead to NPE in runtime otherwise
-        if (languageVersionSettings.getFlag(AnalysisFlag.getIgnoreDataFlowInAssert()) && result.isSingleResult()) {
+        if (languageVersionSettings.getFlag(AnalysisFlags.getIgnoreDataFlowInAssert()) && result.isSingleResult()) {
             D descriptor = result.getResultingDescriptor();
             if (descriptor.getName().equals(Name.identifier("assert"))) {
                 DeclarationDescriptor declaration = descriptor.getContainingDeclaration();

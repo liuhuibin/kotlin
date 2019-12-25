@@ -16,9 +16,7 @@
 
 package org.jetbrains.kotlin.resolve.calls.tower
 
-import org.jetbrains.kotlin.descriptors.CallableDescriptor
-import org.jetbrains.kotlin.descriptors.ClassDescriptor
-import org.jetbrains.kotlin.descriptors.DeclarationDescriptorWithVisibility
+import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.incremental.components.LookupLocation
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.calls.model.DiagnosticReporter
@@ -27,6 +25,7 @@ import org.jetbrains.kotlin.resolve.calls.tower.ResolutionCandidateApplicability
 import org.jetbrains.kotlin.resolve.scopes.*
 import org.jetbrains.kotlin.resolve.scopes.receivers.ReceiverValueWithSmartCastInfo
 import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.types.TypeApproximator
 
 interface ImplicitScopeTower {
     val lexicalScope: LexicalScope
@@ -42,6 +41,15 @@ interface ImplicitScopeTower {
     val isDebuggerContext: Boolean
 
     val isNewInferenceEnabled: Boolean
+
+    val typeApproximator: TypeApproximator
+
+    fun interceptCandidates(
+        resolutionScope: ResolutionScope,
+        name: Name,
+        initialResults: Collection<FunctionDescriptor>,
+        location: LookupLocation
+    ): Collection<FunctionDescriptor>
 }
 
 interface ScopeTowerLevel {
@@ -54,13 +62,11 @@ interface ScopeTowerLevel {
     fun recordLookup(name: Name)
 }
 
-interface CandidateWithBoundDispatchReceiver {
-    val descriptor: CallableDescriptor
-
+class CandidateWithBoundDispatchReceiver(
+    val dispatchReceiver: ReceiverValueWithSmartCastInfo?,
+    val descriptor: CallableDescriptor,
     val diagnostics: List<ResolutionDiagnostic>
-
-    val dispatchReceiver: ReceiverValueWithSmartCastInfo?
-}
+)
 
 fun getResultApplicability(diagnostics: Collection<KotlinCallDiagnostic>) =
     diagnostics.maxBy { it.candidateApplicability }?.candidateApplicability
@@ -77,6 +83,7 @@ enum class ResolutionCandidateApplicability {
     INAPPLICABLE_ARGUMENTS_MAPPING_ERROR, // arguments not mapped to parameters (i.e. different size of arguments and parameters)
     INAPPLICABLE_WRONG_RECEIVER, // receiver not matched
     HIDDEN, // removed from resolve
+    RESOLVED_TO_SAM_WITH_VARARG, // migration warning up to 1.5 (when resolve to function with SAM conversion and array without spread as vararg)
 }
 
 abstract class ResolutionDiagnostic(candidateApplicability: ResolutionCandidateApplicability) :

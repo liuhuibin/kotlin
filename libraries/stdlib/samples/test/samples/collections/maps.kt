@@ -63,6 +63,17 @@ class Maps {
             assertPrints(map, "{1=x, 2=1.05}")
         }
 
+        @Sample
+        fun emptyHashMap() {
+            val map = hashMapOf<Int, Any?>()
+            assertTrue(map.isEmpty())
+
+            map[1] = "x"
+            map[2] = 1.05
+            // Now map contains something:
+            assertPrints(map, "{1=x, 2=1.05}")
+        }
+
     }
 
 
@@ -106,6 +117,58 @@ class Maps {
             }
         }
 
+
+        @Sample
+        fun mapIsNullOrEmpty() {
+            val nullMap: Map<String, Any>? = null
+            assertTrue(nullMap.isNullOrEmpty())
+
+            val emptyMap: Map<String, Any>? = emptyMap<String, Any>()
+            assertTrue(emptyMap.isNullOrEmpty())
+
+            val map: Map<Char, Int>? = mapOf('a' to 1, 'b' to 2, 'c' to 3)
+            assertFalse(map.isNullOrEmpty())
+        }
+
+        @Sample
+        fun mapOrEmpty() {
+            val nullMap: Map<String, Any>? = null
+            assertPrints(nullMap.orEmpty(), "{}")
+
+            val map: Map<Char, Int>? = mapOf('a' to 1, 'b' to 2, 'c' to 3)
+            assertPrints(map.orEmpty(), "{a=1, b=2, c=3}")
+        }
+
+        @Sample
+        fun mapIfEmpty() {
+            val emptyMap: Map<String, Int> = emptyMap()
+
+            val emptyOrNull = emptyMap.ifEmpty { null }
+            assertPrints(emptyOrNull, "null")
+
+            val emptyOrDefault: Map<String, Any> = emptyMap.ifEmpty { mapOf("s" to "a") }
+            assertPrints(emptyOrDefault, "{s=a}")
+
+            val nonEmptyMap = mapOf("x" to 1)
+            val sameMap = nonEmptyMap.ifEmpty { null }
+            assertTrue(nonEmptyMap === sameMap)
+        }
+
+        @Sample
+        fun containsValue() {
+            val map: Map<String, Int> = mapOf("x" to 1, "y" to 2)
+
+            // member containsValue is used
+            assertTrue(map.containsValue(1))
+
+            // extension containsValue is used when the argument type is a supertype of the map value type
+            assertTrue(map.containsValue(1 as Number))
+            assertTrue(map.containsValue(2 as Any))
+
+            assertFalse(map.containsValue("string" as Any))
+
+            // map.containsValue("string") // cannot call extension when the argument type and the map value type are unrelated at all
+        }
     }
 
     class Filtering {
@@ -225,7 +288,6 @@ class Maps {
             assertPrints(map2, "{beverage=2.7$, meal=12.4$}")
         }
 
-
         @Sample
         fun mapToSortedMap() {
             val map = mapOf(Pair("c", 3), Pair("b", 2), Pair("d", 1))
@@ -249,6 +311,16 @@ class Maps {
             assertPrints(props.getProperty("x"), "value A")
             assertPrints(props.getProperty("y", "fail"), "value B")
             assertPrints(props.getProperty("z", "fail"), "fail")
+        }
+
+        @Sample
+        fun mapToList() {
+            val peopleToAge = mapOf("Alice" to 20, "Bob" to 21)
+            assertPrints(
+                peopleToAge.map { (name, age) -> "$name is $age years old" },
+                "[Alice is 20 years old, Bob is 21 years old]"
+            )
+            assertPrints(peopleToAge.map { it.value }, "[20, 21]")
         }
 
     }

@@ -102,6 +102,11 @@ extend Function {
 
 extend Property {
   optional JvmPropertySignature property_signature = 100;
+
+  /**
+    isMovedFromInterfaceCompanion   true if this property is declared in an interface companion, and the field is stored in the interface
+   */
+  optional int32 flags = 101 [default = 0];
 }
 
 extend Type {
@@ -114,7 +119,7 @@ extend TypeParameter {
 }
 
 extend Class {
-  // If absent, assumed to be JvmAbi.DEFAULT_MODULE_NAME
+  // If absent, assumed to be "main" (JvmProtoBufUtil.DEFAULT_MODULE_NAME)
   optional int32 class_module_name = 101 [(string_id_in_table) = true];
 
   repeated Property class_local_variable = 102;

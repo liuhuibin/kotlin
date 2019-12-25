@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.intentions
@@ -53,8 +53,8 @@ class ConvertArrayParameterToVarargIntention : SelfTargetingIntention<KtParamete
         val typeReference = element.getChildOfType<KtTypeReference>() ?: return
         val type = element.descriptor?.type ?: return
         val newType = KotlinBuiltIns.getPrimitiveArrayElementType(type)?.typeName?.asString()
-                ?: typeReference.typeElement?.typeArgumentsAsTypes?.firstOrNull()?.text
-                ?: return
+            ?: typeReference.typeElement?.typeArgumentsAsTypes?.firstOrNull()?.text
+            ?: return
         typeReference.replace(KtPsiFactory(element).createType(newType))
         element.addModifier(KtTokens.VARARG_KEYWORD)
     }

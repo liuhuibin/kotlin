@@ -19,11 +19,12 @@ package org.jetbrains.kotlin.types
 import com.google.common.collect.Maps
 import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
+import org.jetbrains.kotlin.builtins.PlatformToKotlinClassMap
 import org.jetbrains.kotlin.builtins.isExtensionFunctionType
 import org.jetbrains.kotlin.builtins.isFunctionType
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.ClassKind
-import org.jetbrains.kotlin.platform.PlatformToKotlinClassMap
+import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.types.checker.KotlinTypeChecker
@@ -163,7 +164,7 @@ object CastDiagnosticsUtil {
         val supertypeWithVariables = TypeCheckingProcedure.findCorrespondingSupertype(subtypeWithVariables, supertype)
 
         val variables = subtypeWithVariables.constructor.parameters
-        val variableConstructors = variables.map { descriptor -> descriptor.typeConstructor }.toSet()
+        val variableConstructors = variables.map(TypeParameterDescriptor::getTypeConstructor).toSet()
 
         val substitution: MutableMap<TypeConstructor, TypeProjection> = if (supertypeWithVariables != null) {
             // Now, let's try to unify Collection<T> and Collection<Foo> solution is a map from T to Foo

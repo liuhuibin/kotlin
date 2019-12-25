@@ -1,95 +1,171 @@
 /*
- * Copyright 2010-2016 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.backend.jvm.codegen
 
-import org.jetbrains.kotlin.backend.common.lower.DECLARATION_ORIGIN_FUNCTION_FOR_DEFAULT_PARAMETER
+import org.jetbrains.kotlin.backend.common.lower.BOUND_RECEIVER_PARAMETER
+import org.jetbrains.kotlin.backend.common.lower.BOUND_VALUE_PARAMETER
+import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.JvmLoweredDeclarationOrigin
-import org.jetbrains.kotlin.backend.jvm.descriptors.JvmDescriptorWithExtraFlags
-import org.jetbrains.kotlin.builtins.KotlinBuiltIns.FQ_NAMES
-import org.jetbrains.kotlin.codegen.*
-import org.jetbrains.kotlin.codegen.FunctionCodegen
+import org.jetbrains.kotlin.codegen.AsmUtil
+import org.jetbrains.kotlin.codegen.mangleNameIfNeeded
 import org.jetbrains.kotlin.codegen.state.GenerationState
+import org.jetbrains.kotlin.codegen.ClassBuilderMode
+import org.jetbrains.kotlin.codegen.coroutines.SUSPEND_IMPL_NAME_SUFFIX
+import org.jetbrains.kotlin.codegen.visitAnnotableParameterCount
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.declarations.*
-import org.jetbrains.kotlin.ir.util.dump
-import org.jetbrains.kotlin.ir.util.hasAnnotation
-import org.jetbrains.kotlin.ir.util.isAnnotationClass
-import org.jetbrains.kotlin.psi.KtParameter
-import org.jetbrains.kotlin.resolve.jvm.AsmTypes
+import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.psi.KtElement
+import org.jetbrains.kotlin.resolve.jvm.annotations.JVM_SYNTHETIC_ANNOTATION_FQ_NAME
+import org.jetbrains.kotlin.resolve.jvm.annotations.STRICTFP_ANNOTATION_FQ_NAME
+import org.jetbrains.kotlin.resolve.jvm.annotations.SYNCHRONIZED_ANNOTATION_FQ_NAME
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodGenericSignature
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodParameterKind
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodSignature
-import org.jetbrains.kotlin.resolve.source.getPsi
+import org.jetbrains.kotlin.utils.addToStdlib.safeAs
+import org.jetbrains.kotlin.utils.sure
 import org.jetbrains.org.objectweb.asm.MethodVisitor
 import org.jetbrains.org.objectweb.asm.Opcodes
 import org.jetbrains.org.objectweb.asm.commons.InstructionAdapter
 
-open class FunctionCodegen(private val irFunction: IrFunction, private val classCodegen: ClassCodegen) {
-
+open class FunctionCodegen(
+    private val irFunction: IrFunction,
+    private val classCodegen: ClassCodegen,
+    private val inlinedInto: ExpressionCodegen? = null
+) {
+    val context = classCodegen.context
     val state = classCodegen.state
 
-    val descriptor = irFunction.descriptor
-
-    fun generate() {
+    fun generate(): JvmMethodGenericSignature =
         try {
             doGenerate()
         } catch (e: Throwable) {
-            throw RuntimeException("${e.message} while generating code for:\n${irFunction.dump()}", e)
+            throw RuntimeException("Exception while generating code for:\n${irFunction.dump()}", e)
         }
-    }
 
-    private fun doGenerate() {
-        val signature = classCodegen.typeMapper.mapSignatureWithGeneric(descriptor, OwnerKind.IMPLEMENTATION)
+    private fun doGenerate(): JvmMethodGenericSignature {
+        val functionView = irFunction.getOrCreateSuspendFunctionViewIfNeeded(context)
+        val signature = classCodegen.methodSignatureMapper.mapSignatureWithGeneric(functionView)
 
-        val flags = calculateMethodFlags(irFunction.isStatic)
-        val methodVisitor = createMethod(flags, signature)
+        val flags = calculateMethodFlags(functionView.isStatic)
+        var methodVisitor = createMethod(flags, signature)
 
-        FunctionCodegen.generateMethodAnnotations(descriptor, signature.asmMethod, methodVisitor, classCodegen, state.typeMapper)
-        FunctionCodegen.generateParameterAnnotations(descriptor, methodVisitor, signature, classCodegen, state)
+        if (state.generateParametersMetadata && flags.and(Opcodes.ACC_SYNTHETIC) == 0) {
+            generateParameterNames(irFunction, methodVisitor, signature, state)
+        }
+
+        if (irFunction.origin != IrDeclarationOrigin.FUNCTION_FOR_DEFAULT_PARAMETER) {
+            AnnotationCodegen(classCodegen, context, methodVisitor::visitAnnotation).genAnnotations(
+                functionView,
+                signature.asmMethod.returnType
+            )
+        }
+
+
+        if (irFunction !is IrConstructor || !irFunction.parentAsClass.shouldNotGenerateConstructorParameterAnnotations()) {
+            generateParameterAnnotations(functionView, methodVisitor, signature, classCodegen, context)
+        }
 
         if (!state.classBuilderMode.generateBodies || flags.and(Opcodes.ACC_ABSTRACT) != 0 || irFunction.isExternal) {
             generateAnnotationDefaultValueIfNeeded(methodVisitor)
-            methodVisitor.visitEnd()
-            return
+        } else {
+            val frameMap = createFrameMapWithReceivers()
+            methodVisitor = when {
+                irFunction.hasContinuation() -> {
+                    generateStateMachineForNamedFunction(
+                        irFunction, classCodegen, methodVisitor,
+                        access = flags,
+                        signature = signature,
+                        obtainContinuationClassBuilder = {
+                            context.continuationClassBuilders[continuationClass().attributeOwnerId]!!
+                        },
+                        element = psiElement()
+                    )
+                }
+                irFunction.isInvokeSuspendOfLambda() -> generateStateMachineForLambda(
+                    classCodegen, methodVisitor, flags, signature, psiElement()
+                )
+                else -> methodVisitor
+            }
+            ExpressionCodegen(functionView, signature, frameMap, InstructionAdapter(methodVisitor), classCodegen, inlinedInto).generate()
+            methodVisitor.visitMaxs(-1, -1)
+            if (irFunction.hasContinuation()) {
+                context.continuationClassBuilders[continuationClass().attributeOwnerId].sure {
+                    "Could not find continuation class builder for ${continuationClass().render()}"
+                }.done()
+            }
         }
+        methodVisitor.visitEnd()
 
-        val frameMap = createFrameMapWithReceivers(classCodegen.state, irFunction, signature)
-        ExpressionCodegen(irFunction, frameMap, InstructionAdapter(methodVisitor), classCodegen).generate()
+        return signature
     }
 
+    // Since the only arguments to anonymous object constructors are captured variables and complex
+    // super constructor arguments, there shouldn't be any annotations on them other than @NonNull,
+    // and those are meaningless on synthetic parameters. (Also, the inliner cannot handle them and
+    // will throw an exception if we generate any.)
+    // The same applies for continuations.
+    private fun IrClass.shouldNotGenerateConstructorParameterAnnotations() =
+        isAnonymousObject || origin == JvmLoweredDeclarationOrigin.CONTINUATION_CLASS || origin == JvmLoweredDeclarationOrigin.SUSPEND_LAMBDA
+
+    private fun psiElement(): KtElement =
+        if (irFunction.isSuspend) irFunction.symbol.descriptor.psiElement as KtElement
+        else context.suspendLambdaToOriginalFunctionMap[irFunction.parentAsClass.attributeOwnerId]!!.symbol.descriptor.psiElement as KtElement
+
+    private fun IrFunction.hasContinuation(): Boolean = isSuspend &&
+            // We do not generate continuation and state-machine for synthetic accessors, bridges, and delegated members,
+            // in a sense, they are tail-call
+            !isKnownToBeTailCall() &&
+            // TODO: We should generate two versions of inline suspend function: one with state-machine and one without
+            !isInline &&
+            // This is suspend lambda parameter of inline function
+            origin != IrDeclarationOrigin.LOCAL_FUNCTION_FOR_LAMBDA &&
+            // This is just a template for inliner
+            origin != JvmLoweredDeclarationOrigin.FOR_INLINE_STATE_MACHINE_TEMPLATE_CAPTURES_CROSSINLINE &&
+            // Continuations are generated for suspendImpls
+            parentAsClass.functions.none { it.name.asString() == name.asString() + SUSPEND_IMPL_NAME_SUFFIX }
+
+    private fun continuationClass(): IrClass =
+        irFunction.body!!.statements[0] as IrClass
+
     private fun calculateMethodFlags(isStatic: Boolean): Int {
-        if (irFunction.origin == DECLARATION_ORIGIN_FUNCTION_FOR_DEFAULT_PARAMETER) {
+        if (irFunction.origin == IrDeclarationOrigin.FUNCTION_FOR_DEFAULT_PARAMETER) {
             return Opcodes.ACC_PUBLIC or Opcodes.ACC_SYNTHETIC.let {
-                if (irFunction is IrConstructor) it else it or Opcodes.ACC_BRIDGE or Opcodes.ACC_STATIC
+                if (irFunction is IrConstructor) it else it or Opcodes.ACC_STATIC
             }
         }
 
-        val visibility = AsmUtil.getVisibilityAccessFlag(irFunction.visibility) ?: error("Unmapped visibility ${irFunction.visibility}")
+        val visibility = irFunction.getVisibilityAccessFlag()
         val staticFlag = if (isStatic) Opcodes.ACC_STATIC else 0
-        val varargFlag = if (irFunction.valueParameters.any { it.varargElementType != null }) Opcodes.ACC_VARARGS else 0
-        val deprecation = if (irFunction.hasAnnotation(FQ_NAMES.deprecated)) Opcodes.ACC_DEPRECATED else 0
-        val bridgeFlag = 0 //TODO
+        val varargFlag = if (irFunction.valueParameters.lastOrNull()?.varargElementType != null) Opcodes.ACC_VARARGS else 0
+        val deprecation = irFunction.deprecationFlags
+        val bridgeFlag = if (
+            irFunction.origin == IrDeclarationOrigin.BRIDGE ||
+            irFunction.origin == IrDeclarationOrigin.BRIDGE_SPECIAL
+        ) Opcodes.ACC_BRIDGE else 0
         val modalityFlag = when ((irFunction as? IrSimpleFunction)?.modality) {
-            Modality.FINAL -> if (!classCodegen.irClass.isAnnotationClass) Opcodes.ACC_FINAL else Opcodes.ACC_ABSTRACT
+            Modality.FINAL -> when {
+                classCodegen.irClass.isInterface && irFunction.body != null -> 0
+                !classCodegen.irClass.isAnnotationClass || irFunction.isStatic -> Opcodes.ACC_FINAL
+                else -> Opcodes.ACC_ABSTRACT
+            }
             Modality.ABSTRACT -> Opcodes.ACC_ABSTRACT
             else -> if (classCodegen.irClass.isJvmInterface && irFunction.body == null) Opcodes.ACC_ABSTRACT else 0 //TODO transform interface modality on lowering to DefaultImpls
         }
         val nativeFlag = if (irFunction.isExternal) Opcodes.ACC_NATIVE else 0
-        val syntheticFlag = if (irFunction.origin == JvmLoweredDeclarationOrigin.SYNTHETIC_ACCESSOR) Opcodes.ACC_SYNTHETIC else 0
+        val syntheticFlag =
+            if (irFunction.origin.isSynthetic || irFunction.hasAnnotation(JVM_SYNTHETIC_ANNOTATION_FQ_NAME)) Opcodes.ACC_SYNTHETIC
+            else 0
+        val strictFpFlag = if (irFunction.hasAnnotation(STRICTFP_ANNOTATION_FQ_NAME)) Opcodes.ACC_STRICT else 0
+        val synchronizedFlag = if (irFunction.hasAnnotation(SYNCHRONIZED_ANNOTATION_FQ_NAME)) Opcodes.ACC_SYNCHRONIZED else 0
+
         return visibility or
                 modalityFlag or
                 staticFlag or
@@ -98,65 +174,152 @@ open class FunctionCodegen(private val irFunction: IrFunction, private val class
                 nativeFlag or
                 bridgeFlag or
                 syntheticFlag or
-                (if (descriptor is JvmDescriptorWithExtraFlags) descriptor.extraFlags else 0)
+                strictFpFlag or
+                synchronizedFlag
     }
 
     protected open fun createMethod(flags: Int, signature: JvmMethodGenericSignature): MethodVisitor {
+        // @Throws(vararg exceptionClasses: KClass<out Throwable>)
+        val exceptions = irFunction.getAnnotation(FqName("kotlin.jvm.Throws"))?.getValueArgument(0)?.let {
+            (it as IrVararg).elements.map { exceptionClass ->
+                classCodegen.typeMapper.mapType((exceptionClass as IrClassReference).classType).internalName
+            }.toTypedArray()
+        }
+
         return classCodegen.visitor.newMethod(
             irFunction.OtherOrigin,
             flags,
             signature.asmMethod.name, signature.asmMethod.descriptor,
-            if (irFunction.origin == IrDeclarationOrigin.BRIDGE) null else signature.genericsSignature,
-            null/*TODO support exception*/
+            if (flags.and(Opcodes.ACC_SYNTHETIC) != 0) null else signature.genericsSignature,
+            exceptions
         )
     }
 
     private fun generateAnnotationDefaultValueIfNeeded(methodVisitor: MethodVisitor) {
-        if (classCodegen.irClass.isAnnotationClass) {
-            val source = JvmCodegenUtil.getDirectMember(descriptor).source
-            (source.getPsi() as? KtParameter)?.defaultValue?.apply {
-                val defaultValue = this
-                val constant = org.jetbrains.kotlin.codegen.ExpressionCodegen.getCompileTimeConstant(
-                    defaultValue, state.bindingContext, true, state.shouldInlineConstVals
+        getAnnotationDefaultValueExpression()?.let { defaultValueExpression ->
+            val annotationCodegen = AnnotationCodegen(classCodegen, context) { _, _ -> methodVisitor.visitAnnotationDefault() }
+            annotationCodegen.generateAnnotationDefaultValue(defaultValueExpression)
+        }
+    }
+
+    private fun getAnnotationDefaultValueExpression(): IrExpression? {
+        if (!classCodegen.irClass.isAnnotationClass) return null
+        // TODO: any simpler way to get to the value expression?
+        // Are there other valid IR structures that represent the default value?
+        return irFunction.safeAs<IrSimpleFunction>()
+            ?.correspondingPropertySymbol?.owner
+            ?.backingField
+            ?.initializer.safeAs<IrExpressionBody>()
+            ?.expression?.safeAs<IrGetValue>()
+            ?.symbol?.owner?.safeAs<IrValueParameter>()
+            ?.defaultValue?.safeAs<IrExpressionBody>()
+            ?.expression
+    }
+
+    private fun IrFrameMap.enterDispatchReceiver(parameter: IrValueParameter) {
+        val type = classCodegen.typeMapper.mapTypeAsDeclaration(parameter.type)
+        enter(parameter, type)
+    }
+
+    private fun createFrameMapWithReceivers(): IrFrameMap {
+        val frameMap = IrFrameMap()
+        val functionView = irFunction.getOrCreateSuspendFunctionViewIfNeeded(context)
+
+        if (irFunction is IrConstructor) {
+            frameMap.enterDispatchReceiver(irFunction.constructedClass.thisReceiver!!)
+        } else if (functionView.dispatchReceiverParameter != null) {
+            frameMap.enterDispatchReceiver(functionView.dispatchReceiverParameter!!)
+        }
+        functionView.extensionReceiverParameter?.let {
+            frameMap.enter(it, classCodegen.typeMapper.mapType(it))
+        }
+        for (parameter in functionView.valueParameters) {
+            frameMap.enter(parameter, classCodegen.typeMapper.mapType(parameter.type))
+        }
+
+        return frameMap
+    }
+}
+
+// Borrowed from org.jetbrains.kotlin.codegen.FunctionCodegen.java
+private fun generateParameterAnnotations(
+    irFunction: IrFunction,
+    mv: MethodVisitor,
+    jvmSignature: JvmMethodSignature,
+    innerClassConsumer: InnerClassConsumer,
+    context: JvmBackendContext
+) {
+    val iterator = irFunction.valueParameters.iterator()
+    val kotlinParameterTypes = jvmSignature.valueParameters
+    val syntheticParameterCount = kotlinParameterTypes.count { it.kind.isSkippedInGenericSignature }
+
+    visitAnnotableParameterCount(mv, kotlinParameterTypes.size - syntheticParameterCount)
+
+    kotlinParameterTypes.forEachIndexed { i, parameterSignature ->
+        val kind = parameterSignature.kind
+        val annotated = when (kind) {
+            JvmMethodParameterKind.RECEIVER -> irFunction.extensionReceiverParameter
+            else -> iterator.next()
+        }
+
+        if (!kind.isSkippedInGenericSignature) {
+            AnnotationCodegen(innerClassConsumer, context) { descriptor, visible ->
+                mv.visitParameterAnnotation(
+                    i - syntheticParameterCount,
+                    descriptor,
+                    visible
                 )
-                assert(!state.classBuilderMode.generateBodies || constant != null) { "Default value for annotation parameter should be compile time value: " + defaultValue.text }
-                if (constant != null) {
-                    val annotationCodegen = AnnotationCodegen.forAnnotationDefaultValue(methodVisitor, classCodegen, state.typeMapper)
-                    annotationCodegen.generateAnnotationDefaultValue(constant, descriptor.returnType!!)
-                }
-            }
+            }.genAnnotations(annotated, parameterSignature.asmType)
         }
     }
 }
 
-private fun createFrameMapWithReceivers(
-    state: GenerationState,
-    irFunction: IrFunction,
-    signature: JvmMethodSignature
-): IrFrameMap {
-    val frameMap = IrFrameMap()
-    if (irFunction is IrConstructor) {
-        frameMap.enter((irFunction.parent as IrClass).thisReceiver!!, AsmTypes.OBJECT_TYPE)
-    } else if (irFunction.dispatchReceiverParameter != null) {
-        frameMap.enter(irFunction.dispatchReceiverParameter!!, AsmTypes.OBJECT_TYPE)
-    }
-
-    for (parameter in signature.valueParameters) {
-        if (parameter.kind == JvmMethodParameterKind.RECEIVER) {
-            val receiverParameter = irFunction.extensionReceiverParameter
-            if (receiverParameter?.descriptor != null) {
-                frameMap.enter(receiverParameter, state.typeMapper.mapType(receiverParameter.descriptor))
-            } else {
-                frameMap.enterTemp(parameter.asmType)
-            }
-        } else if (parameter.kind != JvmMethodParameterKind.VALUE) {
-            frameMap.enterTemp(parameter.asmType)
+private fun generateParameterNames(irFunction: IrFunction, mv: MethodVisitor, jvmSignature: JvmMethodSignature, state: GenerationState) {
+    val iterator = irFunction.valueParameters.iterator()
+    for (parameterSignature in jvmSignature.valueParameters) {
+        val irParameter = when (parameterSignature.kind) {
+            JvmMethodParameterKind.RECEIVER -> irFunction.extensionReceiverParameter!!
+            else -> iterator.next()
         }
+        val name = when (parameterSignature.kind) {
+            JvmMethodParameterKind.RECEIVER -> getNameForReceiverParameter(irFunction, state)
+            else -> irParameter.name.asString()
+        }
+        // A construct emitted by a Java compiler must be marked as synthetic if it does not correspond to a construct declared
+        // explicitly or implicitly in source code, unless the emitted construct is a class initialization method (JVMS §2.9).
+        // A construct emitted by a Java compiler must be marked as mandated if it corresponds to a formal parameter
+        // declared implicitly in source code (§8.8.1, §8.8.9, §8.9.3, §15.9.5.1).
+        val access = when {
+            irParameter == irFunction.extensionReceiverParameter -> Opcodes.ACC_MANDATED
+            irParameter.origin == JvmLoweredDeclarationOrigin.FIELD_FOR_OUTER_THIS -> Opcodes.ACC_MANDATED
+            // TODO mark these backend-common origins as synthetic? (note: ExpressionCodegen is still expected
+            //      to generate LVT entries for them)
+            irParameter.origin == IrDeclarationOrigin.MOVED_RECEIVER_PARAMETER -> Opcodes.ACC_SYNTHETIC
+            irParameter.origin == BOUND_VALUE_PARAMETER -> Opcodes.ACC_SYNTHETIC
+            irParameter.origin == BOUND_RECEIVER_PARAMETER -> Opcodes.ACC_SYNTHETIC
+            irParameter.origin.isSynthetic -> Opcodes.ACC_SYNTHETIC
+            else -> 0
+        }
+        mv.visitParameter(name, access)
+    }
+}
+
+private fun getNameForReceiverParameter(irFunction: IrFunction, state: GenerationState): String {
+    if (!state.languageVersionSettings.supportsFeature(LanguageFeature.NewCapturedReceiverFieldNamingConvention)) {
+        return AsmUtil.RECEIVER_PARAMETER_NAME
     }
 
-    for (parameter in irFunction.valueParameters) {
-        frameMap.enter(parameter, state.typeMapper.mapType(parameter.type))
-    }
+    // Current codegen never touches CALL_LABEL_FOR_LAMBDA_ARGUMENT
+//    if (irFunction is IrSimpleFunction) {
+//        val labelName = bindingContext.get(CodegenBinding.CALL_LABEL_FOR_LAMBDA_ARGUMENT, irFunction.descriptor)
+//        if (labelName != null) {
+//            return getLabeledThisName(labelName, prefix, defaultName)
+//        }
+//    }
 
-    return frameMap
+    val callableName = irFunction.safeAs<IrSimpleFunction>()?.correspondingPropertySymbol?.owner?.name ?: irFunction.name
+    return if (callableName.isSpecial || !Name.isValidIdentifier(callableName.asString()))
+        AsmUtil.RECEIVER_PARAMETER_NAME
+    else
+        AsmUtil.LABELED_THIS_PARAMETER + mangleNameIfNeeded(callableName.asString())
 }

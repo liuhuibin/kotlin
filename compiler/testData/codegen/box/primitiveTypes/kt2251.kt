@@ -1,4 +1,4 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
 class A(var b: Byte) {
   fun c(d: Short)  = (b + d.toByte()).toChar()
 }

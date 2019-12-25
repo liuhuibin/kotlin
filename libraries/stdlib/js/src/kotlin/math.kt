@@ -1,8 +1,8 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
-@file:Suppress("DEPRECATION")
+@file:Suppress("DEPRECATION", "DEPRECATION_ERROR")
 package kotlin.math
 
 
@@ -10,7 +10,7 @@ import kotlin.internal.InlineOnly
 import kotlin.js.Math as nativeMath
 
 
-// ================ Double Math ========================================
+// region ================ Double Math ========================================
 
 /** Computes the sine of the angle [x] given in radians.
  *
@@ -289,7 +289,7 @@ public actual inline fun ln1p(x: Double): Double = nativeMath.log1p(x)
 /**
  * Rounds the given value [x] to an integer towards positive infinity.
 
- * @return the smallest double value that is greater than the given value [x] and is a mathematical integer.
+ * @return the smallest double value that is greater than or equal to the given value [x] and is a mathematical integer.
  *
  * Special cases:
  *   - `ceil(x)` is `x` where `x` is `NaN` or `+Inf` or `-Inf` or already a mathematical integer.
@@ -301,7 +301,7 @@ public actual inline fun ceil(x: Double): Double = nativeMath.ceil(x).unsafeCast
 /**
  * Rounds the given value [x] to an integer towards negative infinity.
 
- * @return the largest double value that is smaller than the given value [x] and is a mathematical integer.
+ * @return the largest double value that is smaller than or equal to the given value [x] and is a mathematical integer.
  *
  * Special cases:
  *   - `floor(x)` is `x` where `x` is `NaN` or `+Inf` or `-Inf` or already a mathematical integer.
@@ -434,18 +434,6 @@ public actual inline val Double.sign: Double get() = nativeMath.sign(this)
 
 /**
  * Returns this value with the sign bit same as of the [sign] value.
- *
- * If [sign] is `NaN` the sign of the result is undefined.
- */
-@SinceKotlin("1.2")
-public actual fun Double.withSign(sign: Double): Double {
-    val thisSignBit = js("Kotlin").doubleSignBit(this).unsafeCast<Int>()
-    val newSignBit = js("Kotlin").doubleSignBit(sign).unsafeCast<Int>()
-    return if (thisSignBit == newSignBit) this else -this
-}
-
-/**
- * Returns this value with the sign bit same as of the [sign] value.
  */
 @SinceKotlin("1.2")
 @InlineOnly
@@ -543,10 +531,11 @@ public actual fun Double.roundToLong(): Long = when {
     else -> nativeMath.round(this).unsafeCast<Double>().toLong()
 }
 
+// endregion
 
 
 
-// ================ Float Math ========================================
+// region ================ Float Math ========================================
 
 /** Computes the sine of the angle [x] given in radians.
  *
@@ -823,7 +812,7 @@ public actual inline fun ln1p(x: Float): Float = nativeMath.log1p(x.toDouble()).
 /**
  * Rounds the given value [x] to an integer towards positive infinity.
 
- * @return the smallest Float value that is greater than the given value [x] and is a mathematical integer.
+ * @return the smallest Float value that is greater than or equal to the given value [x] and is a mathematical integer.
  *
  * Special cases:
  *   - `ceil(x)` is `x` where `x` is `NaN` or `+Inf` or `-Inf` or already a mathematical integer.
@@ -835,7 +824,7 @@ public actual inline fun ceil(x: Float): Float = nativeMath.ceil(x.toDouble()).t
 /**
  * Rounds the given value [x] to an integer towards negative infinity.
 
- * @return the largest Float value that is smaller than the given value [x] and is a mathematical integer.
+ * @return the largest Float value that is smaller than or equal to the given value [x] and is a mathematical integer.
  *
  * Special cases:
  *   - `floor(x)` is `x` where `x` is `NaN` or `+Inf` or `-Inf` or already a mathematical integer.
@@ -1010,6 +999,9 @@ public actual inline fun Float.roundToInt(): Int = toDouble().roundToInt()
 public actual inline fun Float.roundToLong(): Long = toDouble().roundToLong()
 
 
+// endregion
+
+// region ================ Integer Math ========================================
 
 
 /**
@@ -1116,3 +1108,4 @@ public actual val Long.sign: Int get() = when {
 }
 
 
+// endregion

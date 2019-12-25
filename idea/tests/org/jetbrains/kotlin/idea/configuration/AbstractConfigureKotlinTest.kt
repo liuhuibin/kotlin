@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.configuration
@@ -21,7 +10,6 @@ import com.intellij.openapi.application.PathMacros
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.projectRoots.ProjectJdkTable
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.io.FileUtil
@@ -33,6 +21,8 @@ import junit.framework.TestCase
 import org.jetbrains.kotlin.idea.configuration.KotlinWithLibraryConfigurator.FileState
 import org.jetbrains.kotlin.idea.framework.KotlinSdkType
 import org.jetbrains.kotlin.idea.test.PluginTestCaseBase
+import org.jetbrains.kotlin.idea.util.getProjectJdkTableSafe
+import org.jetbrains.kotlin.test.KotlinTestUtils
 import org.jetbrains.kotlin.utils.PathUtil
 import java.io.File
 import java.nio.file.Path
@@ -41,25 +31,12 @@ abstract class AbstractConfigureKotlinTest : PlatformTestCase() {
     override fun setUp() {
         super.setUp()
 
-        val distPaths = with(PathUtil.kotlinPathsForIdeaPlugin) {
-            listOf(
-                    stdlibPath,
-                    stdlibSourcesPath,
-                    reflectPath,
-                    kotlinTestPath,
-                    jsKotlinTestJarPath,
-                    jsStdLibJarPath,
-                    jsStdLibSrcJarPath
-            )
-        }
-
-        for (path in distPaths) {
-            VfsRootAccess.allowRootAccess(testRootDisposable, path.absolutePath)
-        }
+        VfsRootAccess.allowRootAccess(KotlinTestUtils.getHomeDirectory())
     }
 
     @Throws(Exception::class)
     override fun tearDown() {
+        VfsRootAccess.disallowRootAccess(KotlinTestUtils.getHomeDirectory())
         PathMacros.getInstance().removeMacro(TEMP_DIR_MACRO_KEY)
 
         super.tearDown()
@@ -72,9 +49,11 @@ abstract class AbstractConfigureKotlinTest : PlatformTestCase() {
         KotlinSdkType.setUpIfNeeded()
 
         ApplicationManager.getApplication().runWriteAction {
-            ProjectJdkTable.getInstance().addJdk(PluginTestCaseBase.mockJdk6())
-            ProjectJdkTable.getInstance().addJdk(PluginTestCaseBase.mockJdk8())
-            ProjectJdkTable.getInstance().addJdk(PluginTestCaseBase.mockJdk9())
+            val jdkTable = getProjectJdkTableSafe()
+
+            jdkTable.addJdk(PluginTestCaseBase.mockJdk6())
+            jdkTable.addJdk(PluginTestCaseBase.mockJdk8())
+            jdkTable.addJdk(PluginTestCaseBase.mockJdk9())
         }
 
         PluginTestCaseBase.clearSdkTable(testRootDisposable)
@@ -141,8 +120,8 @@ abstract class AbstractConfigureKotlinTest : PlatformTestCase() {
             val testName = getTestName(true)
             return if (testName.contains("_")) {
                 testName.substring(0, testName.indexOf("_"))
-            }
-            else testName
+            } else
+                testName
         }
 
     protected val projectRoot: String
@@ -171,11 +150,11 @@ abstract class AbstractConfigureKotlinTest : PlatformTestCase() {
         }
 
         private fun configure(
-                modules: List<Module>,
-                runtimeState: FileState,
-                configurator: KotlinWithLibraryConfigurator,
-                jarFromDist: String,
-                jarFromTemp: String
+            modules: List<Module>,
+            runtimeState: FileState,
+            configurator: KotlinWithLibraryConfigurator,
+            jarFromDist: String,
+            jarFromTemp: String
         ) {
             val project = modules.first().project
             val collector = createConfigureKotlinNotificationCollector(project)
@@ -188,37 +167,11 @@ abstract class AbstractConfigureKotlinTest : PlatformTestCase() {
         }
 
         private fun getPathToJar(runtimeState: FileState, jarFromDist: String, jarFromTemp: String) = when (runtimeState) {
-            KotlinWithLibraryConfigurator.FileState.EXISTS -> jarFromDist
-            KotlinWithLibraryConfigurator.FileState.COPY -> jarFromTemp
-            KotlinWithLibraryConfigurator.FileState.DO_NOT_COPY -> jarFromDist
+            FileState.EXISTS -> jarFromDist
+            FileState.COPY -> jarFromTemp
+            FileState.DO_NOT_COPY -> jarFromDist
         }
 
-        protected fun configure(module: Module, jarState: FileState, configurator: KotlinProjectConfigurator) {
-            if (configurator is KotlinJavaModuleConfigurator) {
-                configure(listOf(module), jarState,
-                          configurator as KotlinWithLibraryConfigurator,
-                          pathToExistentRuntimeJar, pathToNonexistentRuntimeJar)
-            }
-            if (configurator is KotlinJsModuleConfigurator) {
-                configure(listOf(module), jarState,
-                          configurator as KotlinWithLibraryConfigurator,
-                          pathToExistentJsJar, pathToNonexistentJsJar)
-            }
-        }
-
-        private val pathToNonexistentRuntimeJar: String
-            get() {
-                val pathToTempKotlinRuntimeJar = FileUtil.getTempDirectory() + "/kotlin-runtime.jar"
-                PlatformTestCase.myFilesToDelete.add(File(pathToTempKotlinRuntimeJar))
-                return pathToTempKotlinRuntimeJar
-            }
-
-        private val pathToNonexistentJsJar: String
-            get() {
-                val pathToTempKotlinRuntimeJar = FileUtil.getTempDirectory() + "/" + PathUtil.JS_LIB_JAR_NAME
-                PlatformTestCase.myFilesToDelete.add(File(pathToTempKotlinRuntimeJar))
-                return pathToTempKotlinRuntimeJar
-            }
 
         private val pathToExistentRuntimeJar: String
             get() = PathUtil.kotlinPathsForDistDirectory.stdlibPath.parent
@@ -228,14 +181,19 @@ abstract class AbstractConfigureKotlinTest : PlatformTestCase() {
 
         protected fun assertNotConfigured(module: Module, configurator: KotlinWithLibraryConfigurator) {
             TestCase.assertFalse(
-                    String.format("Module %s should not be configured as %s Module", module.name, configurator.presentableText),
-                    configurator.isConfigured(module))
+                String.format("Module %s should not be configured as %s Module", module.name, configurator.presentableText),
+                configurator.isConfigured(module)
+            )
         }
 
         protected fun assertConfigured(module: Module, configurator: KotlinWithLibraryConfigurator) {
-            TestCase.assertTrue(String.format("Module %s should be configured with configurator '%s'", module.name,
-                                              configurator.presentableText),
-                                configurator.isConfigured(module))
+            TestCase.assertTrue(
+                String.format(
+                    "Module %s should be configured with configurator '%s'", module.name,
+                    configurator.presentableText
+                ),
+                configurator.isConfigured(module)
+            )
         }
 
         protected fun assertProperlyConfigured(module: Module, configurator: KotlinWithLibraryConfigurator) {
@@ -255,6 +213,37 @@ abstract class AbstractConfigureKotlinTest : PlatformTestCase() {
             return tempPath + '/' + relativePath
         }
     }
+
+    protected fun configure(module: Module, jarState: FileState, configurator: KotlinProjectConfigurator) {
+        if (configurator is KotlinJavaModuleConfigurator) {
+            configure(
+                listOf(module), jarState,
+                configurator as KotlinWithLibraryConfigurator,
+                pathToExistentRuntimeJar, pathToNonexistentRuntimeJar
+            )
+        }
+        if (configurator is KotlinJsModuleConfigurator) {
+            configure(
+                listOf(module), jarState,
+                configurator as KotlinWithLibraryConfigurator,
+                pathToExistentJsJar, pathToNonexistentJsJar
+            )
+        }
+    }
+
+    private val pathToNonexistentRuntimeJar: String
+        get() {
+            val pathToTempKotlinRuntimeJar = FileUtil.getTempDirectory() + "/" + PathUtil.KOTLIN_JAVA_STDLIB_JAR
+            myFilesToDelete.add(File(pathToTempKotlinRuntimeJar))
+            return pathToTempKotlinRuntimeJar
+        }
+
+    private val pathToNonexistentJsJar: String
+        get() {
+            val pathToTempKotlinRuntimeJar = FileUtil.getTempDirectory() + "/" + PathUtil.JS_LIB_JAR_NAME
+            myFilesToDelete.add(File(pathToTempKotlinRuntimeJar))
+            return pathToTempKotlinRuntimeJar
+        }
 
     override fun getTestProjectJdk(): Sdk {
         val projectRootManager = ProjectRootManager.getInstance(project)

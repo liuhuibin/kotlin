@@ -14,30 +14,21 @@
  * limitations under the License.
  */
 
+@file:Suppress("DEPRECATION_ERROR")
+
 package org.jetbrains.kotlin.js.resolve
 
-import org.jetbrains.kotlin.builtins.DefaultBuiltIns
-import org.jetbrains.kotlin.builtins.KotlinBuiltIns
-import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.resolve.ImportPath
-import org.jetbrains.kotlin.resolve.MultiTargetPlatform
-import org.jetbrains.kotlin.resolve.PlatformConfigurator
+import org.jetbrains.kotlin.platform.js.JsPlatforms
 import org.jetbrains.kotlin.resolve.TargetPlatform
-import org.jetbrains.kotlin.storage.LockBasedStorageManager
 
-object JsPlatform : TargetPlatform("JS") {
-    private val defaultImports = LockBasedStorageManager().createMemoizedFunction<Boolean, List<ImportPath>> { includeKotlinComparisons ->
-        Common.getDefaultImports(includeKotlinComparisons) + ImportPath.fromString("kotlin.js.*")
+@Deprecated(
+    message = "This class is deprecated and will be removed soon, use API from 'org.jetbrains.kotlin.platform.*' packages instead",
+    replaceWith = ReplaceWith("JsPlatforms.defaultJsPlatform", "org.jetbrains.kotlin.platform.js.JsPlatforms"),
+    level = DeprecationLevel.ERROR
+)
+interface JsPlatform : TargetPlatform {
+    companion object {
+        @JvmField
+        val INSTANCE: JsPlatform = JsPlatforms.CompatJsPlatform
     }
-
-    override fun getDefaultImports(includeKotlinComparisons: Boolean): List<ImportPath> = defaultImports(includeKotlinComparisons)
-
-    override val platformConfigurator: PlatformConfigurator = JsPlatformConfigurator
-
-    val builtIns: KotlinBuiltIns
-        get() = DefaultBuiltIns.Instance
-
-    override val multiTargetPlatform = MultiTargetPlatform.Specific(platformName)
-
-    override val excludedImports: List<FqName> = listOf("Promise", "Date", "Console", "Math", "RegExp", "RegExpMatch", "Json", "json").map { FqName("kotlin.js.$it") }
 }

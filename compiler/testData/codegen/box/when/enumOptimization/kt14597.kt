@@ -1,8 +1,8 @@
-// IGNORE_BACKEND: JS_IR
+// IGNORE_BACKEND_FIR: JVM_IR
 // CHECK_CASES_COUNT: function=box count=6
 // CHECK_IF_COUNT: function=box count=1
 
-enum class En { A, B, С }
+enum class En { A, B, C }
 
 fun box(): String {
     var res = ""
@@ -12,13 +12,13 @@ fun box(): String {
         when (en2) {
             En.A -> {res += "O"}
             En.B -> {}
-            En.С -> {}
+            En.C -> {}
         }
 
         when (en2 as En) {
             En.A -> {res += "K"}
             En.B -> {}
-            En.С -> {}
+            En.C -> {}
         }
     }
 

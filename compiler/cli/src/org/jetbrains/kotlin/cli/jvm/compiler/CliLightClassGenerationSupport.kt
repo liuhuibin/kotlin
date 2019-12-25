@@ -16,13 +16,18 @@
 
 package org.jetbrains.kotlin.cli.jvm.compiler
 
+import com.intellij.psi.PsiManager
+import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.util.CachedValue
 import org.jetbrains.kotlin.asJava.LightClassBuilder
 import org.jetbrains.kotlin.asJava.LightClassGenerationSupport
 import org.jetbrains.kotlin.asJava.builder.InvalidLightClassDataHolder
 import org.jetbrains.kotlin.asJava.builder.LightClassConstructionContext
 import org.jetbrains.kotlin.asJava.builder.LightClassDataHolder
 import org.jetbrains.kotlin.asJava.builder.LightClassDataHolderImpl
+import org.jetbrains.kotlin.asJava.classes.KtUltraLightClassForFacade
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
+import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext
 
@@ -39,9 +44,17 @@ import org.jetbrains.kotlin.resolve.BindingContext
  * To mitigate this, CliLightClassGenerationSupport hold a trace that is shared between the analyzer and JetLightClasses
  */
 class CliLightClassGenerationSupport(private val traceHolder: CliTraceHolder) : LightClassGenerationSupport() {
-    override fun createDataHolderForClass(
-            classOrObject: KtClassOrObject, builder: LightClassBuilder
-    ): LightClassDataHolder.ForClass {
+
+    override fun createUltraLightClassForFacade(
+        manager: PsiManager,
+        facadeClassFqName: FqName,
+        lightClassDataCache: CachedValue<LightClassDataHolder.ForFacade>,
+        files: Collection<KtFile>
+    ): KtUltraLightClassForFacade? = null
+
+    override fun createUltraLightClass(element: KtClassOrObject) = null
+
+    override fun createDataHolderForClass(classOrObject: KtClassOrObject, builder: LightClassBuilder): LightClassDataHolder.ForClass {
         //force resolve companion for light class generation
         traceHolder.bindingContext.get(BindingContext.CLASS, classOrObject)?.companionObjectDescriptor
 
@@ -49,10 +62,7 @@ class CliLightClassGenerationSupport(private val traceHolder: CliTraceHolder) : 
 
         bindingContext.get(BindingContext.CLASS, classOrObject) ?: return InvalidLightClassDataHolder
 
-        return LightClassDataHolderImpl(
-                stub,
-                diagnostics
-        )
+        return LightClassDataHolderImpl(stub, diagnostics)
     }
 
     override fun createDataHolderForFacade(files: Collection<KtFile>, builder: LightClassBuilder): LightClassDataHolder.ForFacade {
@@ -75,5 +85,3 @@ class CliLightClassGenerationSupport(private val traceHolder: CliTraceHolder) : 
 
     override fun analyzeWithContent(element: KtClassOrObject) = traceHolder.bindingContext
 }
-
-

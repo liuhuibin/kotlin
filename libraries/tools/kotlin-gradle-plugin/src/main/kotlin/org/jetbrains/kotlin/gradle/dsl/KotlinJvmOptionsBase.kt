@@ -7,62 +7,93 @@ internal abstract class KotlinJvmOptionsBase : org.jetbrains.kotlin.gradle.dsl.K
     private var allWarningsAsErrorsField: kotlin.Boolean? = null
     override var allWarningsAsErrors: kotlin.Boolean
         get() = allWarningsAsErrorsField ?: false
-        set(value) { allWarningsAsErrorsField = value }
+        set(value) {
+            allWarningsAsErrorsField = value
+        }
 
     private var suppressWarningsField: kotlin.Boolean? = null
     override var suppressWarnings: kotlin.Boolean
         get() = suppressWarningsField ?: false
-        set(value) { suppressWarningsField = value }
+        set(value) {
+            suppressWarningsField = value
+        }
 
     private var verboseField: kotlin.Boolean? = null
     override var verbose: kotlin.Boolean
         get() = verboseField ?: false
-        set(value) { verboseField = value }
+        set(value) {
+            verboseField = value
+        }
 
     private var apiVersionField: kotlin.String?? = null
     override var apiVersion: kotlin.String?
         get() = apiVersionField ?: null
-        set(value) { apiVersionField = value }
+        set(value) {
+            apiVersionField = value
+        }
 
     private var languageVersionField: kotlin.String?? = null
     override var languageVersion: kotlin.String?
         get() = languageVersionField ?: null
-        set(value) { languageVersionField = value }
+        set(value) {
+            languageVersionField = value
+        }
 
     private var includeRuntimeField: kotlin.Boolean? = null
     override var includeRuntime: kotlin.Boolean
         get() = includeRuntimeField ?: false
-        set(value) { includeRuntimeField = value }
+        set(value) {
+            includeRuntimeField = value
+        }
 
     private var javaParametersField: kotlin.Boolean? = null
     override var javaParameters: kotlin.Boolean
         get() = javaParametersField ?: false
-        set(value) { javaParametersField = value }
+        set(value) {
+            javaParametersField = value
+        }
 
     private var jdkHomeField: kotlin.String?? = null
     override var jdkHome: kotlin.String?
         get() = jdkHomeField ?: null
-        set(value) { jdkHomeField = value }
+        set(value) {
+            jdkHomeField = value
+        }
 
     private var jvmTargetField: kotlin.String? = null
     override var jvmTarget: kotlin.String
         get() = jvmTargetField ?: "1.6"
-        set(value) { jvmTargetField = value }
+        set(value) {
+            jvmTargetField = value
+        }
 
     private var noJdkField: kotlin.Boolean? = null
     override var noJdk: kotlin.Boolean
         get() = noJdkField ?: false
-        set(value) { noJdkField = value }
+        set(value) {
+            noJdkField = value
+        }
 
     private var noReflectField: kotlin.Boolean? = null
     override var noReflect: kotlin.Boolean
         get() = noReflectField ?: true
-        set(value) { noReflectField = value }
+        set(value) {
+            noReflectField = value
+        }
 
     private var noStdlibField: kotlin.Boolean? = null
     override var noStdlib: kotlin.Boolean
         get() = noStdlibField ?: true
-        set(value) { noStdlibField = value }
+        set(value) {
+            noStdlibField = value
+        }
+
+    private var useIRField: kotlin.Boolean? = null
+    override var useIR: kotlin.Boolean
+        get() = useIRField ?: false
+        set(value) {
+            useIRField = value
+        }
 
     internal open fun updateArguments(args: org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments) {
         allWarningsAsErrorsField?.let { args.allWarningsAsErrors = it }
@@ -77,6 +108,7 @@ internal abstract class KotlinJvmOptionsBase : org.jetbrains.kotlin.gradle.dsl.K
         noJdkField?.let { args.noJdk = it }
         noReflectField?.let { args.noReflect = it }
         noStdlibField?.let { args.noStdlib = it }
+        useIRField?.let { args.useIR = it }
     }
 }
 
@@ -93,4 +125,5 @@ internal fun org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments.fi
     noJdk = false
     noReflect = true
     noStdlib = true
+    useIR = false
 }

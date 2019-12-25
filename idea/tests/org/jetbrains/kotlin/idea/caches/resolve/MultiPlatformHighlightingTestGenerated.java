@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.caches.resolve;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.idea.caches.resolve;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -22,7 +21,7 @@ import java.util.regex.Pattern;
 @RunWith(JUnit3RunnerWithInners.class)
 public class MultiPlatformHighlightingTestGenerated extends AbstractMultiPlatformHighlightingTest {
     private void runTest(String testDataFilePath) throws Exception {
-        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
 
     @TestMetadata("additionalMembersInPlatformInterface")
@@ -31,7 +30,7 @@ public class MultiPlatformHighlightingTestGenerated extends AbstractMultiPlatfor
     }
 
     public void testAllFilesPresentInMultiplatform() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/multiModuleHighlighting/multiplatform"), Pattern.compile("^([^\\.]+)$"), TargetBackend.ANY, false);
+        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/multiModuleHighlighting/multiplatform"), Pattern.compile("^([^\\.]+)$"), null, false);
     }
 
     @TestMetadata("basic")
@@ -44,9 +43,24 @@ public class MultiPlatformHighlightingTestGenerated extends AbstractMultiPlatfor
         runTest("idea/testData/multiModuleHighlighting/multiplatform/catchHeaderExceptionInPlatformModule/");
     }
 
+    @TestMetadata("completionHandlexCoroutines")
+    public void testCompletionHandlexCoroutines() throws Exception {
+        runTest("idea/testData/multiModuleHighlighting/multiplatform/completionHandlexCoroutines/");
+    }
+
+    @TestMetadata("contracts")
+    public void testContracts() throws Exception {
+        runTest("idea/testData/multiModuleHighlighting/multiplatform/contracts/");
+    }
+
     @TestMetadata("depends")
     public void testDepends() throws Exception {
         runTest("idea/testData/multiModuleHighlighting/multiplatform/depends/");
+    }
+
+    @TestMetadata("differentJvmImpls")
+    public void testDifferentJvmImpls() throws Exception {
+        runTest("idea/testData/multiModuleHighlighting/multiplatform/differentJvmImpls/");
     }
 
     @TestMetadata("headerClass")
@@ -89,9 +103,29 @@ public class MultiPlatformHighlightingTestGenerated extends AbstractMultiPlatfor
         runTest("idea/testData/multiModuleHighlighting/multiplatform/internalDependencyFromTests/");
     }
 
+    @TestMetadata("internalInheritanceToCommon")
+    public void testInternalInheritanceToCommon() throws Exception {
+        runTest("idea/testData/multiModuleHighlighting/multiplatform/internalInheritanceToCommon/");
+    }
+
     @TestMetadata("javaUsesPlatformFacade")
     public void testJavaUsesPlatformFacade() throws Exception {
         runTest("idea/testData/multiModuleHighlighting/multiplatform/javaUsesPlatformFacade/");
+    }
+
+    @TestMetadata("jvmKotlinReferencesCommonKotlinThroughJava")
+    public void testJvmKotlinReferencesCommonKotlinThroughJava() throws Exception {
+        runTest("idea/testData/multiModuleHighlighting/multiplatform/jvmKotlinReferencesCommonKotlinThroughJava/");
+    }
+
+    @TestMetadata("jvmKotlinReferencesCommonKotlinThroughJavaDifferentJvmImpls")
+    public void testJvmKotlinReferencesCommonKotlinThroughJavaDifferentJvmImpls() throws Exception {
+        runTest("idea/testData/multiModuleHighlighting/multiplatform/jvmKotlinReferencesCommonKotlinThroughJavaDifferentJvmImpls/");
+    }
+
+    @TestMetadata("jvmNameInCommon")
+    public void testJvmNameInCommon() throws Exception {
+        runTest("idea/testData/multiModuleHighlighting/multiplatform/jvmNameInCommon/");
     }
 
     @TestMetadata("multifileFacade")
@@ -107,6 +141,11 @@ public class MultiPlatformHighlightingTestGenerated extends AbstractMultiPlatfor
     @TestMetadata("platformTypeAliasInterchangebleWithAliasedClass")
     public void testPlatformTypeAliasInterchangebleWithAliasedClass() throws Exception {
         runTest("idea/testData/multiModuleHighlighting/multiplatform/platformTypeAliasInterchangebleWithAliasedClass/");
+    }
+
+    @TestMetadata("sealedTypeAlias")
+    public void testSealedTypeAlias() throws Exception {
+        runTest("idea/testData/multiModuleHighlighting/multiplatform/sealedTypeAlias/");
     }
 
     @TestMetadata("suppressHeaderWithoutImpl")
@@ -137,6 +176,11 @@ public class MultiPlatformHighlightingTestGenerated extends AbstractMultiPlatfor
     @TestMetadata("typeAliasedParameter")
     public void testTypeAliasedParameter() throws Exception {
         runTest("idea/testData/multiModuleHighlighting/multiplatform/typeAliasedParameter/");
+    }
+
+    @TestMetadata("typeAliasedSam")
+    public void testTypeAliasedSam() throws Exception {
+        runTest("idea/testData/multiModuleHighlighting/multiplatform/typeAliasedSam/");
     }
 
     @TestMetadata("useAppendable")

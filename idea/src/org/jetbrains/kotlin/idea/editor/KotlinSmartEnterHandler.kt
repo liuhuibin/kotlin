@@ -1,17 +1,17 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.editor
 
+import com.intellij.application.options.CodeStyle
 import com.intellij.lang.SmartEnterProcessorWithFixers
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiWhiteSpace
-import com.intellij.psi.codeStyle.CodeStyleSettingsManager
 import com.intellij.psi.tree.TokenSet
 import com.intellij.util.text.CharArrayUtil
 import org.jetbrains.kotlin.KtNodeTypes
@@ -50,7 +50,9 @@ class KotlinSmartEnterHandler : SmartEnterProcessorWithFixers() {
 
             KotlinClassInitializerFixer(),
 
-            KotlinClassBodyFixer()
+            KotlinClassBodyFixer(),
+
+            KotlinValueArgumentListFixer()
         )
 
         addEnterProcessors(KotlinPlainEnterProcessor())
@@ -98,9 +100,10 @@ class KotlinSmartEnterHandler : SmartEnterProcessorWithFixers() {
         caretOffset = CharArrayUtil.shiftBackward(chars, caretOffset - 1, " \t") + 1
 
         if (CharArrayUtil.regionMatches(chars, caretOffset - "{}".length, "{}") ||
-            CharArrayUtil.regionMatches(chars, caretOffset - "{\n}".length, "{\n}")) {
+            CharArrayUtil.regionMatches(chars, caretOffset - "{\n}".length, "{\n}")
+        ) {
             commit(editor)
-            val settings = CodeStyleSettingsManager.getSettings(file.project)
+            val settings = CodeStyle.getLanguageSettings(file)
             val old = settings.KEEP_SIMPLE_BLOCKS_IN_ONE_LINE
             settings.KEEP_SIMPLE_BLOCKS_IN_ONE_LINE = false
             val elt = file.findElementAt(caretOffset - 1)!!.getStrictParentOfType<KtBlockExpression>()
@@ -133,6 +136,8 @@ class KotlinSmartEnterHandler : SmartEnterProcessorWithFixers() {
         }
 
         override fun doEnter(atCaret: PsiElement, file: PsiFile?, editor: Editor, modified: Boolean): Boolean {
+            if (modified && atCaret is KtCallExpression) return true
+
             val block = getControlStatementBlock(editor.caretModel.offset, atCaret) as? KtBlockExpression
             if (block != null) {
                 val firstElement = block.firstChild?.nextSibling

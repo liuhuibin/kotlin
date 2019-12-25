@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.cli.jvm.compiler
@@ -45,7 +45,7 @@ class CliTraceHolder : CodeAnalyzerInitializer {
 // TODO: needs better name + list of keys to skip somewhere
 class NoScopeRecordCliBindingTrace : CliBindingTrace() {
     override fun <K, V> record(slice: WritableSlice<K, V>, key: K, value: V) {
-        if (slice === BindingContext.LEXICAL_SCOPE || slice == BindingContext.DATA_FLOW_INFO_BEFORE) {
+        if (slice == BindingContext.LEXICAL_SCOPE || slice == BindingContext.DATA_FLOW_INFO_BEFORE) {
             // In the compiler there's no need to keep scopes
             return
         }

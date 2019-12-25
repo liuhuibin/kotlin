@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package kotlin.internal
@@ -42,16 +42,10 @@ private fun differenceModulo(a: Long, b: Long, c: Long): Long {
  * @suppress
  */
 @PublishedApi
-internal fun getProgressionLastElement(start: Int, end: Int, step: Int): Int {
-    if (step > 0) {
-        return end - differenceModulo(end, start, step)
-    }
-    else if (step < 0) {
-        return end + differenceModulo(start, end, -step)
-    }
-    else {
-        throw kotlin.IllegalArgumentException("Step is zero.")
-    }
+internal fun getProgressionLastElement(start: Int, end: Int, step: Int): Int = when {
+    step > 0 -> if (start >= end) end else end - differenceModulo(end, start, step)
+    step < 0 -> if (start <= end) end else end + differenceModulo(start, end, -step)
+    else -> throw kotlin.IllegalArgumentException("Step is zero.")
 }
 
 /**
@@ -71,14 +65,8 @@ internal fun getProgressionLastElement(start: Int, end: Int, step: Int): Int {
  * @suppress
  */
 @PublishedApi
-internal fun getProgressionLastElement(start: Long, end: Long, step: Long): Long {
-    if (step > 0) {
-        return end - differenceModulo(end, start, step)
-    }
-    else if (step < 0) {
-        return end + differenceModulo(start, end, -step)
-    }
-    else {
-        throw kotlin.IllegalArgumentException("Step is zero.")
-    }
+internal fun getProgressionLastElement(start: Long, end: Long, step: Long): Long = when {
+    step > 0 -> if (start >= end) end else end - differenceModulo(end, start, step)
+    step < 0 -> if (start <= end) end else end + differenceModulo(start, end, -step)
+    else -> throw kotlin.IllegalArgumentException("Step is zero.")
 }

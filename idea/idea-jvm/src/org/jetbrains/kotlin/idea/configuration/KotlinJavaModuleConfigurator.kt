@@ -28,8 +28,6 @@ import com.intellij.openapi.roots.OrderRootType
 import com.intellij.openapi.roots.impl.libraries.LibraryEx
 import com.intellij.openapi.roots.libraries.Library
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
-import org.jetbrains.kotlin.config.JvmTarget
-import org.jetbrains.kotlin.config.TargetPlatformKind
 import org.jetbrains.kotlin.idea.compiler.configuration.Kotlin2JvmCompilerArgumentsHolder
 import org.jetbrains.kotlin.idea.facet.getOrCreateFacet
 import org.jetbrains.kotlin.idea.facet.initializeIfNeeded
@@ -40,8 +38,8 @@ import org.jetbrains.kotlin.idea.util.projectStructure.allModules
 import org.jetbrains.kotlin.idea.util.projectStructure.sdk
 import org.jetbrains.kotlin.idea.util.projectStructure.version
 import org.jetbrains.kotlin.idea.versions.LibraryJarDescriptor
-import org.jetbrains.kotlin.resolve.TargetPlatform
-import org.jetbrains.kotlin.resolve.jvm.platform.JvmPlatform
+import org.jetbrains.kotlin.platform.TargetPlatform
+import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
 
 open class KotlinJavaModuleConfigurator protected constructor() : KotlinWithLibraryConfigurator() {
     override fun isApplicable(module: Module): Boolean {
@@ -71,10 +69,13 @@ open class KotlinJavaModuleConfigurator protected constructor() : KotlinWithLibr
         get() = NAME
 
     override val targetPlatform: TargetPlatform
-        get() = JvmPlatform
+        get() = JvmPlatforms.unspecifiedJvmPlatform
+
+    @Suppress("DEPRECATION_ERROR", "OverridingDeprecatedMember")
+    override fun getTargetPlatform() = JvmPlatforms.CompatJvmPlatform
 
     override fun getLibraryJarDescriptors(sdk: Sdk?): List<LibraryJarDescriptor> {
-        var result = listOf(
+        val result = mutableListOf(
             LibraryJarDescriptor.RUNTIME_JAR,
             LibraryJarDescriptor.RUNTIME_SRC_JAR,
             LibraryJarDescriptor.REFLECT_JAR,
@@ -113,7 +114,7 @@ open class KotlinJavaModuleConfigurator protected constructor() : KotlinWithLibr
                     try {
                         val facet = module.getOrCreateFacet(modelsProvider, useProjectSettings = false, commitModel = true)
                         val facetSettings = facet.configuration.settings
-                        facetSettings.initializeIfNeeded(module, null, TargetPlatformKind.Jvm(JvmTarget.JVM_1_8))
+                        facetSettings.initializeIfNeeded(module, null, JvmPlatforms.jvm18)
                         (facetSettings.compilerArguments as? K2JVMCompilerArguments)?.jvmTarget = "1.8"
                     } finally {
                         modelsProvider.dispose()
@@ -139,7 +140,10 @@ open class KotlinJavaModuleConfigurator protected constructor() : KotlinWithLibr
         const val NAME = "java"
 
         val instance: KotlinJavaModuleConfigurator
-            get() = Extensions.findExtension(KotlinProjectConfigurator.EP_NAME, KotlinJavaModuleConfigurator::class.java)
+            get() {
+                @Suppress("DEPRECATION")
+                return Extensions.findExtension(KotlinProjectConfigurator.EP_NAME, KotlinJavaModuleConfigurator::class.java)
+            }
     }
 
     private fun hasBrokenJsRuntime(module: Module): Boolean {

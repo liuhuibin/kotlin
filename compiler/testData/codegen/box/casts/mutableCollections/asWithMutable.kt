@@ -1,5 +1,5 @@
-// IGNORE_BACKEND: JS_IR
-// IGNORE_BACKEND: NATIVE
+// IGNORE_BACKEND_FIR: JVM_IR
+// KJS_WITH_FULL_RUNTIME
 // WITH_RUNTIME
 
 class Itr : Iterator<String> by ArrayList<String>().iterator()

@@ -1,24 +1,12 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.caches.resolve
 
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.StdModuleTypes
-import com.intellij.openapi.projectRoots.ProjectJdkTable
 import com.intellij.openapi.roots.DependencyScope
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.roots.ModuleRootModificationUtil
@@ -27,8 +15,8 @@ import com.intellij.openapi.roots.libraries.Library
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess
+import com.intellij.psi.PsiManager
 import com.intellij.testFramework.ModuleTestCase
-import com.intellij.testFramework.PlatformTestCase
 import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.UsefulTestCase
 import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
@@ -39,14 +27,18 @@ import org.jetbrains.kotlin.idea.framework.CommonLibraryKind
 import org.jetbrains.kotlin.idea.framework.JSLibraryKind
 import org.jetbrains.kotlin.idea.test.PluginTestCaseBase.*
 import org.jetbrains.kotlin.idea.util.application.runWriteAction
+import org.jetbrains.kotlin.idea.util.getProjectJdkTableSafe
+import org.jetbrains.kotlin.test.JUnit3WithIdeaConfigurationRunner
+import org.jetbrains.kotlin.test.KotlinTestUtils
 import org.jetbrains.kotlin.test.util.addDependency
 import org.jetbrains.kotlin.test.util.jarRoot
 import org.jetbrains.kotlin.test.util.projectLibrary
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstance
 import org.junit.Assert
+import org.junit.runner.RunWith
 
+@RunWith(JUnit3WithIdeaConfigurationRunner::class)
 class IdeaModuleInfoTest : ModuleTestCase() {
-
     fun testSimpleModuleDependency() {
         val (a, b) = modules()
         b.addDependency(a)
@@ -338,13 +330,7 @@ class IdeaModuleInfoTest : ModuleTestCase() {
             dependencies().contains(a.production)
             dependencies().contains(a.test)
             !dependencies().contains(b.production)
-            dependencies().firstIsInstance<ScriptDependenciesInfo.ForFile>()
         }
-    }
-
-    override fun setUp() {
-        super.setUp()
-        VfsRootAccess.allowRootAccess("C:/Work/Projects/kotlin/")
     }
 
     fun testScriptDependenciesForProject() {
@@ -359,20 +345,29 @@ class IdeaModuleInfoTest : ModuleTestCase() {
     }
 
     fun testSdkForScript() {
+        // The first known jdk will be used for scripting if there is no jdk in the project
         runWriteAction {
-            ProjectJdkTable.getInstance().addJdk(mockJdk6())
-            ProjectJdkTable.getInstance().addJdk(mockJdk9())
+            val jdkTable = getProjectJdkTableSafe()
+
+            jdkTable.addJdk(mockJdk6())
+            jdkTable.addJdk(mockJdk9())
+
+            ProjectRootManager.getInstance(project).projectSdk = null
         }
 
+        val firstSDK = getProjectJdkTableSafe().allJdks.first()
+
         with(createFileInProject("script.kts").moduleInfo) {
-            dependencies().filterIsInstance<SdkInfo>().single { it.sdk == mockJdk6() }
+            dependencies().filterIsInstance<SdkInfo>().single { it.sdk == firstSDK }
         }
     }
 
     fun testSdkForScriptProjectSdk() {
         runWriteAction {
-            ProjectJdkTable.getInstance().addJdk(mockJdk6())
-            ProjectJdkTable.getInstance().addJdk(mockJdk9())
+            val jdkTable = getProjectJdkTableSafe()
+
+            jdkTable.addJdk(mockJdk6())
+            jdkTable.addJdk(mockJdk9())
 
             ProjectRootManager.getInstance(project).projectSdk = mockJdk9()
         }
@@ -386,8 +381,10 @@ class IdeaModuleInfoTest : ModuleTestCase() {
         val a = module("a")
 
         runWriteAction {
-            ProjectJdkTable.getInstance().addJdk(mockJdk6())
-            ProjectJdkTable.getInstance().addJdk(mockJdk9())
+            val jdkTable = getProjectJdkTableSafe()
+
+            jdkTable.addJdk(mockJdk6())
+            jdkTable.addJdk(mockJdk9())
 
             ProjectRootManager.getInstance(project).projectSdk = mockJdk6()
             with(ModuleRootManager.getInstance(a).modifiableModel) {
@@ -408,7 +405,7 @@ class IdeaModuleInfoTest : ModuleTestCase() {
             for (sourceFolder in contentEntry.sourceFolders) {
                 if (((!inTests && !sourceFolder.isTestSource) || (inTests && sourceFolder.isTestSource)) && sourceFolder.file != null) {
                     return runWriteAction {
-                        PlatformTestCase.getVirtualFile(fileToCopyIO).copy(this, sourceFolder.file!!, fileName)
+                        getVirtualFile(fileToCopyIO).copy(this, sourceFolder.file!!, fileName)
                     }
                 }
             }
@@ -419,18 +416,20 @@ class IdeaModuleInfoTest : ModuleTestCase() {
 
     private fun createFileInProject(fileName: String): VirtualFile {
         return runWriteAction {
-            PlatformTestCase.getVirtualFile(createTempFile(fileName, "")).copy(this, project.baseDir, fileName)
+            getVirtualFile(createTempFile(fileName, "")).copy(this, project.baseDir, fileName)
         }
     }
 
     private fun Module.addDependency(
-            other: Module,
-            dependencyScope: DependencyScope = DependencyScope.COMPILE,
-            exported: Boolean = false
+        other: Module,
+        dependencyScope: DependencyScope = DependencyScope.COMPILE,
+        exported: Boolean = false
     ) = ModuleRootModificationUtil.addDependency(this, other, dependencyScope, exported)
 
     private val VirtualFile.moduleInfo: IdeaModuleInfo
-        get() = getModuleInfoByVirtualFile(project, this)!!
+        get() {
+            return PsiManager.getInstance(project).findFile(this)!!.getModuleInfo()
+        }
 
     private val Module.production: ModuleProductionSourceInfo
         get() = productionSourceInfo()!!
@@ -442,7 +441,7 @@ class IdeaModuleInfoTest : ModuleTestCase() {
         get() = LibraryInfo(project!!, this)
 
     private fun module(name: String, hasProductionRoot: Boolean = true, hasTestRoot: Boolean = true): Module {
-        return createModuleFromTestData(createTempDirectory()!!.absolutePath, name, StdModuleTypes.JAVA, false)!!.apply {
+        return createModuleFromTestData(createTempDirectory().absolutePath, name, StdModuleTypes.JAVA, false).apply {
             if (hasProductionRoot)
                 PsiTestUtil.addSourceContentToRoots(this, dir(), false)
             if (hasTestRoot)
@@ -482,8 +481,16 @@ class IdeaModuleInfoTest : ModuleTestCase() {
         kind = JSLibraryKind
     )
 
+    override fun setUp() {
+        super.setUp()
+
+        VfsRootAccess.allowRootAccess(KotlinTestUtils.getHomeDirectory())
+    }
+
     override fun tearDown() {
         clearSdkTable(testRootDisposable)
+
+        VfsRootAccess.disallowRootAccess(KotlinTestUtils.getHomeDirectory())
 
         super.tearDown()
     }

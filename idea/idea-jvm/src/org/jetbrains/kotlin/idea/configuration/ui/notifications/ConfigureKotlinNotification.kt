@@ -1,6 +1,6 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2000-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.configuration.ui.notifications
@@ -39,11 +39,11 @@ class ConfigureKotlinNotification(
         }
     }
 ) {
-    override fun equals(o: Any?): Boolean {
-        if (this === o) return true
-        if (o !is ConfigureKotlinNotification) return false
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is ConfigureKotlinNotification) return false
 
-        if (content != o.content) return false
+        if (content != other.content) return false
 
         return true
     }
@@ -54,7 +54,10 @@ class ConfigureKotlinNotification(
 
     companion object {
         fun getNotificationState(project: Project, excludeModules: Collection<Module>): ConfigureKotlinNotificationState? {
-            val (configurableModules, ableToRunConfigurators) = getConfigurationPossibilitiesForConfigureNotification(project, excludeModules)
+            val (configurableModules, ableToRunConfigurators) = getConfigurationPossibilitiesForConfigureNotification(
+                project,
+                excludeModules
+            )
             if (ableToRunConfigurators.isEmpty() || configurableModules.isEmpty()) return null
 
             val isOnlyOneModule = configurableModules.size == 1
@@ -71,8 +74,7 @@ class ConfigureKotlinNotification(
             )
         }
 
-        private fun getLink(configurator: KotlinProjectConfigurator, isOnlyOneModule: Boolean): String {
-            return "<a href=\"${configurator.name}\">as Kotlin (${configurator.presentableText}) module${if(!isOnlyOneModule) "s" else ""}</a>"
-        }
+        private fun getLink(configurator: KotlinProjectConfigurator, isOnlyOneModule: Boolean): String =
+            "<a href=\"${configurator.name}\">as Kotlin (${configurator.presentableText}) module${if (!isOnlyOneModule) "s" else ""}</a>"
     }
 }

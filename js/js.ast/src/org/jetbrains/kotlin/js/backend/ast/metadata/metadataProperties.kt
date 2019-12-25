@@ -30,11 +30,13 @@ var JsName.staticRef: JsNode? by MetadataProperty(default = null)
 
 var JsName.descriptor: DeclarationDescriptor? by MetadataProperty(default = null)
 
-var JsName.localAlias: JsName? by MetadataProperty(default = null)
+var JsName.localAlias: LocalAlias? by MetadataProperty(default = null)
+
+data class LocalAlias(val name: JsName, val tag: String?)
 
 var JsName.specialFunction: SpecialFunction? by MetadataProperty(default = null)
 
-var JsExpression.localAlias: JsName? by MetadataProperty(default = null)
+var JsExpression.localAlias: JsImportedModule? by MetadataProperty(default = null)
 
 // TODO: move this to module 'js.inliner' and change dependency on 'frontend' to dependency on 'descriptors'
 var JsInvocation.inlineStrategy: InlineStrategy? by MetadataProperty(default = null)
@@ -46,6 +48,8 @@ var JsInvocation.callableReferenceReceiver: JsExpression? by MetadataProperty(de
 var JsInvocation.descriptor: CallableDescriptor? by MetadataProperty(default = null)
 
 var JsInvocation.psiElement: PsiElement? by MetadataProperty(default = null)
+
+var JsNameRef.isJsCall: Boolean by MetadataProperty(default = false)
 
 var JsNameRef.inlineStrategy: InlineStrategy? by MetadataProperty(default = null)
 
@@ -123,6 +127,10 @@ var JsFunction.coroutineMetadata: CoroutineMetadata? by MetadataProperty(default
 
 var JsExpression.range: Pair<RangeType, RangeKind>? by MetadataProperty(default = null)
 
+var JsExpression.primitiveKClass: JsExpression? by MetadataProperty(default = null)
+
+var JsExpression.kType: JsExpression? by MetadataProperty(default = null)
+
 data class CoroutineMetadata(
         val doResumeName: JsName,
         val stateName: JsName,
@@ -159,7 +167,9 @@ enum class SpecialFunction(val suggestedName: String) {
     COROUTINE_RESULT("coroutineResult"),
     COROUTINE_CONTROLLER("coroutineController"),
     COROUTINE_RECEIVER("coroutineReceiver"),
-    SET_COROUTINE_RESULT("setCoroutineResult")
+    SET_COROUTINE_RESULT("setCoroutineResult"),
+    GET_KCLASS("getKClass"),
+    GET_REIFIED_TYPE_PARAMETER_KTYPE("getReifiedTypeParameterKType")
 }
 
 enum class BoxingKind {

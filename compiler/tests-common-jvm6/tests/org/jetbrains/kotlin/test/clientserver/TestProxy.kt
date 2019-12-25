@@ -42,16 +42,33 @@ class TestProxy(val serverPort: Int, val testClass: String, val classPath: List<
                 val message = input.readObject() as MessageHeader
                 if (message == MessageHeader.RESULT) {
                     input.readObject() as String
-                }
-                else if (message == MessageHeader.ERROR) {
-                    throw input.readObject() as Exception
-                }
-                else {
+                } else if (message == MessageHeader.ERROR) {
+                    throw input.readObject() as Throwable
+                } else {
                     fail("Unknown message: $message")
                 }
             } finally {
                 output.close()
                 input.close()
+            }
+        }
+    }
+
+    fun runTestNoOutput(): String {
+        return Socket("localhost", serverPort).use { clientSocket ->
+
+            val output = ObjectOutputStream(clientSocket.getOutputStream())
+            try {
+                output.writeObject(MessageHeader.NEW_TEST)
+                output.writeObject(testClass)
+                output.writeObject("box")
+
+                output.writeObject(MessageHeader.CLASS_PATH)
+                //filter out jdk libs
+                output.writeObject(filterOutJdkJars(classPath).toTypedArray())
+                return "OK"
+            } finally {
+                output.close()
             }
         }
     }

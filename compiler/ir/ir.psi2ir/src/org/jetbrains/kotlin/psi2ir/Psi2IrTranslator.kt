@@ -16,51 +16,87 @@
 
 package org.jetbrains.kotlin.psi2ir
 
+import org.jetbrains.kotlin.config.LanguageVersionSettings
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
-import org.jetbrains.kotlin.ir.util.patchDeclarationParents
+import org.jetbrains.kotlin.ir.symbols.IrSymbol
+import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.ir.visitors.acceptVoid
 import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.psi2ir.generators.GeneratorContext
-import org.jetbrains.kotlin.psi2ir.generators.ModuleGenerator
-import org.jetbrains.kotlin.psi2ir.transformations.generateAnnotationsForDeclarations
+import org.jetbrains.kotlin.psi2ir.generators.*
 import org.jetbrains.kotlin.psi2ir.transformations.insertImplicitCasts
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.utils.SmartList
 
-class Psi2IrTranslator(val configuration: Psi2IrConfiguration = Psi2IrConfiguration()) {
-    interface PostprocessingStep {
-        fun postprocess(context: GeneratorContext, irElement: IrElement)
-    }
+typealias Psi2IrPostprocessingStep = (IrModuleFragment) -> Unit
 
-    private val postprocessingSteps = SmartList<PostprocessingStep>()
+class Psi2IrTranslator(
+    val languageVersionSettings: LanguageVersionSettings,
+    val configuration: Psi2IrConfiguration = Psi2IrConfiguration(),
+    val mangler: KotlinMangler? = null
+) {
+    private val postprocessingSteps = SmartList<Psi2IrPostprocessingStep>()
 
-    fun add(step: PostprocessingStep) {
+    fun addPostprocessingStep(step: Psi2IrPostprocessingStep) {
         postprocessingSteps.add(step)
     }
 
-    fun generateModule(moduleDescriptor: ModuleDescriptor, ktFiles: Collection<KtFile>, bindingContext: BindingContext): IrModuleFragment {
-        val context = createGeneratorContext(moduleDescriptor, bindingContext)
-        return generateModuleFragment(context, ktFiles)
+    fun generateModule(
+        moduleDescriptor: ModuleDescriptor,
+        ktFiles: Collection<KtFile>,
+        bindingContext: BindingContext,
+        generatorExtensions: GeneratorExtensions
+    ): IrModuleFragment {
+        val context = createGeneratorContext(moduleDescriptor, bindingContext, extensions = generatorExtensions)
+        val irProviders = generateTypicalIrProviderList(
+            moduleDescriptor, context.irBuiltIns, context.symbolTable, extensions = generatorExtensions
+        )
+        return generateModuleFragment(context, ktFiles, irProviders)
     }
 
-    fun createGeneratorContext(moduleDescriptor: ModuleDescriptor, bindingContext: BindingContext) =
-        GeneratorContext(configuration, moduleDescriptor, bindingContext)
+    fun createGeneratorContext(
+        moduleDescriptor: ModuleDescriptor,
+        bindingContext: BindingContext,
+        symbolTable: SymbolTable = SymbolTable(mangler),
+        extensions: GeneratorExtensions = GeneratorExtensions()
+    ): GeneratorContext =
+        GeneratorContext(configuration, moduleDescriptor, bindingContext, languageVersionSettings, symbolTable, extensions)
 
-    fun generateModuleFragment(context: GeneratorContext, ktFiles: Collection<KtFile>): IrModuleFragment {
+    fun generateModuleFragment(
+        context: GeneratorContext,
+        ktFiles: Collection<KtFile>,
+        irProviders: List<IrProvider>,
+        expectDescriptorToSymbol: MutableMap<DeclarationDescriptor, IrSymbol>? = null
+    ): IrModuleFragment {
         val moduleGenerator = ModuleGenerator(context)
         val irModule = moduleGenerator.generateModuleFragmentWithoutDependencies(ktFiles)
+
+        expectDescriptorToSymbol ?. let { referenceExpectsForUsedActuals(it, context.symbolTable, irModule) }
+        irModule.patchDeclarationParents()
         postprocess(context, irModule)
-        moduleGenerator.generateUnboundSymbolsAsDependencies(irModule)
+        // do not generate unbound symbols before postprocessing,
+        // since plugins must work with non-lazy IR
+        moduleGenerator.generateUnboundSymbolsAsDependencies(irProviders)
+        irModule.computeUniqIdForDeclarations(context.symbolTable)
+
+        moduleGenerator.generateUnboundSymbolsAsDependencies(irProviders)
+
         return irModule
     }
 
-    private fun postprocess(context: GeneratorContext, irElement: IrElement) {
-        insertImplicitCasts(context.builtIns, irElement, context.symbolTable)
+    private fun postprocess(context: GeneratorContext, irElement: IrModuleFragment) {
+        insertImplicitCasts(irElement, context)
         generateAnnotationsForDeclarations(context, irElement)
 
-        postprocessingSteps.forEach { it.postprocess(context, irElement) }
+        postprocessingSteps.forEach { it(irElement) }
 
         irElement.patchDeclarationParents()
+    }
+
+    private fun generateAnnotationsForDeclarations(context: GeneratorContext, irElement: IrElement) {
+        val annotationGenerator = AnnotationGenerator(context)
+        irElement.acceptVoid(annotationGenerator)
     }
 }

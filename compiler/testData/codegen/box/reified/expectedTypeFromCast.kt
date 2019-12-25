@@ -1,8 +1,7 @@
-// IGNORE_BACKEND: JS_IR
-// IGNORE_BACKEND: JS, NATIVE
-
-// LANGUAGE_VERSION: 1.2
+// IGNORE_BACKEND_FIR: JVM_IR
+// TARGET_BACKEND: JVM
 // WITH_RUNTIME
+
 import kotlin.test.assertEquals
 
 inline fun <reified T> foo(): T {

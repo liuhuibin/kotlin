@@ -18,8 +18,10 @@ package org.jetbrains.kotlin.codegen.optimization
 
 import org.jetbrains.kotlin.codegen.optimization.common.removeEmptyCatchBlocks
 import org.jetbrains.kotlin.codegen.optimization.transformer.MethodTransformer
+import org.jetbrains.kotlin.utils.SmartIdentityTable
 import org.jetbrains.org.objectweb.asm.Label
 import org.jetbrains.org.objectweb.asm.tree.*
+import java.lang.IllegalStateException
 
 class LabelNormalizationMethodTransformer : MethodTransformer() {
     override fun transform(internalClassName: String, methodNode: MethodNode) {
@@ -28,7 +30,7 @@ class LabelNormalizationMethodTransformer : MethodTransformer() {
 
     private class TransformerForMethod(val methodNode: MethodNode) {
         val instructions = methodNode.instructions
-        val newLabelNodes = hashMapOf<Label, LabelNode>()
+        val newLabelNodes = SmartIdentityTable<Label, LabelNode>()
 
         fun transform() {
             if (rewriteLabelInstructions()) {
@@ -142,8 +144,10 @@ class LabelNormalizationMethodTransformer : MethodTransformer() {
             return frameNode
         }
 
-        private fun getNew(oldLabelNode: LabelNode): LabelNode =
-            newLabelNodes[oldLabelNode.label]!!
+        private fun getNew(oldLabelNode: LabelNode): LabelNode {
+            return newLabelNodes[oldLabelNode.label]
+                ?: throw IllegalStateException("Label wasn't found during iterating through instructions")
+        }
 
         private fun getNewOrOld(oldLabelNode: LabelNode): LabelNode =
             newLabelNodes[oldLabelNode.label] ?: oldLabelNode

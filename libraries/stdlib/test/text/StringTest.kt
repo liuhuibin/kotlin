@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package test.text
@@ -9,6 +9,8 @@ import kotlin.test.*
 import test.*
 import test.collections.behaviors.iteratorBehavior
 import test.collections.compare
+import kotlin.math.sign
+import kotlin.random.Random
 
 
 fun createString(content: String): CharSequence = content
@@ -43,26 +45,77 @@ fun Char.isAsciiUpperCase() = this in 'A'..'Z'
 
 class StringTest {
 
+    private fun testStringFromChars(expected: String, chars: CharArray, offset: Int, length: Int) {
+        assertEquals(expected, String(chars, offset, length))
+        assertEquals(expected, chars.concatToString(startIndex = offset, endIndex = offset + length))
+    }
+
+    private fun testStringFromChars(expected: String, chars: CharArray) {
+        assertEquals(expected, String(chars))
+        assertEquals(expected, chars.concatToString())
+    }
+
     @Test fun stringFromCharArrayFullSlice() {
         val chars: CharArray = charArrayOf('K', 'o', 't', 'l', 'i', 'n')
-        assertEquals("Kotlin", String(chars, 0, chars.size))
+        testStringFromChars("Kotlin", chars, 0, chars.size)
     }
 
     @Test fun stringFromCharArraySlice() {
         val chars: CharArray = charArrayOf('K', 'o', 't', 'l', 'i', 'n', ' ', 'r', 'u', 'l', 'e', 's')
-        assertEquals("rule", String(chars, 7, 4))
+        testStringFromChars("rule", chars, 7, 4)
+
+        val longChars = CharArray(200_000) { 'k' }
+        val longString = String(longChars, offset = 1000, length = 190_000)
+        val longConcatString = longChars.concatToString(startIndex = 1000, endIndex = 191_000)
+        assertEquals(190_000, longString.length)
+        assertEquals(190_000, longConcatString.length)
+        assertTrue(longString.all { it == 'k' })
+        assertTrue(longConcatString.all { it == 'k' })
     }
 
     @Test fun stringFromCharArray() {
         val chars: CharArray = charArrayOf('K', 'o', 't', 'l', 'i', 'n')
-        assertEquals("Kotlin", String(chars))
+        testStringFromChars("Kotlin", chars)
+
+        val longChars = CharArray(200_000) { 'k' }
+        val longString = String(longChars)
+        val longConcatString = longChars.concatToString()
+        assertEquals(200_000, longString.length)
+        assertEquals(200_000, longConcatString.length)
+        assertTrue(longString.all { it == 'k' })
+        assertTrue(longConcatString.all { it == 'k' })
     }
 
     @Test fun stringFromCharArrayUnicodeSurrogatePairs() {
         val chars: CharArray = charArrayOf('Ц', '月', '語', '\u016C', '\u138D', '\uD83C', '\uDC3A')
-        assertEquals("Ц月語Ŭᎍ🀺", String(chars))
-        assertEquals("月", String(chars, 1, 1))
-        assertEquals("Ŭᎍ🀺", String(chars, 3, 4))
+        testStringFromChars("Ц月語Ŭᎍ🀺", chars)
+        testStringFromChars("月", chars, 1, 1)
+        testStringFromChars("Ŭᎍ🀺", chars, 3, 4)
+    }
+
+    @Test fun stringFromCharArrayOutOfBounds() {
+        fun test(chars: CharArray) {
+            assertFailsWith<IndexOutOfBoundsException> { String(chars, -1, 1) }
+            assertFailsWith<IndexOutOfBoundsException> { String(chars, 1, -1) }
+            assertFailsWith<IndexOutOfBoundsException> { String(chars, chars.size - 1, 2) }
+
+            assertFailsWith<IndexOutOfBoundsException> { chars.concatToString(-1, 1) }
+            assertFailsWith<IllegalArgumentException> { chars.concatToString(1, -1) }
+            assertFailsWith<IllegalArgumentException> { chars.concatToString(chars.size - 1, 2) }
+        }
+        test(CharArray(16) { 'k' })
+        test(CharArray(160_000) { 'k' })
+    }
+
+    @Test
+    fun toCharArray() {
+        val s = "hello"
+        assertArrayContentEquals(charArrayOf('h', 'e', 'l', 'l', 'o'), s.toCharArray())
+        assertArrayContentEquals(charArrayOf('e', 'l'), s.toCharArray(1, 3))
+
+        assertFailsWith<IndexOutOfBoundsException> { s.toCharArray(-1) }
+        assertFailsWith<IndexOutOfBoundsException> { s.toCharArray(0, 6) }
+        assertFailsWith<IllegalArgumentException> { s.toCharArray(3, 1) }
     }
 
     @Test fun isEmptyAndBlank() = withOneCharSequenceArg { arg1 ->
@@ -92,6 +145,24 @@ class StringTest {
 
         assertEquals("hey", s.orEmpty())
         assertEquals("", ns.orEmpty())
+    }
+
+    @Test fun regionMatchesForCharSequence() = withTwoCharSequenceArgs { arg1, arg2 ->
+        assertTrue(arg1("abcd").regionMatches(1, arg2("debc"), 2, 2))
+        assertFalse(arg1("abcd").regionMatches(1, arg2("DEBc"), 2, 2, ignoreCase = false))
+        assertTrue(arg1("abcd").regionMatches(1, arg2("DEBc"), 2, 2, ignoreCase = true))
+
+        assertFalse(arg1("abcd").regionMatches(3, arg2(""), 2, 1))
+        assertTrue(arg1("abcd").regionMatches(4, arg2(""), 0, 0))
+    }
+
+    @Test fun regionMatchesForString() {
+        assertTrue("abcd".regionMatches(1, "debc", 2, 2))
+        assertFalse("abcd".regionMatches(1, "DEBc", 2, 2, ignoreCase = false))
+        assertTrue("abcd".regionMatches(1, "DEBc", 2, 2, ignoreCase = true))
+
+        assertFalse("abcd".regionMatches(3, "", 2, 1))
+        assertTrue("abcd".regionMatches(4, "", 0, 0))
     }
 
     @Test fun startsWithString() {
@@ -755,6 +826,59 @@ class StringTest {
         assertTrue(null.equals(null, ignoreCase = false))
     }
 
+    @Test fun compareToIgnoreCase() {
+
+        fun assertCompareResult(expectedResult: Int, v1: String, v2: String, ignoreCase: Boolean) {
+            val result = v1.compareTo(v2, ignoreCase = ignoreCase).sign
+            assertEquals(expectedResult, result, "Comparing '$v1' with '$v2', ignoreCase = $ignoreCase")
+            if (expectedResult == 0)
+                assertTrue(v1.equals(v2, ignoreCase = ignoreCase))
+            if (!ignoreCase)
+                assertEquals(v1.compareTo(v2).sign, result)
+        }
+
+        fun assertCompareResult(expectedResult: Int, expectedResultIgnoreCase: Int, v1: String, v2: String) {
+            assertCompareResult(expectedResult, v1, v2, false)
+            assertCompareResult(expectedResultIgnoreCase, v1, v2, true)
+        }
+
+        val (EQ, LT, GT) = listOf(0, -1, 1)
+
+        assertCompareResult(EQ, EQ, "ABC", "ABC")
+        assertCompareResult(LT, EQ, "ABC", "ABc")
+        assertCompareResult(GT, EQ, "ABc", "ABC")
+
+        assertCompareResult(LT, LT, "ABC", "ABx")
+        assertCompareResult(LT, GT, "ABX", "ABc")
+
+        assertCompareResult(LT, LT, "[", "aa")
+        assertCompareResult(GT, LT, "[", "AA")
+        assertCompareResult(EQ, EQ, "", "")
+        assertCompareResult(LT, LT, "", "A")
+        assertCompareResult(GT, GT, "A", "")
+
+        run {
+            val a32 = "A".repeat(32)
+            assertCompareResult(LT, EQ, a32 + "B", a32 + "b")
+            assertCompareResult(LT, GT, a32 + "BB", a32 + "b")
+            assertCompareResult(LT, GT, a32 + "C", a32 + "b")
+
+        }
+
+        val equalIgnoringCase = listOf("ABC", "ABc", "aBC", "AbC", "abc")
+        for (item1 in equalIgnoringCase) {
+            for (item2 in equalIgnoringCase) {
+                assertCompareResult(EQ, item1, item2, ignoreCase = true)
+            }
+        }
+    }
+
+
+    @Test fun orderIgnoringCase() {
+        val list = listOf("Beast", "Ast", "asterisk", "[]")
+        assertEquals(listOf("Ast", "Beast", "[]", "asterisk"), list.sorted())
+        assertEquals(listOf("[]", "Ast", "asterisk", "Beast"), list.sortedWith(String.CASE_INSENSITIVE_ORDER))
+    }
 
     @Test fun replace() {
         val input = "abbAb"
@@ -882,6 +1006,29 @@ class StringTest {
         assertNull(data.filterNot { it.isAsciiLetter() || it.isAsciiDigit() }.firstOrNull())
     }
 
+    @Test fun random() = withOneCharSequenceArg { data ->
+        data("abcdefg").let { charSeq ->
+            val tosses = List(10) { charSeq.random() }
+            assertTrue(tosses.distinct().size > 1, "Should be some distinct elements in $tosses")
+
+            val seed = Random.nextInt()
+            val random1 = Random(seed)
+            val random2 = Random(seed)
+
+            val tosses1 = List(10) { charSeq.random(random1) }
+            val tosses2 = List(10) { charSeq.random(random2) }
+
+            assertEquals(tosses1, tosses2)
+        }
+
+        data("x").let { singletonCharSeq ->
+            val tosses = List(10) { singletonCharSeq.random() }
+            assertEquals(singletonCharSeq.toList(), tosses.distinct())
+        }
+
+        assertFailsWith<NoSuchElementException> { data("").random() }
+    }
+
     @Test fun partition() {
         val data = "a1b2c3"
         val pair = data.partition { it.isAsciiDigit() }
@@ -921,6 +1068,11 @@ class StringTest {
         data.toString().let { expectedSingleChunk ->
             assertEquals(expectedSingleChunk, data.chunked(size).single())
             assertEquals(expectedSingleChunk, data.chunked(size + 3).single())
+            assertEquals(expectedSingleChunk, data.chunked(Int.MAX_VALUE).single())
+        }
+
+        arg1("ab").let {
+            assertEquals(it.toString(), it.chunked(Int.MAX_VALUE).single())
         }
 
         assertTrue(arg1("").chunked(3).isEmpty())
@@ -977,6 +1129,38 @@ class StringTest {
                 compare(data.windowed(window, step, partialWindows = true).iterator(),
                         data.windowedSequence(window, step, partialWindows = true).iterator()) { iteratorBehavior() }
             }
+        }
+
+        // index overflow tests
+        for (partialWindows in listOf(true, false)) {
+
+            val windowed1 = data.windowed(5, Int.MAX_VALUE, partialWindows)
+            assertEquals("abcde", windowed1.single())
+            val windowed2 = data.windowed(Int.MAX_VALUE, 5, partialWindows)
+            assertEquals(if (partialWindows) listOf(data.toString(), data.substring(5, 7)) else listOf(), windowed2)
+            val windowed3 = data.windowed(Int.MAX_VALUE, Int.MAX_VALUE, partialWindows)
+            assertEquals(if (partialWindows) listOf(data.toString()) else listOf(), windowed3)
+
+            val windowedTransform1 = data.windowed(5, Int.MAX_VALUE, partialWindows) { it }
+            assertEquals("abcde", windowedTransform1.single())
+            val windowedTransform2 = data.windowed(Int.MAX_VALUE, 5, partialWindows) { it }
+            assertEquals(if (partialWindows) listOf(data.toString(), data.substring(5, 7)) else listOf(), windowedTransform2)
+            val windowedTransform3 = data.windowed(Int.MAX_VALUE, Int.MAX_VALUE, partialWindows) { it }
+            assertEquals(if (partialWindows) listOf(data.toString()) else listOf(), windowedTransform3)
+
+            val windowedSequence1 = data.windowedSequence(5, Int.MAX_VALUE, partialWindows)
+            assertEquals("abcde", windowedSequence1.single())
+            val windowedSequence2 = data.windowedSequence(Int.MAX_VALUE, 5, partialWindows)
+            assertEquals(if (partialWindows) listOf(data.toString(), data.substring(5, 7)) else listOf(), windowedSequence2.toList())
+            val windowedSequence3 = data.windowedSequence(Int.MAX_VALUE, Int.MAX_VALUE, partialWindows)
+            assertEquals(if (partialWindows) listOf(data.toString()) else listOf(), windowedSequence3.toList())
+
+            val windowedSequenceTransform1 = data.windowedSequence(5, Int.MAX_VALUE, partialWindows) { it }
+            assertEquals("abcde", windowedSequenceTransform1.single())
+            val windowedSequenceTransform2 = data.windowedSequence(Int.MAX_VALUE, 5, partialWindows) { it }
+            assertEquals(if (partialWindows) listOf(data.toString(), data.substring(5, 7)) else listOf(), windowedSequenceTransform2.toList())
+            val windowedSequenceTransform3 = data.windowedSequence(Int.MAX_VALUE, Int.MAX_VALUE, partialWindows) { it }
+            assertEquals(if (partialWindows) listOf(data.toString()) else listOf(), windowedSequenceTransform3.toList())
         }
     }
 
@@ -1103,6 +1287,14 @@ class StringTest {
         assertEquals(2, result.size)
         assertEquals(listOf('a', 'b', 'b', 'a', 'c'), result[false])
         assertEquals(listOf('A', 'A', 'B', 'D'), result[true])
+    }
+
+    @Test fun associateWith() = withOneCharSequenceArg("abc") { data ->
+        val result = data.associateWith { it + 1 }
+        assertEquals(mapOf('a' to 'b', 'b' to 'c', 'c' to 'd'), result)
+
+        val mutableResult = data.drop(1).associateWithTo(result.toMutableMap()) { it - 1 }
+        assertEquals(mapOf('a' to 'b', 'b' to 'a', 'c' to 'b'), mutableResult)
     }
 
     @Test fun joinToString() {
@@ -1335,5 +1527,15 @@ ${"    "}
         assertEquals("  ABC\n  \n  123", "ABC\n \n123".prependIndent("  "))
         assertEquals("  ABC\n   \n  123", "ABC\n   \n123".prependIndent("  "))
         assertEquals("  ", "".prependIndent("  "))
+    }
+
+    @Test
+    fun elementAt() {
+        expect('a') { "a c".elementAt(0) }
+        expect(' ') { "a c".elementAt(1) }
+        expect('c') { "a c".elementAt(2) }
+
+        assertFailsWith<IndexOutOfBoundsException> { "".elementAt(0) }
+        assertFailsWith<IndexOutOfBoundsException> { "a c".elementAt(-1) }
     }
 }

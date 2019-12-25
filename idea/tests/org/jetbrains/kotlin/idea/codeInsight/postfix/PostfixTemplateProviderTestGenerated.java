@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.codeInsight.postfix;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.idea.codeInsight.postfix;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -22,11 +21,16 @@ import java.util.regex.Pattern;
 @RunWith(JUnit3RunnerWithInners.class)
 public class PostfixTemplateProviderTestGenerated extends AbstractPostfixTemplateProviderTest {
     private void runTest(String testDataFilePath) throws Exception {
-        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
 
     public void testAllFilesPresentInPostfix() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/codeInsight/postfix"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/codeInsight/postfix"), Pattern.compile("^(.+)\\.kt$"), null, true);
+    }
+
+    @TestMetadata("arg.kt")
+    public void testArg() throws Exception {
+        runTest("idea/testData/codeInsight/postfix/arg.kt");
     }
 
     @TestMetadata("assert.kt")
@@ -144,6 +148,16 @@ public class PostfixTemplateProviderTestGenerated extends AbstractPostfixTemplat
         runTest("idea/testData/codeInsight/postfix/soutInLoop.kt");
     }
 
+    @TestMetadata("spread.kt")
+    public void testSpread() throws Exception {
+        runTest("idea/testData/codeInsight/postfix/spread.kt");
+    }
+
+    @TestMetadata("spreadIntArray.kt")
+    public void testSpreadIntArray() throws Exception {
+        runTest("idea/testData/codeInsight/postfix/spreadIntArray.kt");
+    }
+
     @TestMetadata("try.kt")
     public void testTry() throws Exception {
         runTest("idea/testData/codeInsight/postfix/try.kt");
@@ -212,5 +226,38 @@ public class PostfixTemplateProviderTestGenerated extends AbstractPostfixTemplat
     @TestMetadata("while.kt")
     public void testWhile() throws Exception {
         runTest("idea/testData/codeInsight/postfix/while.kt");
+    }
+
+    @TestMetadata("idea/testData/codeInsight/postfix/wrapWithCall")
+    @TestDataPath("$PROJECT_ROOT")
+    @RunWith(JUnit3RunnerWithInners.class)
+    public static class WrapWithCall extends AbstractPostfixTemplateProviderTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        public void testAllFilesPresentInWrapWithCall() throws Exception {
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/codeInsight/postfix/wrapWithCall"), Pattern.compile("^(.+)\\.kt$"), null, true);
+        }
+
+        @TestMetadata("arrayOfStatement.kt")
+        public void testArrayOfStatement() throws Exception {
+            runTest("idea/testData/codeInsight/postfix/wrapWithCall/arrayOfStatement.kt");
+        }
+
+        @TestMetadata("listOf.kt")
+        public void testListOf() throws Exception {
+            runTest("idea/testData/codeInsight/postfix/wrapWithCall/listOf.kt");
+        }
+
+        @TestMetadata("returnSequenceOf.kt")
+        public void testReturnSequenceOf() throws Exception {
+            runTest("idea/testData/codeInsight/postfix/wrapWithCall/returnSequenceOf.kt");
+        }
+
+        @TestMetadata("setOf.kt")
+        public void testSetOf() throws Exception {
+            runTest("idea/testData/codeInsight/postfix/wrapWithCall/setOf.kt");
+        }
     }
 }

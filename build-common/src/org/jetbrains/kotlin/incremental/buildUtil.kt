@@ -16,8 +16,6 @@
 
 package org.jetbrains.kotlin.incremental
 
-import com.intellij.openapi.util.io.FileUtil
-import com.intellij.openapi.util.text.StringUtil
 import org.jetbrains.kotlin.build.GeneratedFile
 import org.jetbrains.kotlin.build.GeneratedJvmClass
 import org.jetbrains.kotlin.build.JvmSourceRoot
@@ -31,14 +29,20 @@ import org.jetbrains.kotlin.modules.TargetId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.progress.CompilationCanceledStatus
 import org.jetbrains.kotlin.synthetic.SAM_LOOKUP_NAME
+import org.jetbrains.kotlin.utils.addToStdlib.flattenTo
+import org.jetbrains.kotlin.utils.keysToMap
 import java.io.File
 import java.util.*
+import kotlin.collections.HashSet
+
+const val DELETE_MODULE_FILE_PROPERTY = "kotlin.delete.module.file.after.build"
 
 fun makeModuleFile(
         name: String,
         isTest: Boolean,
         outputDir: File,
         sourcesToCompile: Iterable<File>,
+        commonSources: Iterable<File>,
         javaSourceRoots: Iterable<JvmSourceRoot>,
         classpath: Iterable<File>,
         friendDirs: Iterable<File>
@@ -53,6 +57,7 @@ fun makeModuleFile(
             sourcesToCompile.map { it.absoluteFile },
             javaSourceRoots,
             classpath,
+            commonSources.map { it.absoluteFile },
             null,
             "java-production",
             isTest,
@@ -61,10 +66,22 @@ fun makeModuleFile(
             friendDirs
     )
 
-    val scriptFile = File.createTempFile("kjps", StringUtil.sanitizeJavaIdentifier(name) + ".script.xml")
-    FileUtil.writeToFile(scriptFile, builder.asText().toString())
+    val scriptFile = File.createTempFile("kjps", sanitizeJavaIdentifier(name) + ".script.xml")
+    scriptFile.writeText(builder.asText().toString())
     return scriptFile
 }
+
+private fun sanitizeJavaIdentifier(string: String) =
+    buildString {
+        for (char in string) {
+            if (char.isJavaIdentifierPart()) {
+                if (length == 0 && !char.isJavaIdentifierStart()) {
+                    append('_')
+                }
+                append(char)
+            }
+        }
+    }
 
 fun makeCompileServices(
         incrementalCaches: Map<TargetId, IncrementalCache>,
@@ -110,7 +127,7 @@ fun LookupStorage.update(
 
     removeLookupsFrom(filesToCompile.asSequence() + removedFiles.asSequence())
 
-    addAll(lookupTracker.lookups.entrySet(), lookupTracker.pathInterner.values)
+    addAll(lookupTracker.lookups, lookupTracker.pathInterner.values)
 }
 
 data class DirtyData(
@@ -126,10 +143,11 @@ fun ChangesCollector.getDirtyData(
     val dirtyClassesFqNames = HashSet<FqName>()
 
     for (change in changes()) {
-        reporter.report { "Process $change" }
+        reporter.reportVerbose { "Process $change" }
 
         if (change is ChangeInfo.SignatureChanged) {
             val fqNames = if (!change.areSubclassesAffected) listOf(change.fqName) else withSubtypes(change.fqName, caches)
+            dirtyClassesFqNames.addAll(fqNames)
 
             for (classFqName in fqNames) {
                 assert(!classFqName.isRoot) { "$classFqName is root when processing $change" }
@@ -138,8 +156,7 @@ fun ChangesCollector.getDirtyData(
                 val name = classFqName.shortName().identifier
                 dirtyLookupSymbols.add(LookupSymbol(name, scope))
             }
-        }
-        else if (change is ChangeInfo.MembersChanged) {
+        } else if (change is ChangeInfo.MembersChanged) {
             val fqNames = withSubtypes(change.fqName, caches)
             // need to recompile subtypes because changed member might break override
             dirtyClassesFqNames.addAll(fqNames)
@@ -156,16 +173,16 @@ fun ChangesCollector.getDirtyData(
 }
 
 fun mapLookupSymbolsToFiles(
-        lookupStorage: LookupStorage,
-        lookupSymbols: Iterable<LookupSymbol>,
-        reporter: ICReporter,
-        excludes: Set<File> = emptySet()
+    lookupStorage: LookupStorage,
+    lookupSymbols: Iterable<LookupSymbol>,
+    reporter: ICReporter,
+    excludes: Set<File> = emptySet()
 ): Set<File> {
     val dirtyFiles = HashSet<File>()
 
     for (lookup in lookupSymbols) {
         val affectedFiles = lookupStorage.get(lookup).map(::File).filter { it !in excludes }
-        reporter.report { "${lookup.scope}#${lookup.name} caused recompilation of: ${reporter.pathsAsString(affectedFiles)}" }
+        reporter.reportMarkDirtyMember(affectedFiles, scope = lookup.scope, name = lookup.name)
         dirtyFiles.addAll(affectedFiles)
     }
 
@@ -178,19 +195,22 @@ fun mapClassesFqNamesToFiles(
     reporter: ICReporter,
     excludes: Set<File> = emptySet()
 ): Set<File> {
-    val dirtyFiles = HashSet<File>()
+    val fqNameToAffectedFiles = HashMap<FqName, MutableSet<File>>()
 
     for (cache in caches) {
-        for (dirtyClassFqName in classesFqNames) {
-            val srcFile = cache.getSourceFileIfClass(dirtyClassFqName)
+        for (classFqName in classesFqNames) {
+            val srcFile = cache.getSourceFileIfClass(classFqName)
             if (srcFile == null || srcFile in excludes || srcFile.isJavaFile()) continue
 
-            reporter.report { ("Class $dirtyClassFqName caused recompilation of: ${reporter.pathsAsString(srcFile)}") }
-            dirtyFiles.add(srcFile)
+            fqNameToAffectedFiles.getOrPut(classFqName) { HashSet() }.add(srcFile)
         }
     }
 
-    return dirtyFiles
+    for ((classFqName, affectedFiles) in fqNameToAffectedFiles) {
+        reporter.reportMarkDirtyClass(affectedFiles, classFqName.asString())
+    }
+
+    return fqNameToAffectedFiles.values.flattenTo(HashSet())
 }
 
 fun withSubtypes(

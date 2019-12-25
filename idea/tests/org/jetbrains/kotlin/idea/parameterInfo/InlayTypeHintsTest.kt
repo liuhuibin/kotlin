@@ -1,13 +1,16 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.parameterInfo
 
 import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCase
 import org.jetbrains.kotlin.idea.test.KotlinWithJdkAndRuntimeLightProjectDescriptor
+import org.jetbrains.kotlin.test.JUnit3WithIdeaConfigurationRunner
+import org.junit.runner.RunWith
 
+@RunWith(JUnit3WithIdeaConfigurationRunner::class)
 class InlayTypeHintsTest : KotlinLightCodeInsightFixtureTestCase() {
     override fun getProjectDescriptor() = KotlinWithJdkAndRuntimeLightProjectDescriptor.INSTANCE
 
@@ -21,9 +24,10 @@ class InlayTypeHintsTest : KotlinLightCodeInsightFixtureTestCase() {
         check(text)
     }
 
-    private fun checkLocalVariable(text: String) = check(text, HintType.LOCAL_VARIABLE_HINT)
-    private fun checkPropertyHint(text: String) = check(text, HintType.PROPERTY_HINT)
+    private fun checkLocalVariable(text: String) = check(text.trimIndent(), HintType.LOCAL_VARIABLE_HINT)
+    private fun checkPropertyHint(text: String) = check(text.trimIndent(), HintType.PROPERTY_HINT)
     private fun checkFunctionHint(text: String) = check(text, HintType.FUNCTION_HINT)
+    private fun checkParameterTypeHint(text: String) = check(text, HintType.PARAMETER_TYPE_HINT)
 
     fun testLocalVariableType() {
         checkLocalVariable("""fun foo() { val a<hint text=": List<String>" /> = listOf("a") }""")
@@ -31,6 +35,31 @@ class InlayTypeHintsTest : KotlinLightCodeInsightFixtureTestCase() {
 
     fun testDestructuringType() {
         checkLocalVariable("""fun foo() { val (i<hint text=": Int" />, s<hint text=": String" />) = 1 to "" }""")
+    }
+
+    fun testQualifiedReferences() {
+        checkLocalVariable(
+            """
+            package p
+            class A {
+                class B {
+                    class C {
+                        class D
+                    }
+                }
+                inner class E
+                enum class F { enumCase }
+            }
+            fun foo() {
+                val v1 = A.B.C.D()
+                val v2 = p.A.B.C.D()
+                val v3<hint text=": A.E"/> = A().E()
+                val v4 = p.A.F.enumCase
+                val v5 = A.F.enumCase
+                val v6 = p.A()
+            }
+        """
+        )
     }
 
     fun testPropertyType() {
@@ -94,7 +123,77 @@ class InlayTypeHintsTest : KotlinLightCodeInsightFixtureTestCase() {
                     val x: Int = 0
                 }
             }
-            """.trimIndent()
+            """
+        )
+    }
+
+    fun testEnumEntry() {
+        checkPropertyHint(
+            """
+            enum class E { ENTRY }
+            val test = E.ENTRY
+            """
+        )
+    }
+
+    fun testEnumEntryLikeProperty() {
+        checkPropertyHint(
+            """
+            enum class E {
+                ENTRY;
+                companion object {
+                    val test: E = ENTRY
+                }
+            }
+
+            val test<hint text=": E"/> = E.test
+            """
+        )
+    }
+
+    fun testEnumEntryLikeFunction() {
+        checkPropertyHint(
+            """
+            enum class E { ENTRY;
+                companion object {
+                    fun test(): E = ENTRY
+                }
+            }
+
+            val test<hint text=": E"/> = E.test()
+            """
+        )
+    }
+
+    fun testImportedEnumEntry() {
+        checkPropertyHint(
+            """
+            import E.ENTRY
+            enum class E { ENTRY }
+            val test<hint text=": E"/> = ENTRY
+            """
+        )
+    }
+
+    fun testEnumEntryCompanion() {
+        checkPropertyHint(
+            """
+            enum class E {
+                ENTRY;
+                companion object {}
+            }
+            val test<hint text=": E"/> = E.Companion
+            """
+        )
+    }
+
+    fun testEnumEntryQualified() {
+        checkPropertyHint(
+            """
+            package a
+            enum class E { ENTRY }
+            val test = a.E.ENTRY
+            """
         )
     }
 
@@ -108,7 +207,7 @@ class InlayTypeHintsTest : KotlinLightCodeInsightFixtureTestCase() {
             fun x() :Triple<String, String,String> {
                 return Triple(<hint text="first:" />"A", <hint text="second:" />"B", <hint text="third:" />"C")
             }
-            """.trimIndent()
+            """
         )
     }
 
@@ -139,7 +238,7 @@ class InlayTypeHintsTest : KotlinLightCodeInsightFixtureTestCase() {
                 }
             }
             val inA<hint text=": A.InA"/> = A.provideInA()
-            """.trimIndent()
+            """
         )
     }
 
@@ -153,7 +252,53 @@ class InlayTypeHintsTest : KotlinLightCodeInsightFixtureTestCase() {
                 }
             }
             val inA<hint text=": A.N.InA"/> = A.provideInA()
-            """.trimIndent()
+            """
+        )
+    }
+
+    fun testUnitLocalVariable() {
+        checkLocalVariable(
+            """
+            fun foo() {
+                val x =
+
+                println("Foo")
+            }
+            """
+        )
+    }
+
+    fun testUnitLocalVariable2() {
+        checkLocalVariable(
+            """
+            fun foo() {
+                val x<hint text=": Unit"/> =
+                    println("Foo")
+            }
+            """
+        )
+    }
+
+    fun testUnitLocalVariable3() {
+        checkLocalVariable(
+            """
+            fun foo() {
+                val x<hint text=": Unit"/> = println("Foo")
+            }
+            """
+        )
+    }
+
+    fun testParameterType() {
+        checkParameterTypeHint(
+            """
+            fun <T> T.wrap(lambda: (T) -> T) {}
+            fun foo() {
+                12.wrap { elem<hint text=": Int"/> ->
+                    elem
+                }
+            }
+            """
         )
     }
 }

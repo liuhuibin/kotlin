@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.run.script.standalone
@@ -24,8 +13,6 @@ import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.util.JavaParametersUtil
 import com.intellij.execution.util.ProgramParametersUtil
 import com.intellij.ide.projectView.impl.ProjectRootsUtil
-import com.intellij.openapi.compiler.CompilerPaths
-import com.intellij.openapi.compiler.ex.CompilerPathsEx
 import com.intellij.openapi.components.PathMacroManager
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleUtilCore
@@ -40,7 +27,8 @@ import com.intellij.psi.PsiElement
 import com.intellij.refactoring.listeners.RefactoringElementAdapter
 import com.intellij.refactoring.listeners.RefactoringElementListener
 import org.jdom.Element
-import org.jetbrains.kotlin.idea.core.script.ScriptDependenciesManager
+import org.jetbrains.kotlin.idea.core.script.ScriptConfigurationManager
+import org.jetbrains.kotlin.idea.run.JavaRunConfigurationExtensionManagerUtil
 import org.jetbrains.kotlin.idea.run.KotlinRunConfiguration
 import org.jetbrains.kotlin.idea.run.script.standalone.KotlinStandaloneScriptRunConfigurationProducer.Companion.pathFromPsiElement
 import org.jetbrains.kotlin.idea.util.ProjectRootsUtil.isProjectSourceFile
@@ -50,24 +38,32 @@ import java.io.File
 import java.util.*
 
 class KotlinStandaloneScriptRunConfiguration(
-        project: Project,
-        factory: ConfigurationFactory,
-        name: String?
-) : KotlinRunConfiguration(name, JavaRunConfigurationModule(project, true), factory), CommonJavaRunConfigurationParameters, RefactoringListenerProvider {
+    project: Project,
+    factory: ConfigurationFactory,
+    name: String?
+) : KotlinRunConfiguration(name, JavaRunConfigurationModule(project, true), factory), CommonJavaRunConfigurationParameters,
+    RefactoringListenerProvider {
     @JvmField
     var filePath: String? = null
+
     @JvmField
     var vmParameters: String? = null
+
     @JvmField
     var alternativeJrePath: String? = null
+
     @JvmField
     var programParameters: String? = null
+
     @JvmField
     var envs: MutableMap<String, String> = LinkedHashMap()
+
     @JvmField
     var passParentEnvs: Boolean = true
+
     @JvmField
     var workingDirectory: String? = null
+
     @JvmField
     var isAlternativeJrePathEnabled: Boolean = false
 
@@ -106,20 +102,24 @@ class KotlinStandaloneScriptRunConfiguration(
         isAlternativeJrePathEnabled = enabled
     }
 
-    override fun getState(executor: Executor, environment: ExecutionEnvironment): RunProfileState = ScriptCommandLineState(environment, this)
+    override fun getState(executor: Executor, environment: ExecutionEnvironment): RunProfileState =
+        ScriptCommandLineState(environment, this)
 
     override fun suggestedName() = filePath?.substringAfterLast('/')
 
     override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> {
         val group = SettingsEditorGroup<KotlinStandaloneScriptRunConfiguration>()
-        group.addEditor(ExecutionBundle.message("run.configuration.configuration.tab.title"), KotlinStandaloneScriptRunConfigurationEditor(project))
-        JavaRunConfigurationExtensionManager.getInstance().appendEditors(this, group)
+        group.addEditor(
+            ExecutionBundle.message("run.configuration.configuration.tab.title"),
+            KotlinStandaloneScriptRunConfigurationEditor(project)
+        )
+        JavaRunConfigurationExtensionManagerUtil.getInstance().appendEditors(this, group)
         return group
     }
 
     override fun writeExternal(element: Element) {
         super.writeExternal(element)
-        JavaRunConfigurationExtensionManager.getInstance().writeExternal(this, element)
+        JavaRunConfigurationExtensionManagerUtil.getInstance().writeExternal(this, element)
         DefaultJDOMExternalizer.writeExternal(this, element)
         EnvironmentVariablesComponent.writeExternal(element, getEnvs())
         PathMacroManager.getInstance(project).collapsePathsRecursively(element)
@@ -128,7 +128,7 @@ class KotlinStandaloneScriptRunConfiguration(
     override fun readExternal(element: Element) {
         PathMacroManager.getInstance(project).expandPaths(element)
         super.readExternal(element)
-        JavaRunConfigurationExtensionManager.getInstance().readExternal(this, element)
+        JavaRunConfigurationExtensionManagerUtil.getInstance().readExternal(this, element)
         DefaultJDOMExternalizer.readExternal(this, element)
         EnvironmentVariablesComponent.readExternal(element, getEnvs())
     }
@@ -194,20 +194,20 @@ class KotlinStandaloneScriptRunConfiguration(
 }
 
 private class ScriptCommandLineState(
-        environment: ExecutionEnvironment,
-        configuration: KotlinStandaloneScriptRunConfiguration) :
-        BaseJavaApplicationCommandLineState<KotlinStandaloneScriptRunConfiguration>(environment, configuration) {
+    environment: ExecutionEnvironment,
+    configuration: KotlinStandaloneScriptRunConfiguration
+) : BaseJavaApplicationCommandLineState<KotlinStandaloneScriptRunConfiguration>(environment, configuration) {
 
     override fun createJavaParameters(): JavaParameters? {
         val params = commonParameters()
 
         val filePath = configuration.filePath ?: throw CantRunException("Script file was not specified")
-        val scriptVFile = LocalFileSystem.getInstance().findFileByIoFile(File(filePath)) ?:
-                          throw CantRunException("Script file was not found in project")
+        val scriptVFile =
+            LocalFileSystem.getInstance().findFileByIoFile(File(filePath)) ?: throw CantRunException("Script file was not found in project")
 
         params.classPath.add(PathUtil.kotlinPathsForIdeaPlugin.compilerPath)
 
-        val scriptClasspath = ScriptDependenciesManager.getInstance(environment.project).getScriptClasspath(scriptVFile)
+        val scriptClasspath = ScriptConfigurationManager.getInstance(environment.project).getScriptClasspath(scriptVFile)
         scriptClasspath.forEach {
             params.classPath.add(it.presentableUrl)
         }
@@ -220,7 +220,7 @@ private class ScriptCommandLineState(
 
         val module = scriptVFile.module(environment.project)
         if (module != null) {
-            val orderEnumerator = OrderEnumerator.orderEntries(module).recursively().let {
+            val orderEnumerator = OrderEnumerator.orderEntries(module).withoutSdk().recursively().let {
                 if (!ProjectRootsUtil.isInTestSource(scriptVFile, environment.project)) it.productionOnly() else it
             }
 

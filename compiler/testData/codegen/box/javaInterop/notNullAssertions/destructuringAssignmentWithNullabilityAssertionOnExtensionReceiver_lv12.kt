@@ -1,7 +1,8 @@
+// IGNORE_BACKEND_FIR: JVM_IR
 // TARGET_BACKEND: JVM
 // WITH_RUNTIME
-// FILE: test.kt
-// LANGUAGE_VERSION: 1.2
+// FILE: destructuringAssignmentWithNullabilityAssertionOnExtensionReceiver_lv12.kt
+
 import kotlin.test.*
 
 var component1Evaluated = false

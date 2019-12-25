@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.integration;
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.integration;
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.runner.RunWith;
 
@@ -22,7 +21,7 @@ import java.util.regex.Pattern;
 @RunWith(JUnit3RunnerWithInners.class)
 public class AntTaskTestGenerated extends AbstractAntTaskTest {
     private void runTest(String testDataFilePath) throws Exception {
-        KotlinTestUtils.runTest(this::doTest, TargetBackend.ANY, testDataFilePath);
+        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
 
     @TestMetadata("additionalArguments")
@@ -31,7 +30,7 @@ public class AntTaskTestGenerated extends AbstractAntTaskTest {
     }
 
     public void testAllFilesPresentInJvm() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/integration/ant/jvm"), Pattern.compile("^([^\\.]+)$"), TargetBackend.ANY, false);
+        KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/integration/ant/jvm"), Pattern.compile("^([^\\.]+)$"), null, false);
     }
 
     @TestMetadata("doNotFailOnError")
@@ -107,11 +106,6 @@ public class AntTaskTestGenerated extends AbstractAntTaskTest {
     @TestMetadata("stdlibForJavacWithNoKotlin")
     public void testStdlibForJavacWithNoKotlin() throws Exception {
         runTest("compiler/testData/integration/ant/jvm/stdlibForJavacWithNoKotlin/");
-    }
-
-    @TestMetadata("stdlibJre78AndStdlibJdk78")
-    public void testStdlibJre78AndStdlibJdk78() throws Exception {
-        runTest("compiler/testData/integration/ant/jvm/stdlibJre78AndStdlibJdk78/");
     }
 
     @TestMetadata("suppressWarnings")

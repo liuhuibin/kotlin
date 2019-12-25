@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2017 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.caches.lightClasses
@@ -19,6 +8,7 @@ package org.jetbrains.kotlin.idea.caches.lightClasses
 import com.intellij.ide.highlighter.JavaFileType
 import com.intellij.openapi.project.Project
 import com.intellij.psi.*
+import com.intellij.psi.impl.PsiClassImplUtil
 import com.intellij.psi.impl.light.AbstractLightClass
 import com.intellij.psi.impl.light.LightMethod
 import com.intellij.util.IncorrectOperationException
@@ -52,7 +42,7 @@ class KtFakeLightClass(override val kotlinOrigin: KtClassOrObject) :
 
     override fun getQualifiedName() = kotlinOrigin.fqName?.asString()
     override fun getContainingClass() = _containingClass
-    override fun getNavigationElement() = kotlinOrigin
+    override fun getNavigationElement() = kotlinOrigin.navigationElement
     override fun getIcon(flags: Int) = kotlinOrigin.getIcon(flags)
     override fun getContainingFile() = kotlinOrigin.containingFile
     override fun getUseScope() = kotlinOrigin.useScope
@@ -68,6 +58,8 @@ class KtFakeLightClass(override val kotlinOrigin: KtClassOrObject) :
         else
             DescriptorUtils.isDirectSubclass(thisDescriptor, baseDescriptor)
     }
+
+    override fun isEquivalentTo(another: PsiElement?): Boolean = PsiClassImplUtil.isClassEquivalentTo(this, another)
 }
 
 class KtFakeLightMethod private constructor(
@@ -105,10 +97,10 @@ private object DummyJavaPsiFactory {
         val canonicalText = GenericsUtil.getVariableTypeByExpressionType(returnType).getCanonicalText(true)
         val file = createDummyJavaFile(project, "class _Dummy_ { public $canonicalText $name() {\n} }")
         val klass = file.classes.singleOrNull()
-                ?: throw IncorrectOperationException("Class was not created. Method name: $name; return type: $canonicalText")
+            ?: throw IncorrectOperationException("Class was not created. Method name: $name; return type: $canonicalText")
 
         return klass.methods.singleOrNull()
-                ?: throw IncorrectOperationException("Method was not created. Method name: $name; return type: $canonicalText")
+            ?: throw IncorrectOperationException("Method was not created. Method name: $name; return type: $canonicalText")
     }
 
     fun createDummyClass(project: Project): PsiClass = PsiElementFactory.SERVICE.getInstance(project).createClass("dummy")
